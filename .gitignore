@@ -1,0 +1,43 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# testing
+/coverage
+
+# env — never committed (real secrets, plus a filled-in example invites leaks)
+.env
+.env.*
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# drizzle
+# NOTE: drizzle/meta (journal + snapshots) MUST be committed — without it
+# `drizzle-kit generate` re-emits 0000_* from scratch and drift goes unnoticed.
+/drizzle/*.sql.bak
+
+# editor
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+
+# local agent tooling (third-party skill bundles, 40MB) — not part of the app
+.claude/
+.agents/

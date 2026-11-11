@@ -1,0 +1,9 @@
+.next
+out
+build
+coverage
+node_modules
+drizzle/meta
+.claude
+.agents
+package-lock.json
