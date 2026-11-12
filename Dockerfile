@@ -13,9 +13,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # ── deps ─────────────────────────────────────────────────────────────
 # Full install, cached on the manifests alone.
+#
+# Lifecycle scripts are off. `redis-memory-server` (a devDependency for the
+# tests) builds Redis from source in its postinstall, and this image has no
+# toolchain by design. It is never loaded at run time: the worker talks to the
+# server in compose.yaml, not to an in-memory one. Turning every script off is
+# simpler than an allow-list and leaves the image without a compiler it would
+# otherwise quietly need.
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 
 # ── build ────────────────────────────────────────────────────────────

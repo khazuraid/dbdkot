@@ -59,6 +59,9 @@ const nextConfig: NextConfig = {
     images: {
         remotePatterns: [],
     },
+    // The container runs `node server.js` from a traced bundle; without this
+    // `next build` writes only `.next/`, and the Dockerfile has nothing to copy.
+    output: 'standalone',
     async headers() {
         return [
             {
