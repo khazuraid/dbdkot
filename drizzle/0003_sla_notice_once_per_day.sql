@@ -1,1 +1,1 @@
-CREATE UNIQUE INDEX "notifications_sla_once_per_day" ON "notifications" USING btree ("user_id","entity_id","type",date_trunc('day', "created_at")) WHERE "notifications"."type" = 'SLA_BREACH';
+CREATE UNIQUE INDEX "notifications_sla_once_per_day" ON "notifications" USING btree ("user_id","entity_id","type",date_trunc('day', "created_at" AT TIME ZONE 'Asia/Jakarta')) WHERE "notifications"."type" = 'SLA_BREACH';

@@ -10,6 +10,9 @@ import { formatNumber } from '@/lib/format';
 import { PageBody, PageHeader } from '@/components/shell/page';
 import { LiveData } from '@/components/shell/live-data';
 import { ReportTable } from '@/components/reports/report-table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -60,12 +63,12 @@ export default async function LaporanPage({
                 action="/laporan"
             >
                 <div className="space-y-1.5">
-                    <label
+                    <Label
                         htmlFor="status"
                         className="text-[12px] font-medium text-muted-foreground"
                     >
                         Status
-                    </label>
+                    </Label>
                     <select
                         id="status"
                         name="status"
@@ -82,27 +85,24 @@ export default async function LaporanPage({
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-1.5 sm:flex-none">
-                    <label
+                    <Label
                         htmlFor="search"
                         className="text-[12px] font-medium text-muted-foreground"
                     >
                         Cari
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                         id="search"
                         name="search"
                         defaultValue={search ?? ''}
                         placeholder="No. laporan atau kelurahan"
-                        className="h-9 w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-card px-3 text-[14px] sm:w-64"
+                        className="h-9 w-full sm:w-64"
                     />
                 </div>
 
-                <button
-                    type="submit"
-                    className="h-9 rounded-[var(--radius-control)] border border-[var(--control)] px-3 text-[14px] transition-colors hover:bg-[var(--raised)]"
-                >
+                <Button type="submit" variant="outline" className="h-9 px-3">
                     Terapkan
-                </button>
+                </Button>
 
                 {(status || search) && (
                     <Link

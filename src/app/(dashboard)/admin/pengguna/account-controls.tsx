@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ROLES, type Role } from '@/lib/roles';
 import { ROLE_LABEL } from '@/lib/nav';
+import { Button } from '@/components/ui/button';
 import {
     approveAccountAction,
     rejectAccountAction,
@@ -66,23 +67,22 @@ export function ApprovalRow({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
+                    <Button
                         type="button"
                         onClick={() => setOpen((v) => !v)}
                         aria-expanded={open}
-                        className="h-8 rounded-[var(--radius-control)] bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                     >
                         {open ? 'Tutup' : 'Tinjau'}
-                    </button>
+                    </Button>
                     <form action={reject}>
                         <input type="hidden" name="userId" value={userId} />
-                        <button
+                        <Button
                             type="submit"
+                            variant="outline"
                             disabled={rejecting}
-                            className="h-8 rounded-[var(--radius-control)] border border-border px-3 text-[13px] transition-colors hover:bg-[var(--raised)] disabled:opacity-60"
                         >
                             Tolak
-                        </button>
+                        </Button>
                     </form>
                 </div>
             </div>
@@ -142,13 +142,9 @@ export function ApprovalRow({
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={pending}
-                        className="h-9 rounded-[var(--radius-control)] bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
+                    <Button type="submit" disabled={pending}>
                         {pending ? 'Menyimpan…' : 'Setujui'}
-                    </button>
+                    </Button>
 
                     {options.length === 0 && kind && (
                         <p className="text-[12px] text-[var(--warning)] sm:col-span-3">
@@ -199,13 +195,14 @@ export function AccountToggle({
         <form action={action}>
             <input type="hidden" name="userId" value={userId} />
             <input type="hidden" name="isActive" value={String(!isActive)} />
-            <button
+            <Button
                 type="submit"
+                variant="link"
+               
                 disabled={pending}
-                className="text-[13px] underline decoration-[var(--control)] underline-offset-2 transition-colors hover:decoration-[var(--text)] disabled:opacity-60"
             >
                 {isActive ? 'Nonaktifkan' : 'Aktifkan'}
-            </button>
+            </Button>
         </form>
     );
 }

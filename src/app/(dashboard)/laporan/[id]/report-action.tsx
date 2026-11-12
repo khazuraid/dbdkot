@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { reportAction } from './actions';
 import type { Transition } from '@/lib/domain/report-detail';
+import { Button } from '@/components/ui/button';
 
 const MESSAGE: Record<string, string> = {
     NOT_FOUND: 'Laporan tidak ditemukan.',
@@ -26,8 +27,10 @@ export function ReportAction({
 
     return (
         <div className="flex flex-col items-end gap-1">
-            <button
+            <Button
                 type="button"
+                variant={primary ? 'default' : 'outline'}
+                className="h-9 px-3"
                 disabled={pending}
                 onClick={() =>
                     start(async () => {
@@ -44,14 +47,9 @@ export function ReportAction({
                         }
                     })
                 }
-                className={
-                    primary
-                        ? 'h-9 rounded-md bg-primary px-3 text-[14px] font-medium text-primary-foreground disabled:opacity-50'
-                        : 'border-control h-9 rounded-md border px-3 text-[14px] hover:bg-[var(--raised)] disabled:opacity-50'
-                }
             >
                 {pending ? 'Memproses…' : label}
-            </button>
+            </Button>
             {error && (
                 <span className="text-[12px] text-[var(--negative)]">
                     {error}

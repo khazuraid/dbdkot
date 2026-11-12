@@ -528,7 +528,10 @@ export const notifications = pgTable(
                 t.userId,
                 t.entityId,
                 t.type,
-                sql`date_trunc('day', ${t.createdAt})`,
+                // The zone is pinned: `date_trunc` on a timestamptz reads the
+                // session timezone, so it is not IMMUTABLE and Postgres refuses
+                // it in an index until the value no longer depends on the session.
+                sql`date_trunc('day', ${t.createdAt} AT TIME ZONE 'Asia/Jakarta')`,
             )
             .where(sql`${t.type} = 'SLA_BREACH'`),
     ],

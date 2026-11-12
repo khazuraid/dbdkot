@@ -1953,7 +1953,7 @@
               "nulls": "last"
             },
             {
-              "expression": "date_trunc('day', \"created_at\")",
+              "expression": "date_trunc('day', \"created_at\" AT TIME ZONE 'Asia/Jakarta')",
               "asc": true,
               "isExpression": true,
               "nulls": "last"

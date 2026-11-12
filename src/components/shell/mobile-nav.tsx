@@ -8,6 +8,7 @@ import { NAV, ROLE_LABEL } from '@/lib/nav';
 import { NAV_ICON } from '@/lib/nav-icons';
 import type { Role } from '@/lib/roles';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { UserMenu } from './user-menu';
 
 function isActive(pathname: string, href: string) {
@@ -39,15 +40,17 @@ export function MobileNav({
     return (
         <div className="md:hidden">
             <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-[var(--ground)] px-4">
-                <button
+                <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-lg"
                     onClick={() => setOpen(true)}
                     aria-label="Buka navigasi"
                     aria-expanded={open}
-                    className="-ml-2 grid size-9 place-items-center rounded-[var(--radius-control)] text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground"
+                    className="-ml-2 text-muted-foreground"
                 >
                     <Menu className="size-5" strokeWidth={1.5} />
-                </button>
+                </Button>
                 <span className="text-[14px] font-medium">WALI-EPI</span>
             </header>
 
@@ -67,14 +70,16 @@ export function MobileNav({
                             <span className="text-[14px] font-medium">
                                 WALI-EPI
                             </span>
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon-lg"
                                 onClick={() => setOpen(false)}
                                 aria-label="Tutup navigasi"
-                                className="grid size-9 place-items-center rounded-[var(--radius-control)] text-muted-foreground hover:bg-[var(--raised)]"
+                                className="text-muted-foreground"
                             >
                                 <X className="size-5" strokeWidth={1.5} />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="flex items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground">

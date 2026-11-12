@@ -17,6 +17,10 @@ import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { createReportSchema } from '@/lib/domain/form-contracts';
 import { DateField } from '@/components/ui/date-field';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { submitReport } from './actions';
 
 // Derived from the schema, not restated: `z.coerce.number()` takes `unknown`
@@ -218,10 +222,10 @@ export function ReportForm() {
                     <FieldError message={errors.phoneNumber?.message} />
                 </div>
                 <Field label="Diagnosis" wide error={errors.diagnosis?.message}>
-                    <textarea
+                    <Textarea
                         {...register('diagnosis')}
                         rows={2}
-                        className={`${CONTROL} h-auto py-2`}
+                        className="mt-1 py-2"
                     />
                 </Field>
             </Section>
@@ -236,13 +240,9 @@ export function ReportForm() {
             )}
 
             <div className="mt-6 flex items-center gap-3">
-                <button
-                    type="submit"
-                    disabled={submitting}
-                    className="h-9 rounded-md bg-primary px-3 text-[14px] font-medium text-primary-foreground disabled:opacity-50"
-                >
+                <Button type="submit" className="h-9 px-3" disabled={submitting}>
                     {submitting ? 'Menyimpan…' : 'Kirim laporan'}
-                </button>
+                </Button>
                 <Link href="/laporan" className="text-[14px] underline">
                     Batal
                 </Link>
@@ -251,8 +251,7 @@ export function ReportForm() {
     );
 }
 
-const CONTROL =
-    'mt-1 h-9 w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-card px-3 text-[14px]';
+const CONTROL = 'mt-1 h-9';
 
 /** A real fieldset: a legend outside one is not a group label at all. */
 function Section({
@@ -287,11 +286,11 @@ function Field({
 
     return (
         <div className={wide ? 'sm:col-span-2' : undefined}>
-            <label htmlFor={id} className="text-[13px] font-medium">
+            <Label htmlFor={id} className="text-[13px] font-medium">
                 {label}
-            </label>
+            </Label>
             {children ?? (
-                <input
+                <Input
                     id={id}
                     className={CONTROL}
                     aria-invalid={error ? true : undefined}
@@ -384,6 +383,7 @@ function FieldError({ id, message }: { id?: string; message?: string }) {
     return (
         <span
             id={id}
+            role="alert"
             className="mt-1 block text-[12px] text-[var(--negative)]"
         >
             {message}

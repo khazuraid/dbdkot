@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { APIError } from 'better-auth';
 
 /**
  * Creates the first administrator. Run with `npm run db:seed-admin`.
@@ -86,8 +87,14 @@ async function main() {
     // The public route is open now, but every account it creates lands PENDING
     // and inactive (see the user-create hook in lib/auth.ts). This call is not
     // a request from the public, so the seed clears that state right after.
-    await auth.api.signUpEmail({
-        body: { name, email, password },
+    //
+    // Sign-up writes the user row and then mints a session, and the session
+    // hook refuses one for a PENDING account — so the FORBIDDEN it raises here
+    // is the approval gate working, not a failure to create the account. The
+    // row is already there by the time it is thrown; the update below is what
+    // makes the account usable.
+    await auth.api.signUpEmail({ body: { name, email, password } }).catch((error) => {
+        if (!(error instanceof APIError) || error.status !== 'FORBIDDEN') throw error;
     });
 
     const [created] = await db

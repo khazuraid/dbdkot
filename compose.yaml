@@ -17,7 +17,9 @@ services:
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wali_epi_password}
             POSTGRES_DB: ${POSTGRES_DB:-wali_epi_db}
         volumes:
-            - pgdata:/var/lib/postgresql/data
+            # 18+ expects the mount at /var/lib/postgresql; the image puts the
+            # cluster in a versioned subdirectory so pg_upgrade can work.
+            - pgdata:/var/lib/postgresql
         ports:
             # Bound to loopback: the database is for this host, not the network.
             - '127.0.0.1:5432:5432'
