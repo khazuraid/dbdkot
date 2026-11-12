@@ -50,10 +50,22 @@ BETTER_AUTH_SECRET=      # node -e "console.log(require('crypto').randomBytes(32
 BETTER_AUTH_URL=http://localhost:3000
 PII_ENCRYPTION_KEY=      # openssl rand -base64 32   (harus tepat 32 byte)
 PII_HASH_KEY=            # openssl rand -hex 32
+REDIS_URL=redis://localhost:6379
+WORKER_CONCURRENCY=5     # opsional, default 5
 ```
 
 `PII_ENCRYPTION_KEY` dan `PII_HASH_KEY` mengenkripsi NIK/nama/alamat pasien dan mencari NIK lewat
 hash. **Menggantinya membuat data PII lama tidak terbaca** — simpan di secret manager, jangan di repo.
+
+Worker terpisah (penugasan laporan, SLA 4 hari, notifikasi, export):
+
+```bash
+npm run worker       # produksi
+npm run worker:dev   # tsx watch
+```
+
+Tanpa worker, laporan tetap tersimpan tetapi tidak ditugaskan otomatis; pekerjaan menumpuk di Redis.
+Tanpa `REDIS_URL` aplikasi tetap jalan — `createReport` mencatat kegagalan enqueue ke log.
 
 ## Struktur
 

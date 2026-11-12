@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { headers } from 'next/headers';
 import { auth } from './auth';
 import type { Role } from './roles';
@@ -13,8 +14,14 @@ export type Actor = {
  * Resolves the caller from the better-auth session. Roles are read from the
  * database, never from a request header — the legacy `ProxyAuthGuard` trusted
  * `x-user-id`/`x-user-email`, which let anyone act as any user (C3).
+ *
+ * Deliberately renders per request: patient data must never come from a
+ * prerendered or cached shell, so every screen that calls this calls
+ * `connection()` and is dynamic by fact rather than by config flag.
  */
 export async function requireActor(): Promise<Actor> {
+    await connection();
+
     const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session?.user) {
@@ -60,7 +67,10 @@ export function scopeToInstitution(actor: Actor): string | null {
     }
 
     if (!actor.institutionId) {
-        throw new Error('FORBIDDEN');
+        // A staff account detached from its institution has no data to see.
+        // Callers that can recover (a page) turn this into a 403; without the
+        // explicit code it would surface as a bare 500 on every screen.
+        throw new Error('NO_INSTITUTION');
     }
 
     return actor.institutionId;

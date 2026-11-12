@@ -36,8 +36,11 @@ type AuditInput = {
  * zero callers, so the audit trail was permanently empty. Every mutation and
  * every PII read must go through this.
  *
- * Intentionally non-throwing: losing an audit row must not abort the business
- * operation, but it is logged loudly so it cannot pass silently.
+ * Intentionally non-throwing: a failed audit write must not abort a business
+ * operation the user already triggered. But it must not vanish either — the
+ * whole point of C9 was a trail nobody could tell was missing — so the entry
+ * is always emitted to stderr as a structured line, which is what a log
+ * collector or the deploy's log store can still recover.
  */
 export async function audit(input: AuditInput): Promise<void> {
     try {
@@ -53,11 +56,22 @@ export async function audit(input: AuditInput): Promise<void> {
                 userAgent: input.userAgent ?? null,
             });
     } catch (error) {
-        console.error('[audit] failed to persist audit entry', {
-            action: input.action,
-            entityType: input.entityType,
-            entityId: input.entityId,
-            error,
-        });
+        console.error(
+            JSON.stringify({
+                level: 'error',
+                msg: 'audit write failed',
+                persisted: false,
+                audit: {
+                    userId: input.actor.userId,
+                    role: input.actor.role,
+                    action: input.action,
+                    entityType: input.entityType,
+                    entityId: input.entityId,
+                    changes: input.changes ?? null,
+                },
+                error: error instanceof Error ? error.message : String(error),
+                at: new Date().toISOString(),
+            }),
+        );
     }
 }

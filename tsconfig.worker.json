@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "noEmit": true,
+        "jsx": "react-jsx",
+        "types": ["node"],
+        "paths": {
+            "@/*": ["./src/*"]
+        }
+    },
+    "include": ["src/worker/**/*.ts", "src/lib/**/*.ts", "src/db/**/*.ts"],
+    "exclude": ["node_modules", ".next", "**/*.test.ts"]
+}

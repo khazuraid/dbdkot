@@ -3,6 +3,7 @@ import {
     boolean,
     doublePrecision,
     index,
+    uniqueIndex,
     integer,
     jsonb,
     numeric,
@@ -242,7 +243,11 @@ export const reportsRS = pgTable(
         patientAge: integer('patient_age').notNull(),
         patientGender: gender('patient_gender').notNull(),
         caseType: caseType('case_type').notNull(),
-        phoneNumber: text('phone_number'),
+        // Ciphertext like the other patient identifiers: this is a contact
+        // number for a named dengue patient, and it was the one PII column
+        // still sitting in the clear (renamed so no plaintext value can be
+        // mistaken for encrypted after the migration).
+        phoneNumberEncrypted: text('phone_number_encrypted'),
         initialDiagnosis: text('initial_diagnosis'),
         finalDiagnosis: text('final_diagnosis'),
         symptomOnsetDate: timestamp('symptom_onset_date', {
@@ -499,6 +504,17 @@ export const notifications = pgTable(
     (t) => [
         index('notifications_user_idx').on(t.userId),
         index('notifications_is_read_idx').on(t.isRead),
+        // One SLA breach notice per report per user per day. Declared here so
+        // `generate` sees it; the worker relies on it to dedupe safely under
+        // concurrency instead of a check-then-insert.
+        uniqueIndex('notifications_sla_once_per_day')
+            .on(
+                t.userId,
+                t.entityId,
+                t.type,
+                sql`date_trunc('day', ${t.createdAt})`,
+            )
+            .where(sql`${t.type} = 'SLA_BREACH'`),
     ],
 );
 

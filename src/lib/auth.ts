@@ -10,10 +10,27 @@ export const auth = betterAuth({
         provider: 'pg',
         schema: { user, session, account, verification },
     }),
+    // The app has no self-registration screen: an administrator creates every
+    // account. Leaving sign-up reachable meant anyone could POST
+    // /api/auth/sign-up/email and mint a live session in a PUSKESMAS tenant.
     emailAndPassword: {
         enabled: true,
+        disableSignUp: true,
         minPasswordLength: 10,
         requireEmailVerification: false,
+    },
+    // Rejects cross-site POSTs with a valid-looking Origin; the cookie is
+    // SameSite anyway, but auth endpoints are the one place worth both.
+    trustedOrigins: [process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'],
+    rateLimit: {
+        enabled: true,
+        window: 60,
+        max: 20,
+        customRules: {
+            // Credential stuffing: sign-in gets a much tighter budget than
+            // the read endpoints a page refresh hits.
+            '/sign-in/email': { window: 60, max: 5 },
+        },
     },
     user: {
         additionalFields: {

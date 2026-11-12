@@ -1446,12 +1446,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "phone_number": {
-          "name": "phone_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "phone": {
           "name": "phone",
           "type": "text",
@@ -1497,6 +1491,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2621,12 +2621,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "phone_number": {
-          "name": "phone_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "initial_diagnosis": {
           "name": "initial_diagnosis",
           "type": "text",
@@ -2832,6 +2826,12 @@
         "rejected_by": {
           "name": "rejected_by",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }

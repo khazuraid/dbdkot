@@ -15,6 +15,20 @@
       "when": 1794376043931,
       "tag": "0001_romantic_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794402676997,
+      "tag": "0002_encrypt_patient_phone",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794404416225,
+      "tag": "0003_sla_notice_once_per_day",
+      "breakpoints": true
     }
   ]
 }

@@ -50,5 +50,11 @@ jobs:
       - name: Tests
         run: npm run test
 
+      # Schema drift: a column edited without a migration would otherwise be
+      # discovered only on a real database. Exits non-zero when generate would
+      # emit a new file.
+      - name: Schema matches migrations
+        run: npx drizzle-kit generate --name ci-drift-check && git diff --exit-code drizzle/
+
       - name: Build
         run: npm run build

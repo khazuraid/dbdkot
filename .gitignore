@@ -41,3 +41,4 @@ yarn-error.log*
 # local agent tooling (third-party skill bundles, 40MB) — not part of the app
 .claude/
 .agents/
+uploads/
