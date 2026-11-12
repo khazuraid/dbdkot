@@ -59,4 +59,32 @@ export const createPeSchema = z.object({
     households: z.array(householdSchema).min(1, 'Minimal satu rumah diperiksa'),
 });
 
+/**
+ * A PUSKESMAS or RUMAH_SAKIT account without an institution could never be
+ * tenant-scoped, so it would read every institution's reports. Refuse it here
+ * so the form shows the error before the server ever inserts a row.
+ */
+export const needsInstitution = (role: string) =>
+    role === 'PUSKESMAS' || role === 'RUMAH_SAKIT';
+
+export const createAccountSchema = z
+    .object({
+        name: z.string().trim().min(3, 'Nama minimal 3 karakter'),
+        email: z.email('Email tidak valid').toLowerCase(),
+        password: z.string().min(10, 'Password minimal 10 karakter'),
+        role: z.enum(['ADMIN', 'DINKES', 'PUSKESMAS', 'RUMAH_SAKIT']),
+        institutionId: z.uuid().optional().or(z.literal('')),
+    })
+    .superRefine((v, ctx) => {
+        if (needsInstitution(v.role) && !v.institutionId) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['institutionId'],
+                message: 'Institusi wajib dipilih untuk peran ini',
+            });
+        }
+    });
+
+export type CreateAccountInput = z.infer<typeof createAccountSchema>;
+
 export type CreatePeInput = z.infer<typeof createPeSchema>;

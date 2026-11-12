@@ -16,7 +16,8 @@
         "db:push": "drizzle-kit push",
         "db:studio": "drizzle-kit studio",
         "worker": "tsx --tsconfig tsconfig.worker.json src/worker/index.ts",
-        "worker:dev": "tsx watch --tsconfig tsconfig.worker.json src/worker/index.ts"
+        "worker:dev": "tsx watch --tsconfig tsconfig.worker.json src/worker/index.ts",
+        "db:seed-admin": "tsx --env-file-if-exists=.env --tsconfig tsconfig.worker.json src/scripts/seed-admin.ts"
     },
     "dependencies": {
         "@hookform/resolvers": "^7.0.5",

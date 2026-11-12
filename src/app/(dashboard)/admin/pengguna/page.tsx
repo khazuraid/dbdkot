@@ -1,10 +1,22 @@
+import Link from 'next/link';
 import { requireRole } from '@/lib/session';
-import { listUsers } from '@/lib/domain/queries';
+import {
+    accountStatusLabel,
+    statusTone,
+} from '@/lib/domain/account-labels';
+import { institutionOptions, listManagedAccounts } from '@/lib/domain/accounts';
 import { formatDate } from '@/lib/format';
 import { ROLE_LABEL } from '@/lib/nav';
 import type { Role } from '@/lib/roles';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager';
+import { StatusText } from '@/components/shell/status-text';
+import { ApprovalRow, AccountToggle } from './account-controls';
+
+type AccountRow = Awaited<
+    ReturnType<typeof listManagedAccounts>
+>['rows'][number];
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -15,63 +27,114 @@ export default async function PenggunaPage({
     searchParams: Promise<{ page?: string }>;
 }) {
     const sp = await searchParams;
-    await requireRole('ADMIN');
-    const { rows, page, perPage, total } = await listUsers(readPage(sp.page));
+    const actor = await requireRole('ADMIN');
+    const [{ rows, page, perPage, total, pending }, institutions] =
+        await Promise.all([
+            listManagedAccounts(readPage(sp.page), 25),
+            institutionOptions(),
+        ]);
+
+    const queue = rows.filter((u) => u.status === 'PENDING');
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Pengguna"
-                context="Akun dibuat administrator; tidak ada pendaftaran mandiri."
+                context="Setujui pendaftaran baru, tetapkan peran, dan nonaktifkan akun."
+                action={{ href: '/admin/pengguna/baru', label: 'Tambah akun' }}
             />
+
+            {pending > 0 && (
+                <Panel
+                    title={`${pending} pendaftaran menunggu persetujuan`}
+                    aside={
+                        <span className="text-[12px] text-[var(--warning)]">
+                            Belum bisa masuk
+                        </span>
+                    }
+                >
+                    <ul className="border-t border-border">
+                        {queue.map((u) => (
+                            <ApprovalRow
+                                key={u.id}
+                                userId={u.id}
+                                name={u.name}
+                                email={u.email}
+                                institutions={institutions}
+                            />
+                        ))}
+                    </ul>
+                    {pending > queue.length && (
+                        <p className="pt-3 text-[12px] text-muted-foreground">
+                            {pending - queue.length} lainnya di halaman
+                            berikutnya.
+                        </p>
+                    )}
+                </Panel>
+            )}
+
             <Panel title={`${total} akun`}>
-                {rows.length === 0 ? (
-                    <Empty>Belum ada akun.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">Nama</th>
-                                <th className="py-2 font-normal">Email</th>
-                                <th className="py-2 font-normal">Peran</th>
-                                <th className="py-2 font-normal">Institusi</th>
-                                <th className="py-2 font-normal">Status</th>
-                                <th className="py-2 text-right font-normal">
-                                    Dibuat
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {rows.map((u) => (
-                                <tr
-                                    key={u.id}
-                                    className="h-[var(--row-height)]"
-                                >
-                                    <td className="py-2">{u.name}</td>
-                                    <td className="py-2 text-muted-foreground">
-                                        {u.email}
-                                    </td>
-                                    <td className="py-2">
-                                        {ROLE_LABEL[u.role as Role] ?? u.role}
-                                    </td>
-                                    <td className="py-2">
-                                        {u.institutionName ?? '—'}
-                                    </td>
-                                    <td className="py-2">
-                                        {u.isActive ? 'Aktif' : 'Nonaktif'}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-right text-muted-foreground"
-                                    >
-                                        {formatDate(u.createdAt)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                <DataTable<AccountRow>
+                    rows={rows}
+                    empty="Belum ada akun. Buat akun pertama lewat Tambah akun."
+                    caption="Daftar akun"
+                    columns={[
+                        { key: 'name', header: 'Nama', cell: (u) => u.name },
+                        {
+                            key: 'email',
+                            header: 'Email',
+                            cell: (u) => (
+                                <span className="text-muted-foreground">
+                                    {u.email}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'role',
+                            header: 'Peran',
+                            cell: (u) => ROLE_LABEL[u.role as Role] ?? u.role,
+                        },
+                        {
+                            key: 'inst',
+                            header: 'Institusi',
+                            cell: (u) => u.institutionName ?? <Dash />,
+                        },
+                        {
+                            key: 'status',
+                            header: 'Status',
+                            cell: (u) => (
+                                <StatusText tone={statusTone(u)}>
+                                    {accountStatusLabel(u)}
+                                </StatusText>
+                            ),
+                        },
+                        {
+                            key: 'created',
+                            header: 'Dibuat',
+                            align: 'right',
+                            cell: (u) => (
+                                <span className="whitespace-nowrap text-muted-foreground">
+                                    {formatDate(u.createdAt)}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'action',
+                            header: 'Tindakan',
+                            align: 'right',
+                            cell: (u) => (
+                                <AccountToggle
+                                    userId={u.id}
+                                    isActive={u.isActive}
+                                    status={u.status}
+                                    self={u.id === actor.userId}
+                                />
+                            ),
+                        },
+                    ]}
+                />
             </Panel>
+
             <Pager
                 info={{ page, perPage, total }}
                 label="akun"
@@ -79,6 +142,13 @@ export default async function PenggunaPage({
                     n > 1 ? `/admin/pengguna?page=${n}` : '/admin/pengguna'
                 }
             />
-        </div>
+
+            <p className="mt-6 text-[12px] text-muted-foreground">
+                Akun yang dinonaktifkan tidak bisa membuat sesi baru.{' '}
+                <Link href="/admin/audit-log" className="underline">
+                    Lihat audit log
+                </Link>
+            </p>
+        </PageBody>
     );
 }

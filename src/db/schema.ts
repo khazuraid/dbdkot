@@ -30,6 +30,16 @@ export const userRole = pgEnum('UserRole', [
     'PUSKESMAS',
     'RUMAH_SAKIT',
 ]);
+/**
+ * Account lifecycle, separate from `isActive`. `isActive` already means
+ * "disabled by an administrator"; folding "waiting for approval" into it would
+ * make the two states indistinguishable in the UI and unevaluable in the gate.
+ */
+export const accountStatus = pgEnum('AccountStatus', [
+    'PENDING',
+    'APPROVED',
+    'REJECTED',
+]);
 export const institutionType = pgEnum('InstitutionType', [
     'RUMAH_SAKIT',
     'PUSKESMAS',
@@ -161,12 +171,18 @@ export const users = pgTable(
             },
         ),
         isActive: boolean('is_active').notNull().default(true),
+        /**
+         * Existing rows predate approval and were created by an administrator,
+         * so the default is APPROVED. Public sign-up sets PENDING explicitly.
+         */
+        status: accountStatus('status').notNull().default('APPROVED'),
         createdAt: createdAt(),
         updatedAt: updatedAt(),
     },
     (t) => [
         index('users_email_idx').on(t.email),
         index('users_institution_idx').on(t.institutionId),
+        index('users_status_idx').on(t.status),
     ],
 );
 

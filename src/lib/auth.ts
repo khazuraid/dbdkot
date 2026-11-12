@@ -1,8 +1,9 @@
-import { betterAuth } from 'better-auth';
+import { betterAuth, APIError } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
+import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { account, session, user, verification } from '@/db/schema';
+import { account, session, user, users, verification } from '@/db/schema';
 import { ROLES } from './roles';
 
 export const auth = betterAuth({
@@ -15,12 +16,13 @@ export const auth = betterAuth({
         provider: 'pg',
         schema: { user, session, account, verification },
     }),
-    // The app has no self-registration screen: an administrator creates every
-    // account. Leaving sign-up reachable meant anyone could POST
-    // /api/auth/sign-up/email and mint a live session in a PUSKESMAS tenant.
+    // Self-registration is open again, but an account it creates cannot be used
+    // until an administrator approves it: `disableSignUp` used to be the only
+    // thing standing between a public POST and a live session, so the gate now
+    // lives in the database (`status = PENDING`) and in the hook below, and the
+    // sign-up path is safe to expose.
     emailAndPassword: {
         enabled: true,
-        disableSignUp: true,
         minPasswordLength: 10,
         requireEmailVerification: false,
     },
@@ -57,6 +59,14 @@ export const auth = betterAuth({
                 defaultValue: true,
                 input: false,
             },
+            status: {
+                type: ['PENDING', 'APPROVED', 'REJECTED'],
+                required: false,
+                defaultValue: 'APPROVED',
+                // Server-owned. A request that could name its own status would
+                // approve itself, which is the whole point of the approval.
+                input: false,
+            },
         },
     },
     session: {
@@ -67,6 +77,64 @@ export const auth = betterAuth({
         // IDs come from the Drizzle schema's uuid().defaultRandom(), so
         // better-auth must generate a UUID, not its default 32-char string.
         database: { generateId: 'uuid' },
+    },
+    databaseHooks: {
+        session: {
+            create: {
+                /**
+                 * The one gate every sign-in path passes through — email and
+                 * password, and any future OAuth provider added to this config.
+                 * Returning false aborts the session creation, so a PENDING or
+                 * rejected account cannot hold a cookie even for one request.
+                 * The message is the same for both states on purpose: it tells
+                 * the person what to do without confirming to a stranger which
+                 * addresses are registered.
+                 */
+                before: async (sessionData) => {
+                    const [account] = await getDb()
+                        .select({
+                            status: users.status,
+                            isActive: users.isActive,
+                        })
+                        .from(users)
+                        .where(eq(users.id, sessionData.userId))
+                        .limit(1);
+
+                    if (
+                        !account ||
+                        account.status !== 'APPROVED' ||
+                        !account.isActive
+                    ) {
+                        throw new APIError('FORBIDDEN', {
+                            message:
+                                'Akun belum disetujui administrator atau sedang dinonaktifkan. Hubungi Dinas Kesehatan.',
+                        });
+                    }
+
+                    return { data: sessionData };
+                },
+            },
+        },
+        user: {
+            create: {
+                /**
+                 * Server-owned for the same reason `role` is `input: false`:
+                 * the request must not choose whether it is approved. Anyone
+                 * who reaches the public endpoint lands as PENDING and inactive,
+                 * so a self-registered account holds no session even if the
+                 * sign-in gate were ever bypassed. better-auth's own
+                 * `/admin/create-user` and the seed script run this hook too,
+                 * so both flip it back once an administrator is the actor.
+                 */
+                before: async (created) => ({
+                    data: {
+                        ...created,
+                        status: 'PENDING',
+                        isActive: false,
+                    },
+                }),
+            },
+        },
     },
     plugins: [nextCookies()],
 });

@@ -29,6 +29,13 @@
       "when": 1794404416225,
       "tag": "0003_sla_notice_once_per_day",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794454568658,
+      "tag": "0004_account_approval",
+      "breakpoints": true
     }
   ]
 }

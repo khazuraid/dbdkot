@@ -10,6 +10,11 @@
             "@/*": ["./src/*"]
         }
     },
-    "include": ["src/worker/**/*.ts", "src/lib/**/*.ts", "src/db/**/*.ts"],
+    "include": [
+        "src/worker/**/*.ts",
+        "src/lib/**/*.ts",
+        "src/db/**/*.ts",
+        "src/scripts/**/*.ts"
+    ],
     "exclude": ["node_modules", ".next", "**/*.test.ts"]
 }
