@@ -3,6 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+} from '@/components/ui/field';
 
 /**
  * Requesting an account is only a request: the server leaves it PENDING and
@@ -65,92 +75,104 @@ export function RegisterForm() {
                     Administrator Dinas Kesehatan akan meninjau akun Anda.
                     Anda belum bisa masuk sampai akun disetujui.
                 </p>
-                <button
+                <Button
                     type="button"
                     onClick={() => router.push('/masuk')}
-                    className="mt-4 h-9 rounded-[var(--radius-control)] bg-primary px-3 text-[14px] font-medium text-primary-foreground"
+                    className="mt-4 h-10 justify-between px-3.5"
                 >
-                    Kembali ke halaman masuk
-                </button>
+                    <span>Kembali ke halaman masuk</span>
+                    <ArrowRight className="size-4" strokeWidth={1.5} />
+                </Button>
             </div>
         );
     }
 
     return (
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-            <Field
-                id="name"
-                label="Nama lengkap"
-                type="text"
-                autoComplete="name"
-                required
-            />
-            <Field
-                id="email"
-                label="Email"
-                type="email"
-                autoComplete="email"
-                required
-            />
-            <Field
-                id="password"
-                label="Password"
-                type="password"
-                autoComplete="new-password"
-                minLength={10}
-                hint="Minimal 10 karakter."
-                required
-            />
-            <Field
-                id="confirm"
-                label="Ulangi password"
-                type="password"
-                autoComplete="new-password"
-                minLength={10}
-                required
-            />
+        <form onSubmit={onSubmit} noValidate>
+            <FieldGroup className="gap-4">
+                <Field data-invalid={error ? true : undefined}>
+                    <FieldLabel htmlFor="name" className="text-[13px]">
+                        Nama lengkap
+                    </FieldLabel>
+                    <Input
+                        id="name"
+                        name="name"
+                        type="text"
+                        autoComplete="name"
+                        required
+                        aria-invalid={error ? true : undefined}
+                        className="h-10"
+                    />
+                </Field>
+                <Field data-invalid={error ? true : undefined}>
+                    <FieldLabel htmlFor="email" className="text-[13px]">
+                        Email
+                    </FieldLabel>
+                    <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        placeholder="nama@instansi.go.id"
+                        aria-invalid={error ? true : undefined}
+                        className="h-10"
+                    />
+                </Field>
+                <Field data-invalid={error ? true : undefined}>
+                    <FieldLabel htmlFor="password" className="text-[13px]">
+                        Password
+                    </FieldLabel>
+                    <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={10}
+                        required
+                        aria-invalid={error ? true : undefined}
+                        className="h-10"
+                    />
+                    <FieldDescription className="text-[12px]">
+                        Minimal 10 karakter.
+                    </FieldDescription>
+                </Field>
+                <Field data-invalid={error ? true : undefined}>
+                    <FieldLabel htmlFor="confirm" className="text-[13px]">
+                        Ulangi password
+                    </FieldLabel>
+                    <Input
+                        id="confirm"
+                        name="confirm"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={10}
+                        required
+                        aria-invalid={error ? true : undefined}
+                        className="h-10"
+                    />
+                </Field>
 
-            {error && (
-                <p role="alert" className="text-[13px] text-[var(--negative)]">
-                    {error}
-                </p>
-            )}
+                {error && <FieldError>{error}</FieldError>}
 
-            <button
-                type="submit"
-                disabled={pending}
-                className="h-9 w-full rounded-[var(--radius-control)] bg-primary text-[14px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-                {pending ? 'Mengirim…' : 'Ajukan akun'}
-            </button>
+                <Button
+                    type="submit"
+                    disabled={pending}
+                    className="h-10 w-full justify-between px-3.5"
+                >
+                    {pending ? (
+                        <>
+                            <span>Mengirim</span>
+                            <Loader2 className="size-4 animate-spin" />
+                        </>
+                    ) : (
+                        <>
+                            <span>Ajukan akun</span>
+                            <ArrowRight className="size-4" strokeWidth={1.5} />
+                        </>
+                    )}
+                </Button>
+            </FieldGroup>
         </form>
-    );
-}
-
-function Field({
-    id,
-    label,
-    hint,
-    ...props
-}: {
-    id: string;
-    label: string;
-    hint?: string;
-} & React.InputHTMLAttributes<HTMLInputElement>) {
-    return (
-        <div className="space-y-1.5">
-            <label htmlFor={id} className="text-[13px] font-medium">
-                {label}
-            </label>
-            <input
-                id={id}
-                name={id}
-                className="h-9 w-full rounded-[var(--radius-control)] border border-input bg-card px-3 text-[14px] outline-none focus-visible:border-[var(--text)] focus-visible:ring-2 focus-visible:ring-[var(--text)]/15"
-                {...props}
-            />
-            {hint && (
-                <p className="text-[12px] text-muted-foreground">{hint}</p>
-            )}
-        </div>
     );
 }
