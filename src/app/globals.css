@@ -27,6 +27,17 @@
     --negative: #c4242a;
     --warning: #92400e;
 
+    /* Status pills (§7.6): a pale tint with dark ink of the same hue. The one
+       place on the chrome where colour is allowed, because it means a state. */
+    --pill-positive-bg: #dcfae5;
+    --pill-positive-ink: #04250e;
+    --pill-negative-bg: #ffedea;
+    --pill-negative-ink: #831c1e;
+    --pill-warning-bg: #fffbeb;
+    --pill-warning-ink: #92400e;
+    --pill-neutral-bg: #eeeeee;
+    --pill-neutral-ink: #3d3d3d;
+
     --radius-card: 8px;
     --radius-control: 6px;
     --row-height: 44px;
@@ -62,6 +73,16 @@
     --positive: #6bbf70;
     --negative: #ff7b7b;
     --warning: #e0a15e;
+
+    /* Reversed pairs: the tint becomes the ink and the ink the tint. */
+    --pill-positive-bg: #0d2e1a;
+    --pill-positive-ink: #a8e6bf;
+    --pill-negative-bg: #3a1416;
+    --pill-negative-ink: #ffbdbd;
+    --pill-warning-bg: #33260d;
+    --pill-warning-ink: #f5cd8e;
+    --pill-neutral-bg: #262626;
+    --pill-neutral-ink: #d4d4d4;
 }
 
 @theme inline {

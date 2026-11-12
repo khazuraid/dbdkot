@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { requireActor } from '@/lib/session';
 import { listPeTasks } from '@/lib/domain/queries';
 import { formatDate } from '@/lib/format';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager';
+import { StatusText } from '@/components/shell/status-text';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -22,6 +24,8 @@ const PRIORITY_LABEL: Record<string, string> = {
     CRITICAL: 'Kritis',
 };
 
+type TaskRow = Awaited<ReturnType<typeof listPeTasks>>['rows'][number];
+
 export default async function PeTugasPage({
     searchParams,
 }: {
@@ -33,74 +37,100 @@ export default async function PeTugasPage({
         actor,
         readPage(sp.page),
     );
+    const late = rows.filter((t) => t.isLate).length;
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Tugas PE"
-                context="Tenggat empat hari sejak laporan masuk."
+                context={
+                    <>
+                        Tenggat empat hari sejak laporan masuk.
+                        {late > 0 && (
+                            <span className="text-[var(--negative)]">
+                                {' '}
+                                {late} lewat tenggat di halaman ini.
+                            </span>
+                        )}
+                    </>
+                }
             />
             <Panel title={`${total} tugas`}>
-                {rows.length === 0 ? (
-                    <Empty>Belum ada tugas PE.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">Laporan</th>
-                                <th className="py-2 font-normal">Petugas</th>
-                                <th className="py-2 font-normal">Prioritas</th>
-                                <th className="py-2 font-normal">Tenggat</th>
-                                <th className="py-2 font-normal">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {rows.map((t) => (
-                                <tr
-                                    key={t.id}
-                                    className="h-[var(--row-height)]"
+                <DataTable<TaskRow>
+                    rows={rows}
+                    empty="Belum ada tugas PE yang ditugaskan."
+                    caption="Tugas penyelidikan epidemiologi"
+                    columns={[
+                        {
+                            key: 'report',
+                            header: 'Laporan',
+                            cell: (t) => (
+                                <Link
+                                    href={`/pe/${t.reportPEId}`}
+                                    className="underline decoration-[var(--control)] underline-offset-4 hover:decoration-[var(--text)]"
                                 >
-                                    <td className="py-2">
-                                        <Link
-                                            href={`/pe/${t.reportPEId}`}
-                                            className="underline"
-                                        >
-                                            {t.reportNumber}
-                                        </Link>
-                                    </td>
-                                    <td className="py-2">
-                                        {t.assignedToName ?? '—'}
-                                    </td>
-                                    <td className="py-2">
-                                        {PRIORITY_LABEL[t.priority] ??
-                                            t.priority}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className={
-                                            t.isLate
-                                                ? 'py-2 text-[var(--negative)]'
-                                                : 'py-2'
-                                        }
-                                    >
-                                        {formatDate(t.dueDate)}
-                                        {t.isLate && ' · lewat'}
-                                    </td>
-                                    <td className="py-2">
-                                        {TASK_STATUS_LABEL[t.status] ??
-                                            t.status}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                                    {t.reportNumber}
+                                </Link>
+                            ),
+                        },
+                        {
+                            key: 'officer',
+                            header: 'Petugas',
+                            cell: (t) => t.assignedToName ?? <Dash />,
+                        },
+                        {
+                            key: 'priority',
+                            header: 'Prioritas',
+                            cell: (t) => (
+                                <StatusText
+                                    tone={
+                                        t.priority === 'CRITICAL'
+                                            ? 'bad'
+                                            : t.priority === 'HIGH'
+                                              ? 'warn'
+                                              : 'neutral'
+                                    }
+                                >
+                                    {PRIORITY_LABEL[t.priority] ?? t.priority}
+                                </StatusText>
+                            ),
+                        },
+                        {
+                            key: 'due',
+                            header: 'Tenggat',
+                            align: 'right',
+                            cell: (t) => (
+                                <StatusText tone={t.isLate ? 'bad' : 'neutral'}>
+                                    {formatDate(t.dueDate)}
+                                    {t.isLate && ' · lewat'}
+                                </StatusText>
+                            ),
+                        },
+                        {
+                            key: 'status',
+                            header: 'Status',
+                            cell: (t) => (
+                                <StatusText
+                                    tone={
+                                        t.status === 'COMPLETED'
+                                            ? 'neutral'
+                                            : t.status === 'OVERDUE'
+                                              ? 'bad'
+                                              : 'good'
+                                    }
+                                >
+                                    {TASK_STATUS_LABEL[t.status] ?? t.status}
+                                </StatusText>
+                            ),
+                        },
+                    ]}
+                />
             </Panel>
             <Pager
                 info={{ page, perPage, total }}
                 label="tugas"
                 buildHref={(n) => (n > 1 ? `/pe/tugas?page=${n}` : '/pe/tugas')}
             />
-        </div>
+        </PageBody>
     );
 }

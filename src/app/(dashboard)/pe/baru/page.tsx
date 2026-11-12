@@ -1,6 +1,6 @@
 import { requireRole } from '@/lib/session';
 import { peCandidates } from '@/lib/domain/pe';
-import { PageHeader, NotBuilt } from '@/components/shell/page';
+import { PageBody, PageHeader, NotBuilt } from '@/components/shell/page';
 import { PeForm } from './pe-form';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
@@ -13,7 +13,7 @@ export default async function PeBaruPage() {
     const { rows } = await peCandidates(actor);
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Buat PE"
                 context="Laporan yang sudah Anda terima dan belum diselidiki."
@@ -31,6 +31,6 @@ export default async function PeBaruPage() {
                     }))}
                 />
             )}
-        </div>
+        </PageBody>
     );
 }

@@ -1,7 +1,9 @@
 import { requireRole } from '@/lib/session';
 import { listInstitutions } from '@/lib/domain/queries';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager';
+import { StatusText } from '@/components/shell/status-text';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -11,6 +13,8 @@ const TYPE_LABEL: Record<string, string> = {
     PUSKESMAS: 'Puskesmas',
     DINAS_KESEHATAN: 'Dinas kesehatan',
 };
+
+type InstitutionRow = Awaited<ReturnType<typeof listInstitutions>>['rows'][number];
 
 export default async function InstitusiPage({
     searchParams,
@@ -24,54 +28,54 @@ export default async function InstitusiPage({
     );
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Institusi"
                 context="Wilayah kerja puskesmas menentukan tujuan penugasan laporan."
             />
             <Panel title={`${total} institusi`}>
-                {rows.length === 0 ? (
-                    <Empty>Belum ada institusi.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">Nama</th>
-                                <th className="py-2 font-normal">Jenis</th>
-                                <th className="py-2 font-normal">Kota</th>
-                                <th className="py-2 text-right font-normal">
-                                    Kelurahan
-                                </th>
-                                <th className="py-2 font-normal">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {rows.map((i) => (
-                                <tr
-                                    key={i.id}
-                                    className="h-[var(--row-height)]"
-                                >
-                                    <td className="py-2">{i.name}</td>
-                                    <td className="py-2">
-                                        {TYPE_LABEL[i.type] ?? i.type}
-                                    </td>
-                                    <td className="py-2 text-muted-foreground">
-                                        {i.city ?? '—'}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-right"
-                                    >
-                                        {i.kelurahanList.length}
-                                    </td>
-                                    <td className="py-2">
-                                        {i.isActive ? 'Aktif' : 'Nonaktif'}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                <DataTable<InstitutionRow>
+                    rows={rows}
+                    empty="Belum ada institusi. Impor data fasilitas lebih dulu."
+                    caption="Daftar institusi"
+                    columns={[
+                        { key: 'name', header: 'Nama', cell: (i) => i.name },
+                        {
+                            key: 'type',
+                            header: 'Jenis',
+                            cell: (i) => (
+                                <span className="text-muted-foreground">
+                                    {TYPE_LABEL[i.type] ?? i.type}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'city',
+                            header: 'Kota',
+                            cell: (i) => i.city ?? <Dash />,
+                        },
+                        {
+                            key: 'kelurahan',
+                            header: 'Kelurahan',
+                            align: 'right',
+                            cell: (i) =>
+                                i.kelurahanList.length === 0 ? (
+                                    <Dash />
+                                ) : (
+                                    i.kelurahanList.length
+                                ),
+                        },
+                        {
+                            key: 'status',
+                            header: 'Status',
+                            cell: (i) => (
+                                <StatusText tone={i.isActive ? 'good' : 'neutral'}>
+                                    {i.isActive ? 'Aktif' : 'Nonaktif'}
+                                </StatusText>
+                            ),
+                        },
+                    ]}
+                />
             </Panel>
             <Pager
                 info={{ page, perPage, total }}
@@ -80,6 +84,6 @@ export default async function InstitusiPage({
                     n > 1 ? `/admin/institusi?page=${n}` : '/admin/institusi'
                 }
             />
-        </div>
+        </PageBody>
     );
 }

@@ -1,9 +1,18 @@
 import { requireRole } from '@/lib/session';
 import { listReportsPE } from '@/lib/domain/queries';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
+
+type OfficerRow = {
+    id: string;
+    officer: string;
+    reports: number;
+    meanHi: string | null;
+    meanCi: string | null;
+};
 
 /** Aggregate indices only. The per-household breakdown lives in the PE detail. */
 export default async function AnalitikPePage() {
@@ -26,65 +35,57 @@ export default async function AnalitikPePage() {
     const mean = (xs: number[]) =>
         xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 
-    const ranked = [...byOfficer.entries()].sort((a, b) => b[1].n - a[1].n);
+    const ranked: OfficerRow[] = [...byOfficer.entries()]
+        .sort((a, b) => b[1].n - a[1].n)
+        .map(([officer, entry]) => ({
+            id: officer,
+            officer,
+            reports: entry.n,
+            meanHi: mean(entry.hi)?.toFixed(2) ?? null,
+            meanCi: mean(entry.ci)?.toFixed(2) ?? null,
+        }));
+
+    const totalHi = rows.filter((r) => r.houseIndex).length;
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Analitik PE"
-                context={`${rows.length} laporan PE.`}
+                context={`${rows.length} laporan PE, ${totalHi} dengan angka HI.`}
             />
 
             <Panel title="Beban per petugas">
-                {ranked.length === 0 ? (
-                    <Empty>Belum ada laporan PE.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">Petugas</th>
-                                <th className="py-2 text-right font-normal">
-                                    Laporan
-                                </th>
-                                <th className="py-2 text-right font-normal">
-                                    Rata HI
-                                </th>
-                                <th className="py-2 text-right font-normal">
-                                    Rata CI
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {ranked.map(([officer, entry]) => (
-                                <tr
-                                    key={officer}
-                                    className="h-[var(--row-height)]"
-                                >
-                                    <td className="py-2">{officer}</td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-right"
-                                    >
-                                        {entry.n}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-right"
-                                    >
-                                        {mean(entry.hi)?.toFixed(2) ?? '—'}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-right"
-                                    >
-                                        {mean(entry.ci)?.toFixed(2) ?? '—'}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                <DataTable<OfficerRow>
+                    rows={ranked}
+                    empty="Belum ada laporan PE pada periode ini."
+                    caption="Beban laporan per petugas"
+                    columns={[
+                        {
+                            key: 'officer',
+                            header: 'Petugas',
+                            cell: (o) => o.officer,
+                        },
+                        {
+                            key: 'n',
+                            header: 'Laporan',
+                            align: 'right',
+                            cell: (o) => o.reports,
+                        },
+                        {
+                            key: 'hi',
+                            header: 'Rata HI',
+                            align: 'right',
+                            cell: (o) => o.meanHi ?? <Dash />,
+                        },
+                        {
+                            key: 'ci',
+                            header: 'Rata CI',
+                            align: 'right',
+                            cell: (o) => o.meanCi ?? <Dash />,
+                        },
+                    ]}
+                />
             </Panel>
-        </div>
+        </PageBody>
     );
 }

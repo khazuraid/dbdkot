@@ -1,10 +1,13 @@
 import { requireRole } from '@/lib/session';
 import { listReports } from '@/lib/domain/reports';
 import { formatDate } from '@/lib/format';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
+
+type ReportRow = Awaited<ReturnType<typeof listReports>>['rows'][number];
 
 /**
  * Only exists in the live repo (dbdfix), not in the audited one. Rather than
@@ -19,51 +22,49 @@ export default async function KoreksiWilayahPage() {
     });
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Koreksi wilayah"
                 context="Laporan yang belum menemukan puskesmas karena kelurahannya tidak cocok."
             />
             <Panel title={`${rows.length} laporan tanpa puskesmas`}>
-                {rows.length === 0 ? (
-                    <Empty>Tidak ada laporan yang gagal ditugaskan.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">
-                                    No. laporan
-                                </th>
-                                <th className="py-2 font-normal">Kelurahan</th>
-                                <th className="py-2 font-normal">Kecamatan</th>
-                                <th className="py-2 font-normal">Masuk</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {rows.map((r) => (
-                                <tr
-                                    key={r.id}
-                                    className="h-[var(--row-height)]"
-                                >
-                                    <td className="py-2">{r.reportNumber}</td>
-                                    <td className="py-2">
-                                        {r.kelurahan ?? '—'}
-                                    </td>
-                                    <td className="py-2">
-                                        {r.kecamatan ?? '—'}
-                                    </td>
-                                    <td
-                                        data-numeric
-                                        className="py-2 text-muted-foreground"
-                                    >
-                                        {formatDate(r.createdAt)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                <DataTable<ReportRow>
+                    rows={rows}
+                    empty="Tidak ada laporan yang gagal ditugaskan. Semua kelurahan cocok dengan wilayah puskesmas."
+                    caption="Laporan yang perlu koreksi wilayah"
+                    columns={[
+                        {
+                            key: 'number',
+                            header: 'No. laporan',
+                            cell: (r) => (
+                                <span className="tabular-nums">
+                                    {r.reportNumber}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'kel',
+                            header: 'Kelurahan',
+                            cell: (r) => r.kelurahan ?? <Dash />,
+                        },
+                        {
+                            key: 'kec',
+                            header: 'Kecamatan',
+                            cell: (r) => r.kecamatan ?? <Dash />,
+                        },
+                        {
+                            key: 'created',
+                            header: 'Masuk',
+                            align: 'right',
+                            cell: (r) => (
+                                <span className="whitespace-nowrap text-muted-foreground">
+                                    {formatDate(r.createdAt)}
+                                </span>
+                            ),
+                        },
+                    ]}
+                />
             </Panel>
-        </div>
+        </PageBody>
     );
 }

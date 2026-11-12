@@ -7,7 +7,7 @@ import {
     type ReportStatus,
 } from '@/lib/domain/reports';
 import { formatNumber } from '@/lib/format';
-import { PageHeader } from '@/components/shell/page';
+import { PageBody, PageHeader } from '@/components/shell/page';
 import { LiveData } from '@/components/shell/live-data';
 import { ReportTable } from '@/components/reports/report-table';
 
@@ -42,11 +42,11 @@ export default async function LaporanPage({
     });
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 aside={<LiveData since={renderedAt} />}
                 title="Laporan"
-                context={`${formatNumber(total)} laporan${status ? ` · ${STATUS_LABEL[status]}` : ''}`}
+                context={`${formatNumber(total)} laporan${status ? `, ${STATUS_LABEL[status]}` : ''}`}
                 action={
                     actor.role === 'RUMAH_SAKIT'
                         ? { href: '/laporan/baru', label: 'Lapor kasus' }
@@ -62,7 +62,7 @@ export default async function LaporanPage({
                 <div className="space-y-1.5">
                     <label
                         htmlFor="status"
-                        className="text-[12px] text-muted-foreground"
+                        className="text-[12px] font-medium text-muted-foreground"
                     >
                         Status
                     </label>
@@ -70,7 +70,7 @@ export default async function LaporanPage({
                         id="status"
                         name="status"
                         defaultValue={status ?? ''}
-                        className="h-9 rounded-md border border-input bg-card px-2 text-[14px]"
+                        className="h-9 rounded-[var(--radius-control)] border border-[var(--control)] bg-card px-2 text-[14px]"
                     >
                         <option value="">Semua</option>
                         {STATUSES.map((s) => (
@@ -81,10 +81,10 @@ export default async function LaporanPage({
                     </select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="min-w-0 flex-1 space-y-1.5 sm:flex-none">
                     <label
                         htmlFor="search"
-                        className="text-[12px] text-muted-foreground"
+                        className="text-[12px] font-medium text-muted-foreground"
                     >
                         Cari
                     </label>
@@ -93,53 +93,65 @@ export default async function LaporanPage({
                         name="search"
                         defaultValue={search ?? ''}
                         placeholder="No. laporan atau kelurahan"
-                        className="h-9 w-64 rounded-md border border-input bg-card px-3 text-[14px]"
+                        className="h-9 w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-card px-3 text-[14px] sm:w-64"
                     />
                 </div>
 
                 <button
                     type="submit"
-                    className="border-control h-9 rounded-md border px-3 text-[14px] hover:bg-[var(--raised)]"
+                    className="h-9 rounded-[var(--radius-control)] border border-[var(--control)] px-3 text-[14px] transition-colors hover:bg-[var(--raised)]"
                 >
                     Terapkan
                 </button>
+
+                {(status || search) && (
+                    <Link
+                        href="/laporan"
+                        className="pb-2 text-[13px] text-muted-foreground underline decoration-[var(--control)] underline-offset-4 hover:text-foreground"
+                    >
+                        Reset
+                    </Link>
+                )}
             </form>
 
-            <div className="mt-8">
+            <div className="mt-6">
                 <ReportTable
                     rows={rows}
-                    empty="Tidak ada laporan yang cocok."
+                    empty="Tidak ada laporan yang cocok dengan filter ini."
                 />
             </div>
 
             {lastPage > 1 && (
-                <nav className="mt-6 flex items-center justify-between text-[13px]">
-                    <Pager
+                <nav
+                    aria-label="Navigasi halaman"
+                    className="mt-6 flex items-center justify-between border-t border-border pt-3 text-[13px]"
+                >
+                    <PageLink
                         page={page - 1}
                         disabled={page <= 1}
                         status={status}
                         search={search}
                     >
                         Sebelumnya
-                    </Pager>
-                    <span className="text-muted-foreground">
+                    </PageLink>
+                    <span className="tabular-nums text-muted-foreground">
                         Halaman {page} dari {lastPage}
                     </span>
-                    <Pager
+                    <PageLink
                         page={page + 1}
                         disabled={page >= lastPage}
                         status={status}
                         search={search}
                     >
                         Berikutnya
-                    </Pager>
+                    </PageLink>
                 </nav>
             )}
-        </div>
+        </PageBody>
     );
 }
 
-function Pager({
+function PageLink({
     page,
     disabled,
     status,
@@ -154,7 +166,7 @@ function Pager({
 }) {
     if (disabled) {
         return (
-            <span className="px-1 py-1 text-muted-foreground/50">
+            <span aria-disabled className="text-muted-foreground/60">
                 {children}
             </span>
         );
@@ -166,7 +178,10 @@ function Pager({
     if (page > 1) params.set('page', String(page));
 
     return (
-        <Link href={`/laporan?${params}`} className="px-1 py-1 underline">
+        <Link
+            href={`/laporan?${params}`}
+            className="underline decoration-[var(--control)] underline-offset-4 hover:decoration-[var(--text)]"
+        >
             {children}
         </Link>
     );

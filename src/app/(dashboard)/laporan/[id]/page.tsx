@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireActor } from '@/lib/session';
+import { PageBody } from '@/components/shell/page';
 import { getReport } from '@/lib/domain/report-detail';
 import { CASE_TYPE_LABEL, STATUS_LABEL } from '@/lib/domain/reports';
 import { formatDate } from '@/lib/format';
@@ -30,20 +31,17 @@ export default async function LaporanDetailPage({
         actor.role === 'DINKES' && report.status === 'PE_COMPLETED';
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <Link
                 href="/laporan"
-                className="text-[13px] text-muted-foreground underline"
+                className="text-[13px] text-muted-foreground underline decoration-[var(--control)] underline-offset-4 hover:text-foreground"
             >
                 Laporan
             </Link>
 
             <header className="mt-3 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1
-                        data-numeric
-                        className="text-[24px] font-medium tracking-tight"
-                    >
+                    <h1 className="text-[24px] font-semibold tracking-[-0.02em] tabular-nums">
                         {report.reportNumber}
                     </h1>
                     <p className="mt-1 text-[14px] text-muted-foreground">
@@ -88,7 +86,7 @@ export default async function LaporanDetailPage({
             </header>
 
             <section className="mt-8">
-                <h2 className="text-[16px] font-medium">Pasien</h2>
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Pasien</h2>
                 <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Field label="Nama" value={report.patient.name} />
                     <Field label="NIK" value={report.patient.nik} numeric />
@@ -110,7 +108,7 @@ export default async function LaporanDetailPage({
             </section>
 
             <section className="mt-10">
-                <h2 className="text-[16px] font-medium">Wilayah & rujukan</h2>
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Wilayah & rujukan</h2>
                 <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Field label="Kelurahan" value={report.kelurahan ?? '—'} />
                     <Field label="Kecamatan" value={report.kecamatan ?? '—'} />
@@ -129,7 +127,7 @@ export default async function LaporanDetailPage({
             </section>
 
             <section className="mt-10">
-                <h2 className="text-[16px] font-medium">Klinis</h2>
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Klinis</h2>
                 <dl className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <Field
                         label="Tanggal masuk"
@@ -166,7 +164,7 @@ export default async function LaporanDetailPage({
             </section>
 
             <section className="mt-10">
-                <h2 className="text-[16px] font-medium">Lampiran</h2>
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Lampiran</h2>
                 <p className="mt-1 text-[13px] text-muted-foreground">
                     Hasil laboratorium atau dokumen pendukung.
                 </p>
@@ -177,7 +175,7 @@ export default async function LaporanDetailPage({
 
             {report.rejectionReason && (
                 <section className="mt-10">
-                    <h2 className="text-[16px] font-medium">
+                    <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
                         Alasan penolakan
                     </h2>
                     <p className="mt-2 text-[14px] text-[var(--negative)]">
@@ -185,6 +183,6 @@ export default async function LaporanDetailPage({
                     </p>
                 </section>
             )}
-        </div>
+        </PageBody>
     );
 }

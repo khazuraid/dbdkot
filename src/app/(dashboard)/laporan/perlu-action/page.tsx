@@ -1,7 +1,7 @@
 import { requireActor } from '@/lib/session';
 import { listReports, type ReportStatus } from '@/lib/domain/reports';
 import { formatNumber } from '@/lib/format';
-import { PageHeader, Panel } from '@/components/shell/page';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
 import { ReportTable } from '@/components/reports/report-table';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
@@ -44,14 +44,20 @@ export default async function PerluActionPage() {
     });
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader title={queue.title} context={queue.context} />
-            <Panel title={`${formatNumber(rows.length)} laporan`}>
+            <Panel
+                title={
+                    rows.length === 0
+                        ? 'Tidak ada antrian'
+                        : `${formatNumber(rows.length)} laporan`
+                }
+            >
                 <ReportTable
                     rows={rows}
                     empty="Tidak ada yang menunggu tindakan."
                 />
             </Panel>
-        </div>
+        </PageBody>
     );
 }

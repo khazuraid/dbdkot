@@ -1,11 +1,19 @@
 import { requireRole } from '@/lib/session';
 import { listAuditLogs } from '@/lib/domain/queries';
-import { formatDate } from '@/lib/format';
-import { PageHeader, Panel, Empty } from '@/components/shell/page';
+import { formatDate, formatTime } from '@/lib/format';
+import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
+
+type AuditRow = Awaited<ReturnType<typeof listAuditLogs>>['rows'][number];
+
+/** UUIDs are unreadable; the first block is enough to match against a record. */
+function shortId(id: string) {
+    return id.slice(0, 8);
+}
 
 export default async function AuditLogPage({
     searchParams,
@@ -19,47 +27,63 @@ export default async function AuditLogPage({
     );
 
     return (
-        <div className="px-[var(--pad)] py-8">
+        <PageBody>
             <PageHeader
                 title="Audit log"
                 context="Setiap mutasi dan setiap pembacaan data pribadi dicatat di sini."
             />
             <Panel title={`${total} entri terbaru`}>
-                {rows.length === 0 ? (
-                    <Empty>Belum ada entri audit.</Empty>
-                ) : (
-                    <table className="w-full border-collapse text-[14px]">
-                        <thead>
-                            <tr className="border-y border-border text-left text-[12px] text-muted-foreground">
-                                <th className="py-2 font-normal">Waktu</th>
-                                <th className="py-2 font-normal">Pengguna</th>
-                                <th className="py-2 font-normal">Aksi</th>
-                                <th className="py-2 font-normal">Entitas</th>
-                                <th className="py-2 font-normal">ID</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {rows.map((a) => (
-                                <tr
-                                    key={a.id}
-                                    className="h-[var(--row-height)]"
+                <DataTable<AuditRow>
+                    rows={rows}
+                    empty="Belum ada entri audit."
+                    caption="Catatan audit sistem"
+                    columns={[
+                        {
+                            key: 'time',
+                            header: 'Waktu',
+                            align: 'right',
+                            cell: (a) => (
+                                <span className="whitespace-nowrap text-muted-foreground">
+                                    {formatDate(a.createdAt)}
+                                    {' · '}
+                                    {formatTime(a.createdAt)}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'user',
+                            header: 'Pengguna',
+                            cell: (a) => a.userName ?? a.userEmail ?? <Dash />,
+                        },
+                        {
+                            key: 'action',
+                            header: 'Aksi',
+                            cell: (a) => a.action,
+                        },
+                        {
+                            key: 'entity',
+                            header: 'Entitas',
+                            cell: (a) => (
+                                <span className="text-muted-foreground">
+                                    {a.entityType}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'id',
+                            header: 'ID',
+                            align: 'right',
+                            cell: (a) => (
+                                <span
+                                    className="tabular-nums text-[12px] text-muted-foreground"
+                                    title={a.entityId}
                                 >
-                                    <td data-numeric className="py-2">
-                                        {formatDate(a.createdAt)}
-                                    </td>
-                                    <td className="py-2">
-                                        {a.userName ?? a.userEmail ?? '—'}
-                                    </td>
-                                    <td className="py-2">{a.action}</td>
-                                    <td className="py-2">{a.entityType}</td>
-                                    <td className="py-2 font-mono text-[12px] text-muted-foreground">
-                                        {a.entityId}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                                    {shortId(a.entityId)}
+                                </span>
+                            ),
+                        },
+                    ]}
+                />
             </Panel>
             <Pager
                 info={{ page, perPage, total }}
@@ -68,6 +92,6 @@ export default async function AuditLogPage({
                     n > 1 ? `/admin/audit-log?page=${n}` : '/admin/audit-log'
                 }
             />
-        </div>
+        </PageBody>
     );
 }

@@ -11,3 +11,12 @@ export function formatDate(value: Date | string): string {
         typeof value === 'string' ? new Date(value) : value,
     );
 }
+
+const timeFormat = new Intl.DateTimeFormat('id-ID', { timeStyle: 'short' });
+
+/** Clock time, for a column that already carries the date. */
+export function formatTime(value: Date | string): string {
+    return timeFormat.format(
+        typeof value === 'string' ? new Date(value) : value,
+    );
+}
