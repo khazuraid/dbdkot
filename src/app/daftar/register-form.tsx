@@ -57,7 +57,7 @@ export function RegisterForm() {
 
     if (done) {
         return (
-            <div className="mt-8 rounded-[var(--radius-card)] border border-border bg-[var(--surface)] p-4">
+            <div className="rounded-[var(--radius-card)] border border-border bg-[var(--surface)] p-4">
                 <p className="text-[14px] font-medium">
                     Pendaftaran diterima
                 </p>
@@ -77,7 +77,7 @@ export function RegisterForm() {
     }
 
     return (
-        <form onSubmit={onSubmit} className="mt-8 space-y-4" noValidate>
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
             <Field
                 id="name"
                 label="Nama lengkap"
