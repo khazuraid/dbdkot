@@ -1,0 +1,25 @@
+# Build context hygiene. Without this the whole repo — including .env — is
+# sent to the daemon, and a COPY . . would bake secrets into a layer.
+#
+# node_modules is installed inside the image; .env is injected at run time by
+# compose, never copied in.
+node_modules
+.next
+.git
+.github
+.taste-skill
+.claude
+.agents
+
+# Never ship secrets or local state.
+.env
+.env.*
+!.env.example
+uploads
+*.pem
+
+# Local noise.
+.DS_Store
+*.log
+coverage
+README.md

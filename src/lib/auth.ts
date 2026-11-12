@@ -6,6 +6,11 @@ import { account, session, user, verification } from '@/db/schema';
 import { ROLES } from './roles';
 
 export const auth = betterAuth({
+    // Without this, better-auth falls back to an internal default: sessions
+    // signed with one value become invalid the moment the fallback shifts, and
+    // a known default lets anyone forge a cookie in production. Passed
+    // explicitly so the value is owned by the deployment, not the library.
+    secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(getDb(), {
         provider: 'pg',
         schema: { user, session, account, verification },

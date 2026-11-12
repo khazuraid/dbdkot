@@ -1,0 +1,121 @@
+# Local / single-host deployment.
+#
+#   docker compose up -d --build
+#
+# Values come from `.env` (gitignored). Only the postgres credentials are
+# defaulted here, and only for a local database that is not published to the
+# host beyond its own port.
+
+name: wali-epi
+
+services:
+    postgres:
+        image: postgres:18-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-wali_epi}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wali_epi_password}
+            POSTGRES_DB: ${POSTGRES_DB:-wali_epi_db}
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        ports:
+            # Bound to loopback: the database is for this host, not the network.
+            - '127.0.0.1:5432:5432'
+        healthcheck:
+            # -U and -d must be passed explicitly: pg_isready defaults to the
+            # invoking user, which is not the app's role.
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -U ${POSTGRES_USER:-wali_epi} -d ${POSTGRES_DB:-wali_epi_db}',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+    redis:
+        image: redis:8-alpine
+        restart: unless-stopped
+        # BullMQ needs persistence across a restart, or queued jobs are lost.
+        command: redis-server --appendonly yes
+        volumes:
+            - redisdata:/data
+        ports:
+            - '127.0.0.1:6379:6379'
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    # One-shot: applies drizzle migrations, then exits. `app` and `worker`
+    # wait on it, so neither ever queries a schema that is not there yet.
+    migrate:
+        build:
+            context: .
+            target: runner
+        command: ['npm', 'run', 'db:migrate']
+        # No `env_file: .env` here on purpose. Migrations touch the schema and
+        # nothing else, so this service is given the one variable it needs
+        # rather than the full secret set (auth, OAuth, PII keys, S3).
+        environment:
+            # Overrides any .env value: inside the network the database is a
+            # service name, not localhost.
+            DATABASE_URL: postgresql://${POSTGRES_USER:-wali_epi}:${POSTGRES_PASSWORD:-wali_epi_password}@postgres:5432/${POSTGRES_DB:-wali_epi_db}
+        depends_on:
+            postgres:
+                condition: service_healthy
+        restart: 'no'
+
+    app:
+        build:
+            context: .
+            target: runner
+        restart: unless-stopped
+        env_file: .env
+        environment:
+            DATABASE_URL: postgresql://${POSTGRES_USER:-wali_epi}:${POSTGRES_PASSWORD:-wali_epi_password}@postgres:5432/${POSTGRES_DB:-wali_epi_db}
+            REDIS_URL: redis://redis:6379
+        ports:
+            - '${APP_PORT:-3000}:3000'
+        volumes:
+            # Attachments are written to local disk; without this they are lost
+            # on every recreate.
+            - uploads:/app/uploads
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            migrate:
+                condition: service_completed_successfully
+
+    worker:
+        build:
+            context: .
+            target: runner
+        # Runs the TypeScript source through tsx, the same way `npm run worker`
+        # does locally. It is a separate service because a long job must not
+        # occupy a web request, and restarting the web app must not kill it.
+        command: ['npm', 'run', 'worker']
+        restart: unless-stopped
+        env_file: .env
+        environment:
+            DATABASE_URL: postgresql://${POSTGRES_USER:-wali_epi}:${POSTGRES_PASSWORD:-wali_epi_password}@postgres:5432/${POSTGRES_DB:-wali_epi_db}
+            REDIS_URL: redis://redis:6379
+        volumes:
+            # The export job writes files the web app then serves, so both
+            # services must see the same directory.
+            - uploads:/app/uploads
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            migrate:
+                condition: service_completed_successfully
+
+volumes:
+    pgdata:
+    redisdata:
+    uploads:
