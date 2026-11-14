@@ -1,89 +1,101 @@
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Empty } from './page';
 
 export type Column<T> = {
     key: string;
-    header: React.ReactNode;
-    /** Numbers, dates and counts right-align so the digits line up. */
+    header: ReactNode;
+    cell: (row: T) => ReactNode;
     align?: 'right';
     className?: string;
-    cell: (row: T) => React.ReactNode;
 };
 
+/** A dash for "no value", in the faint tone so it never reads as data. */
+export function Dash() {
+    return (
+        <span aria-label="tidak ada data" className="text-faint">
+            -
+        </span>
+    );
+}
+
 /**
- * One table for every read-only list. Before this, nine pages carried a copy of
- * the same <table> with the same thead classes, and the copies had already
- * drifted apart (two had a status column the others lost).
- *
- * Rules from the app-screens study: no zebra, no header band, numbers right,
- * hairline rows only. On a phone the table scrolls inside its own frame rather
- * than pushing the page sideways.
+ * Shared ledger table for all operational list views.
  */
 export function DataTable<T extends { id: string }>({
     rows,
     columns,
     empty,
     caption,
+    minWidth = 720,
+    rowClassName,
 }: {
     rows: T[];
     columns: Column<T>[];
-    empty: React.ReactNode;
+    empty: ReactNode;
     caption?: string;
+    minWidth?: number;
+    rowClassName?: (row: T) => string | undefined;
 }) {
     if (rows.length === 0) return <Empty>{empty}</Empty>;
 
     return (
-        <div className="-mx-4 overflow-x-auto md:mx-0">
-            <table className="w-full min-w-[560px] border-collapse text-[14px] md:min-w-0">
+        <div className="w-full overflow-x-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+            <Table
+                className="ledger caption-bottom"
+                style={{ minWidth: `${minWidth}px` }}
+            >
                 {caption && <caption className="sr-only">{caption}</caption>}
-                <thead>
-                    <tr className="border-b border-border text-[12px] text-muted-foreground">
+                <TableHeader>
+                    <TableRow className="border-b border-[var(--border)] bg-[var(--raised)]/60 hover:bg-[var(--raised)]/60">
                         {columns.map((c) => (
-                            <th
+                            <TableHead
                                 key={c.key}
                                 scope="col"
-                                className={[
-                                    'whitespace-nowrap px-3 py-2 font-normal first:pl-0 last:pr-0',
-                                    c.align === 'right' ? 'text-right' : 'text-left',
-                                ].join(' ')}
+                                className={cn(
+                                    'h-9 font-semibold text-muted-foreground',
+                                    c.align === 'right' && 'text-right',
+                                    c.className,
+                                )}
                             >
                                 {c.header}
-                            </th>
+                            </TableHead>
                         ))}
-                    </tr>
-                </thead>
-                <tbody>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {rows.map((row) => (
-                        <tr
+                        <TableRow
                             key={row.id}
-                            className="h-[var(--row-height)] border-b border-[var(--rule)] transition-colors last:border-0 hover:bg-[var(--raised)]"
+                            className={cn(
+                                'border-b border-[var(--rule)] transition-colors hover:bg-[var(--raised)]/40',
+                                rowClassName?.(row),
+                            )}
                         >
                             {columns.map((c) => (
-                                <td
+                                <TableCell
                                     key={c.key}
-                                    className={[
-                                        'px-3 py-2 align-middle first:pl-0 last:pr-0',
-                                        c.align === 'right'
-                                            ? 'text-right tabular-nums'
-                                            : '',
-                                        c.className ?? '',
-                                    ].join(' ')}
+                                    className={cn(
+                                        'py-2.5',
+                                        c.align === 'right' && 'num',
+                                        c.className,
+                                    )}
                                 >
                                     {c.cell(row)}
-                                </td>
+                                </TableCell>
                             ))}
-                        </tr>
+                        </TableRow>
                     ))}
-                </tbody>
-            </table>
+                </TableBody>
+            </Table>
         </div>
-    );
-}
-
-/** A missing value is a grey dash, never an empty cell or a "0". */
-export function Dash() {
-    return (
-        <span className="text-[var(--faint)]" aria-label="tidak ada data">
-            —
-        </span>
     );
 }

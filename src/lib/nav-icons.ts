@@ -1,4 +1,5 @@
 import {
+    Activity,
     LayoutDashboard,
     FileText,
     FilePlus2,
@@ -13,6 +14,7 @@ import {
     TrendingUp,
     PlusCircle,
     Building2,
+    Package,
     MapPin,
     MapPinned,
     Users,
@@ -22,9 +24,8 @@ import {
 } from 'lucide-react';
 
 /**
- * One icon per route, keyed by href, drawn at 16px on a 1.5px stroke — the
- * study's median (§3.2). Below `md` the sheet uses the same map, so a route
- * cannot gain an icon on one surface and lose it on the other.
+ * One icon per route, keyed by href, rendered with uniform stroke weight across
+ * desktop rail and mobile drawer.
  */
 export const NAV_ICON: Record<string, LucideIcon> = {
     '/dasbor': LayoutDashboard,
@@ -33,6 +34,7 @@ export const NAV_ICON: Record<string, LucideIcon> = {
     '/laporan/perlu-action': Inbox,
     '/laporan/analitik': BarChart3,
     '/laporan/monitoring': ClipboardList,
+    '/laporan/lintas-wilayah': MapPinned,
     '/notifikasi': Bell,
     '/pesan': MessageSquare,
     '/pe': Search,
@@ -40,7 +42,9 @@ export const NAV_ICON: Record<string, LucideIcon> = {
     '/pe/baru': PlusCircle,
     '/pe/analitik': TrendingUp,
     '/pe/verifikasi': CheckCheck,
-    '/aset': Building2,
+    '/tindak-lanjut': Activity,
+    '/logistik': Package,
+    '/aset': Package,
     '/admin/institusi': Building2,
     '/admin/kelurahan': MapPin,
     '/admin/koreksi-wilayah': MapPinned,

@@ -53,6 +53,7 @@ services:
     # One-shot: applies drizzle migrations, then exits. `app` and `worker`
     # wait on it, so neither ever queries a schema that is not there yet.
     migrate:
+        image: wali-epi:latest
         build:
             context: .
             target: runner
@@ -70,9 +71,8 @@ services:
         restart: 'no'
 
     app:
-        build:
-            context: .
-            target: runner
+        image: wali-epi:latest
+        pull_policy: never
         restart: unless-stopped
         env_file: .env
         environment:
@@ -93,14 +93,18 @@ services:
                 condition: service_completed_successfully
 
     worker:
-        build:
-            context: .
-            target: runner
+        image: wali-epi:latest
+        pull_policy: never
         # Runs the TypeScript source through tsx, the same way `npm run worker`
         # does locally. It is a separate service because a long job must not
         # occupy a web request, and restarting the web app must not kill it.
         command: ['npm', 'run', 'worker']
         restart: unless-stopped
+        # The worker inherits the image's HTTP healthcheck but serves no port,
+        # so it reported unhealthy forever. Liveness here is "the process is
+        # still up", which restart: unless-stopped already watches.
+        healthcheck:
+            disable: true
         env_file: .env
         environment:
             DATABASE_URL: postgresql://${POSTGRES_USER:-wali_epi}:${POSTGRES_PASSWORD:-wali_epi_password}@postgres:5432/${POSTGRES_DB:-wali_epi_db}

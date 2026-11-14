@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { institutions, reportsPE, reportsRS } from '@/db/schema';
 import { decryptPii } from '@/lib/crypto';
@@ -8,6 +8,18 @@ import { scopeToInstitution, type Actor } from '@/lib/session';
 export type ExportKind = 'reports-rs' | 'reports-pe' | 'dashboard';
 
 export type ExportRow = Record<string, string | number | null>;
+
+/**
+ * Most rows one workbook carries. The worker writes a note row when the
+ * total exceeds it, so a truncated file never reads as the whole dataset.
+ */
+export const EXPORT_ROW_LIMIT = 50_000;
+
+export type ExportResult = {
+    columns: string[];
+    rows: ExportRow[];
+    total: number;
+};
 
 /**
  * Aggregation + row building for exports. Kept off the request path: the
@@ -25,7 +37,7 @@ export async function buildReportExport(
     actor: Actor,
     kind: ExportKind,
     filters: Record<string, unknown> = {},
-): Promise<{ columns: string[]; rows: ExportRow[] }> {
+): Promise<ExportResult> {
     const db = getDb();
     const institutionId = scopeToInstitution(actor);
 
@@ -45,13 +57,20 @@ export async function buildReportExport(
             conditions.push(lte(reportsRS.createdAt, new Date(filters.to)));
         }
         if (typeof filters.status === 'string') {
-            conditions.push(
-                eq(
-                    reportsRS.status,
-                    filters.status as (typeof reportsRS.status.enumValues)[number],
-                ),
+            // A job payload is not a typed argument: an unknown status would
+            // otherwise fail the whole export with a Postgres enum error.
+            const status = reportsRS.status.enumValues.find(
+                (v) => v === filters.status,
             );
+            if (status) {
+                conditions.push(eq(reportsRS.status, status));
+            }
         }
+
+        const [totals] = await db
+            .select({ n: count() })
+            .from(reportsRS)
+            .where(conditions.length ? and(...conditions) : undefined);
 
         const rows = await db
             .select({
@@ -74,7 +93,7 @@ export async function buildReportExport(
             )
             .where(conditions.length ? and(...conditions) : undefined)
             .orderBy(desc(reportsRS.createdAt))
-            .limit(50_000);
+            .limit(EXPORT_ROW_LIMIT);
 
         await audit({
             actor,
@@ -111,8 +130,15 @@ export async function buildReportExport(
                 'Tgl Masuk': r.admissionDate?.toISOString() ?? null,
                 RS: r.hospital,
             })),
+            total: Number(totals?.n ?? 0),
         };
     }
+
+    const [totals] = await db
+        .select({ n: count() })
+        .from(reportsPE)
+        .innerJoin(reportsRS, eq(reportsRS.id, reportsPE.reportRSId))
+        .where(scope);
 
     const rows = await db
         .select({
@@ -128,7 +154,7 @@ export async function buildReportExport(
         .innerJoin(reportsRS, eq(reportsRS.id, reportsPE.reportRSId))
         .where(scope)
         .orderBy(desc(reportsPE.createdAt))
-        .limit(50_000);
+        .limit(EXPORT_ROW_LIMIT);
 
     return {
         columns: [
@@ -149,6 +175,7 @@ export async function buildReportExport(
             'Breteau Index': r.breteauIndex,
             Status: r.status,
         })),
+        total: Number(totals?.n ?? 0),
     };
 }
 

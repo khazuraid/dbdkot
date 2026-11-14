@@ -2,9 +2,14 @@ import Link from 'next/link';
 import { requireActor } from '@/lib/session';
 import { listPeTasks } from '@/lib/domain/queries';
 import { formatDate } from '@/lib/format';
-import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import {
+    PageBody,
+    PageContent,
+    PageHeader,
+    Panel,
+} from '@/components/shell/page';
 import { DataTable, Dash } from '@/components/shell/data-table';
-import { Pager, readPage } from '@/components/shell/pager';
+import { Pager, readPage } from '@/components/shell/pager-view';
 import { StatusText } from '@/components/shell/status-text';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
@@ -55,82 +60,128 @@ export default async function PeTugasPage({
                     </>
                 }
             />
-            <Panel title={`${total} tugas`}>
-                <DataTable<TaskRow>
-                    rows={rows}
-                    empty="Belum ada tugas PE yang ditugaskan."
-                    caption="Tugas penyelidikan epidemiologi"
-                    columns={[
-                        {
-                            key: 'report',
-                            header: 'Laporan',
-                            cell: (t) => (
-                                <Link
-                                    href={`/pe/${t.reportPEId}`}
-                                    className="underline decoration-[var(--control)] underline-offset-4 hover:decoration-[var(--text)]"
-                                >
-                                    {t.reportNumber}
-                                </Link>
-                            ),
-                        },
-                        {
-                            key: 'officer',
-                            header: 'Petugas',
-                            cell: (t) => t.assignedToName ?? <Dash />,
-                        },
-                        {
-                            key: 'priority',
-                            header: 'Prioritas',
-                            cell: (t) => (
-                                <StatusText
-                                    tone={
-                                        t.priority === 'CRITICAL'
-                                            ? 'bad'
-                                            : t.priority === 'HIGH'
-                                              ? 'warn'
-                                              : 'neutral'
+
+            <PageContent>
+                <Panel title={`${total} tugas`}>
+                    <DataTable<TaskRow>
+                        rows={rows}
+                        empty="Belum ada tugas PE yang ditugaskan."
+                        caption="Tugas penyelidikan epidemiologi"
+                        columns={[
+                            {
+                                key: 'report',
+                                header: 'Laporan',
+                                cell: (t) => (
+                                    <Link
+                                        href={`/laporan/${t.reportRSId}`}
+                                        className="font-mono text-[13px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                                    >
+                                        {t.reportNumber}
+                                    </Link>
+                                ),
+                            },
+                            {
+                                key: 'officer',
+                                header: 'Petugas',
+                                cell: (t) => t.assignedToName ?? <Dash />,
+                            },
+                            {
+                                key: 'priority',
+                                header: 'Prioritas',
+                                cell: (t) => (
+                                    <StatusText
+                                        tone={
+                                            t.priority === 'CRITICAL'
+                                                ? 'bad'
+                                                : t.priority === 'HIGH'
+                                                  ? 'warn'
+                                                  : 'neutral'
+                                        }
+                                    >
+                                        {PRIORITY_LABEL[t.priority] ??
+                                            t.priority}
+                                    </StatusText>
+                                ),
+                            },
+                            {
+                                key: 'due',
+                                header: 'Tenggat',
+                                align: 'right',
+                                cell: (t) => (
+                                    <StatusText
+                                        tone={t.isLate ? 'bad' : 'neutral'}
+                                    >
+                                        {formatDate(t.dueDate)}
+                                        {t.isLate && ' · lewat'}
+                                    </StatusText>
+                                ),
+                            },
+                            {
+                                key: 'status',
+                                header: 'Status',
+                                cell: (t) => (
+                                    <div className="flex flex-col gap-0.5">
+                                        <StatusText
+                                            tone={
+                                                t.status === 'COMPLETED'
+                                                    ? 'good'
+                                                    : t.status === 'OVERDUE'
+                                                      ? 'bad'
+                                                      : 'warn'
+                                            }
+                                        >
+                                            {TASK_STATUS_LABEL[t.status] ??
+                                                t.status}
+                                        </StatusText>
+                                        {t.notes && (
+                                            <span className="text-[11px] text-muted-foreground line-clamp-1">
+                                                {t.notes}
+                                            </span>
+                                        )}
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: 'action',
+                                header: 'Aksi',
+                                align: 'right',
+                                cell: (t) => {
+                                    if (
+                                        t.rawStatus === 'ASSIGNED_ACCEPTED' ||
+                                        t.rawStatus === 'PE_IN_PROGRESS'
+                                    ) {
+                                        return (
+                                            <Link
+                                                href={`/pe/baru?reportId=${t.reportRSId}`}
+                                                className="inline-flex items-center gap-1 rounded-md bg-[var(--accent)] px-2.5 py-1 text-[11.5px] font-medium text-white shadow-2xs hover:opacity-90"
+                                            >
+                                                Isi Form PE
+                                            </Link>
+                                        );
                                     }
-                                >
-                                    {PRIORITY_LABEL[t.priority] ?? t.priority}
-                                </StatusText>
-                            ),
-                        },
-                        {
-                            key: 'due',
-                            header: 'Tenggat',
-                            align: 'right',
-                            cell: (t) => (
-                                <StatusText tone={t.isLate ? 'bad' : 'neutral'}>
-                                    {formatDate(t.dueDate)}
-                                    {t.isLate && ' · lewat'}
-                                </StatusText>
-                            ),
-                        },
-                        {
-                            key: 'status',
-                            header: 'Status',
-                            cell: (t) => (
-                                <StatusText
-                                    tone={
-                                        t.status === 'COMPLETED'
-                                            ? 'neutral'
-                                            : t.status === 'OVERDUE'
-                                              ? 'bad'
-                                              : 'good'
-                                    }
-                                >
-                                    {TASK_STATUS_LABEL[t.status] ?? t.status}
-                                </StatusText>
-                            ),
-                        },
-                    ]}
-                />
-            </Panel>
-            <Pager
-                info={{ page, perPage, total }}
-                label="tugas"
-                buildHref={(n) => (n > 1 ? `/pe/tugas?page=${n}` : '/pe/tugas')}
-            />
+                                    return (
+                                        <Link
+                                            href={`/laporan/${t.reportRSId}`}
+                                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11.5px] font-medium text-foreground hover:bg-[var(--raised)]"
+                                        >
+                                            {t.rawStatus === 'ASSIGNED'
+                                                ? 'Tinjau'
+                                                : 'Detail'}
+                                        </Link>
+                                    );
+                                },
+                            },
+                        ]}
+                    />
+                    <Pager
+                        info={{ page, perPage, total }}
+                        label="tugas"
+                        buildHref={(n) =>
+                            n > 1 ? `/pe/tugas?page=${n}` : '/pe/tugas'
+                        }
+                    />
+                </Panel>
+            </PageContent>
         </PageBody>
     );
 }

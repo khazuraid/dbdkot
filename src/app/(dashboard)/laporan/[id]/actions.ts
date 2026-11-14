@@ -7,7 +7,14 @@ import { transitionReport, type Transition } from '@/lib/domain/report-detail';
 
 const inputSchema = z.object({
     id: z.uuid(),
-    transition: z.enum(['ACCEPT', 'REJECT', 'VERIFY', 'REJECT_BY_DINKES']),
+    transition: z.enum([
+        'ACCEPT',
+        'START_PE',
+        'REJECT',
+        'VERIFY',
+        'REJECT_BY_DINKES',
+        'MARK_CLOSED',
+    ]),
 });
 
 export async function reportAction(id: string, transition: Transition) {

@@ -6,11 +6,13 @@ import { getDb } from '@/db';
 import { institutions } from '@/db/schema';
 import type { Role } from '@/lib/roles';
 import { Sidebar } from '@/components/shell/sidebar';
+import { MobileNav } from '@/components/shell/mobile-nav';
+import { CommandPalette } from '@/components/shell/command-palette';
+import { MobileBottomDock } from '@/components/shell/mobile-bottom-dock';
+import { TopBar } from '@/components/shell/top-bar';
 
 /**
- * Server-side gate. The prototype's middleware matched every path as public
- * (`pathname.startsWith("/")`), so this is where authorisation actually starts:
- * no session, no shell.
+ * Server-side gate. No session, no shell.
  */
 export default async function DashboardLayout({
     children,
@@ -44,22 +46,51 @@ export default async function DashboardLayout({
         institution = row?.name ?? null;
     }
 
+    const role = (user.role ?? 'PUSKESMAS') as Role;
+    const name = user.name ?? 'Pengguna';
+    const email = user.email ?? '';
+
     return (
-        // Tinted frame, white sheet: the sidebar and page ground share one tint
-        // and the work sits on a white sheet inset from the window's right and
-        // bottom edges, with a hairline and no shadow.
-        <div className="flex min-h-dvh bg-[var(--ground)]">
-            <Sidebar
-                role={(user.role ?? 'PUSKESMAS') as Role}
-                name={user.name}
-                email={user.email}
+        <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:h-dvh md:max-h-dvh md:overflow-hidden md:flex-row md:gap-3 md:p-3">
+            <a href="#main-content" className="skip-link">
+                Lewati ke konten utama
+            </a>
+
+            <MobileNav
+                role={role}
+                name={name}
+                email={email}
                 institution={institution}
             />
-            <main className="min-w-0 flex-1 pb-2 md:pr-2">
-                <div className="min-h-[calc(100dvh-0.5rem)] rounded-[var(--radius-card)] border border-border bg-surface">
+
+            <aside className="hidden shrink-0 md:flex md:h-full md:flex-col md:overflow-hidden">
+                <Sidebar
+                    role={role}
+                    name={name}
+                    email={email}
+                    institution={institution}
+                />
+            </aside>
+
+            {/* Desktop Workstation Pane with Pinned Navbar */}
+            <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface)] md:h-full md:overflow-hidden md:rounded-[var(--radius-card)] md:border md:border-[var(--border)] md:shadow-[var(--elev-soft)]">
+                <TopBar
+                    role={role}
+                    name={name}
+                    email={email}
+                    institution={institution}
+                />
+                <main
+                    id="main-content"
+                    tabIndex={-1}
+                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto outline-none pb-20 md:pb-0"
+                >
                     {children}
-                </div>
-            </main>
+                </main>
+            </div>
+
+            <MobileBottomDock role={role} />
+            <CommandPalette role={role} />
         </div>
     );
 }

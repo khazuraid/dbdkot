@@ -1,84 +1,175 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import {
+    Check,
+    ChevronsUpDown,
+    LogOutIcon,
+    MonitorIcon,
+    MoonIcon,
+    SettingsIcon,
+    SunIcon,
+} from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
-import { ROLE_LABEL } from '@/lib/nav';
-import type { Role } from '@/lib/roles';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 
-type Props = { name: string; email: string; role: Role };
-
-export function UserMenu({ name, email, role }: Props) {
+export function UserMenu({
+    name,
+    email,
+    roleLabel,
+    institution,
+    compact = false,
+}: {
+    name: string;
+    email: string;
+    roleLabel: string;
+    institution: string | null;
+    compact?: boolean;
+}) {
     const router = useRouter();
-    const { resolvedTheme, setTheme } = useTheme();
+    const { theme, setTheme } = useTheme();
+
+    async function signOut() {
+        await authClient.signOut();
+        router.replace('/masuk');
+    }
+
+    const initials = name
+        .split(/\s+/)
+        .map((part) => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="flex w-full items-center gap-2 rounded-md p-1.5 text-left hover:bg-[var(--raised)]">
-                <span
-                    aria-hidden
-                    className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--raised)] text-[11px] font-medium"
-                >
-                    {initials(name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium">
-                        {name}
-                    </span>
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                        {ROLE_LABEL[role]}
-                    </span>
-                </span>
+            <DropdownMenuTrigger
+                className={cn(
+                    'flex w-full items-center gap-2.5 rounded-[var(--radius-control)] px-2 py-2 text-left transition-colors hover:bg-[var(--raised)] data-popup-open:bg-[var(--active)]',
+                    compact && 'justify-center px-0',
+                )}
+                aria-label="Menu akun"
+                title={compact ? `${name} (${roleLabel})` : undefined}
+            >
+                <Avatar size="sm" aria-hidden>
+                    <AvatarFallback className="bg-[var(--accent)] text-[10.5px] font-semibold text-[var(--accent-ink)]">
+                        {initials || 'WE'}
+                    </AvatarFallback>
+                </Avatar>
+                {!compact && (
+                    <>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] leading-tight font-medium text-foreground">
+                                {name}
+                            </p>
+                            <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                                {roleLabel}
+                            </p>
+                        </div>
+                        <ChevronsUpDown
+                            className="size-3.5 shrink-0 text-faint"
+                            aria-hidden
+                        />
+                    </>
+                )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-56">
-                <div className="px-2 py-1.5">
-                    <div className="truncate text-[13px] font-medium">
+
+            <DropdownMenuContent side="top" align="start" className="w-60">
+                <DropdownMenuLabel className="font-normal">
+                    <p className="truncate text-[13px] font-semibold text-foreground">
                         {name}
-                    </div>
-                    <div className="truncate text-[12px] text-muted-foreground">
+                    </p>
+                    <p className="truncate text-[11.5px] text-muted-foreground">
                         {email}
-                    </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                    onClick={() =>
-                        setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
-                    }
-                >
-                    {resolvedTheme === 'dark' ? (
-                        <Sun className="size-4" strokeWidth={1.5} />
-                    ) : (
-                        <Moon className="size-4" strokeWidth={1.5} />
+                    </p>
+                    {institution && (
+                        <p className="mt-0.5 truncate text-[11px] text-faint">
+                            {institution}
+                        </p>
                     )}
-                    Tema {resolvedTheme === 'dark' ? 'terang' : 'gelap'}
+                </DropdownMenuLabel>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground">
+                    Tampilan
+                </DropdownMenuLabel>
+
+                <DropdownMenuItem
+                    onClick={() => setTheme('light')}
+                    className="justify-between"
+                >
+                    <span className="flex items-center gap-2">
+                        <SunIcon className="size-4" aria-hidden />
+                        Terang
+                    </span>
+                    {theme === 'light' && (
+                        <Check
+                            className="size-3.5 text-[var(--accent)]"
+                            aria-hidden
+                        />
+                    )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                    onClick={async () => {
-                        await authClient.signOut();
-                        router.push('/masuk');
-                        router.refresh();
-                    }}
+                    onClick={() => setTheme('dark')}
+                    className="justify-between"
                 >
-                    <LogOut className="size-4" strokeWidth={1.5} />
+                    <span className="flex items-center gap-2">
+                        <MoonIcon className="size-4" aria-hidden />
+                        Gelap
+                    </span>
+                    {theme === 'dark' && (
+                        <Check
+                            className="size-3.5 text-[var(--accent)]"
+                            aria-hidden
+                        />
+                    )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={() => setTheme('system')}
+                    className="justify-between"
+                >
+                    <span className="flex items-center gap-2">
+                        <MonitorIcon className="size-4" aria-hidden />
+                        Ikuti sistem
+                    </span>
+                    {theme === 'system' && (
+                        <Check
+                            className="size-3.5 text-[var(--accent)]"
+                            aria-hidden
+                        />
+                    )}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem asChild>
+                    <Link href="/pengaturan" className="flex items-center gap-2">
+                        <SettingsIcon className="size-4" aria-hidden />
+                        Pengaturan akun
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={signOut}
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                >
+                    <LogOutIcon className="size-4" aria-hidden />
                     Keluar
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );
-}
-
-function initials(name: string) {
-    return name
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? '')
-        .join('');
 }

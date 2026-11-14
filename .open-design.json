@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "designSystem": {
+    "slug": "ibm",
+    "path": "design-systems/ibm"
+  },
+  "skill": {
+    "slug": "dashboard",
+    "path": "design-templates/dashboard",
+    "kind": "design-template",
+    "mode": "prototype"
+  },
+  "boundAt": "2026-11-14T02:25:00Z"
+}

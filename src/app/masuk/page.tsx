@@ -5,95 +5,74 @@ import type { Metadata } from 'next';
 import { ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { FadeIn } from '@/components/shell/fade-in';
-import { AuthMark } from '@/components/shell/auth-shell';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
 } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = {
-    title: 'Masuk — WALI-EPI',
+    title: 'Masuk: WALI-EPI',
 };
 
-// The session check reads cookies, so the shell cannot be prerendered; same
-// opt-out as every other route that reads request data.
 export const instant = false;
 
-/** The reporting chain from README, compressed to one line under the card. */
-const CHAIN = ['Rumah sakit', 'Puskesmas', 'PE', 'Dinkes'];
-
-export default async function MasukPage() {
-    // A live session that lands here is already past this screen.
+export default async function MasukPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ error?: string }>;
+}) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user) redirect('/dasbor');
 
+    const { error } = await searchParams;
+
     return (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-            <FadeIn className="w-full max-w-[400px]">
-                {/*
-                 * The stock Card draws `ring-1`, which compiles into the
-                 * shadow stack and is read as a floating panel. The sheet
-                 * separates surfaces with a 1px edge and no shadow at rest,
-                 * so the ring is cleared and a border takes its place.
-                 */}
-                <Card className="gap-0 rounded-xl border border-border py-0 [--tw-ring-shadow:none] [--tw-ring-color:transparent] shadow-none">
-                    <CardHeader className="gap-1.5 border-b border-border px-6 py-5">
-                        <AuthMark />
-                        <h1 className="mt-3 text-[20px] font-medium tracking-[-0.01em]">
-                            Masuk
-                        </h1>
-                        <CardDescription className="text-[13px] leading-5">
-                            Sistem surveilans DBD. Gunakan akun yang sudah
-                            disetujui Dinas Kesehatan.
-                        </CardDescription>
-                    </CardHeader>
+        <FadeIn className="w-full">
+            <Card className="gap-0 py-0">
+                <CardHeader className="gap-1.5 border-b border-[var(--rule)] px-6 py-5">
+                    <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-foreground">
+                        Masuk ke ruang kerja
+                    </h2>
+                    <CardDescription className="text-[13px] leading-relaxed">
+                        Gunakan akun instansi terdaftar untuk mengakses data
+                        pelaporan dan penyelidikan epidemiologi.
+                    </CardDescription>
+                </CardHeader>
 
-                    <CardContent className="px-6 pt-5 pb-4">
-                        <LoginForm />
-                    </CardContent>
-
-                    <Separator />
-
-                    <div className="px-6 py-4">
-                        <p className="flex items-start gap-2 text-[12px] leading-5 text-muted-foreground">
+                <CardContent className="space-y-4 px-6 py-5">
+                    {error === 'disabled' && (
+                        <div
+                            role="alert"
+                            className="flex items-start gap-2.5 rounded-[var(--radius-control)] border border-[var(--pill-negative-border)] bg-[var(--pill-negative-bg)] px-3.5 py-2.5 text-[13px] text-[var(--pill-negative-ink)]"
+                        >
                             <ShieldCheck
+                                className="mt-0.5 size-4 shrink-0"
                                 aria-hidden
-                                className="mt-0.5 size-3.5 shrink-0"
-                                strokeWidth={1.5}
                             />
                             <span>
-                                Belum punya akun?{' '}
-                                <Link
-                                    href="/daftar"
-                                    className="text-foreground underline decoration-[var(--control)] underline-offset-4 hover:decoration-foreground"
-                                >
-                                    Ajukan akun
-                                </Link>{' '}
-                                — ditinjau administrator sebelum bisa dipakai.
+                                Akun Anda sedang dinonaktifkan. Hubungi
+                                administrator Dinas Kesehatan untuk mengaktifkan
+                                kembali akses.
                             </span>
-                        </p>
-                    </div>
-                    <div className="border-t border-border px-6 py-3.5">
-                        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-muted-foreground">
-                            <span className="text-foreground">Alur:</span>
-                            {CHAIN.map((step, i) => (
-                                <span key={step} className="flex items-center gap-1.5">
-                                    {i > 0 && (
-                                        <span aria-hidden className="opacity-40">
-                                            →
-                                        </span>
-                                    )}
-                                    {step}
-                                </span>
-                            ))}
-                        </p>
-                    </div>
-                </Card>
-            </FadeIn>
-        </div>
+                        </div>
+                    )}
+
+                    <LoginForm />
+                </CardContent>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--rule)] bg-[var(--raised)]/45 px-6 py-3.5 text-[12.5px] text-muted-foreground">
+                    <span>Belum memiliki akses staf?</span>
+                    <Link
+                        href="/daftar"
+                        className="font-semibold text-[var(--accent)] underline-offset-4 hover:underline"
+                    >
+                        Ajukan akun
+                    </Link>
+                </div>
+            </Card>
+        </FadeIn>
     );
 }

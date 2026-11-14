@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Calendar, X } from 'lucide-react';
 import { DayPicker, type DayPickerLocale } from 'react-day-picker';
 import { id } from 'react-day-picker/locale';
 import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import 'react-day-picker/style.css';
 
 /**
@@ -19,21 +21,44 @@ export function DateField({
     id: fieldId,
     value,
     onChange,
+    className,
+    placeholder = 'Pilih tanggal',
     'aria-invalid': ariaInvalid,
     'aria-describedby': ariaDescribedBy,
 }: {
     id: string;
     value?: string;
     onChange: (value: string) => void;
+    className?: string;
+    placeholder?: string;
     'aria-invalid'?: true;
     'aria-describedby'?: string;
 }) {
     const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
     const selected =
         typeof value === 'string' && value ? parseISODate(value) : undefined;
 
+    useEffect(() => {
+        if (!open) return;
+        const onPointerDown = (e: MouseEvent) => {
+            if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [open]);
+
     return (
-        <div className="relative mt-1">
+        <div ref={rootRef} className={cn('relative mt-1', className)}>
             {/* `aria-invalid` is not permitted on `role=button`, so the error
                 reaches assistive tech through the description instead. */}
             <button
@@ -43,26 +68,31 @@ export function DateField({
                 aria-expanded={open}
                 aria-describedby={ariaDescribedBy}
                 onClick={() => setOpen((v) => !v)}
-                className={`h-9 w-full rounded-[var(--radius-control)] border bg-card px-3 text-left text-[14px] ${
+                className={cn(
+                    'flex h-[var(--control-height)] w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border bg-[var(--surface)] px-3 text-left text-[13.5px] transition-colors outline-none focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
                     ariaInvalid
-                        ? 'border-[var(--negative)]'
-                        : 'border-[var(--control)]'
-                }`}
-            >
-                {selected ? (
-                    formatDate(selected)
-                ) : (
-                    <span className="text-muted-foreground">
-                        Pilih tanggal
-                    </span>
+                        ? 'border-[var(--negative)] ring-2 ring-[var(--negative)]/20'
+                        : 'border-[var(--control)]',
                 )}
+            >
+                <span className="truncate">
+                    {selected ? (
+                        formatDate(selected)
+                    ) : (
+                        <span className="text-faint">{placeholder}</span>
+                    )}
+                </span>
+                <Calendar
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground"
+                />
             </button>
 
             {open && (
                 <div
                     role="dialog"
                     aria-label="Pilih tanggal"
-                    className="absolute z-20 mt-1 rounded-[var(--radius-control)] border border-[var(--control)] bg-card p-2 shadow-lg"
+                    className="absolute left-0 z-30 mt-1.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-2.5 shadow-[var(--elev-pop)]"
                 >
                     {/* The shipped `id` locale is complete at runtime, but its
                         declaration is typed against react-day-picker's own
@@ -78,6 +108,20 @@ export function DateField({
                             setOpen(false);
                         }}
                     />
+                    {selected && (
+                        <div className="mt-1 flex justify-end border-t border-[var(--rule)] pt-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onChange('');
+                                    setOpen(false);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2 py-1 text-[12px] text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground"
+                            >
+                                <X className="size-3" aria-hidden /> Kosongkan
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

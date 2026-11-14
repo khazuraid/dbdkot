@@ -7,16 +7,19 @@ import './globals.css';
 const geistSans = Geist({
     variable: '--font-geist-sans',
     subsets: ['latin'],
+    display: 'swap',
 });
 
 const geistMono = Geist_Mono({
     variable: '--font-geist-mono',
     subsets: ['latin'],
+    display: 'swap',
 });
 
 export const metadata: Metadata = {
-    title: 'WALI-EPI — SiLapor DBD',
-    description: 'Sistem surveilans Demam Berdarah Dengue',
+    title: 'WALI-EPI: Surveilans DBD',
+    description:
+        'Sistem surveilans dan penyelidikan epidemiologi Demam Berdarah Dengue lintas fasilitas kesehatan.',
 };
 
 export default function RootLayout({
@@ -32,14 +35,12 @@ export default function RootLayout({
         >
             <body className="flex min-h-full flex-col">
                 <Providers>{children}</Providers>
-                {/* Alert region, not a dialog: it must not steal focus, and it
-                    must announce itself to a screen reader on its own. */}
                 <Toaster
                     position="bottom-right"
                     closeButton
                     toastOptions={{
                         classNames: {
-                            toast: 'rounded-[var(--radius-card)] border border-border text-[13px]',
+                            toast: 'rounded-[var(--radius-card)] border border-border bg-surface text-foreground text-[13.5px] shadow-[var(--elev-pop)]',
                         },
                     }}
                 />

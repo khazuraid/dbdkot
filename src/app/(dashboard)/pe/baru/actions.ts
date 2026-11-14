@@ -14,18 +14,28 @@ export async function submitPe(
     _prev: PeFormState,
     formData: FormData,
 ): Promise<PeFormState> {
-    // Households arrive as one JSON field from the client list; it is parsed and
-    // validated here, never trusted as already-shaped.
     let households: unknown = [];
+    let clinicalSymptoms: unknown = [];
     try {
         households = JSON.parse(String(formData.get('households') ?? '[]'));
     } catch {
         return { fieldErrors: { households: 'Data rumah tidak valid.' } };
     }
+    try {
+        clinicalSymptoms = JSON.parse(
+            String(formData.get('clinicalSymptoms') ?? '[]'),
+        );
+    } catch {
+        clinicalSymptoms = [];
+    }
 
+    const raw = Object.fromEntries(formData);
     const parsed = createPeSchema.safeParse({
-        ...Object.fromEntries(formData),
+        ...raw,
         households,
+        clinicalSymptoms,
+        hasOtherDenguePatients:
+            formData.get('hasOtherDenguePatients') === 'true',
     });
 
     if (!parsed.success) {
@@ -44,6 +54,7 @@ export async function submitPe(
 
     revalidatePath('/pe');
     revalidatePath('/laporan');
+    revalidatePath(`/laporan/${parsed.data.reportRSId}`);
     revalidatePath('/dasbor');
 
     return { ok: true };

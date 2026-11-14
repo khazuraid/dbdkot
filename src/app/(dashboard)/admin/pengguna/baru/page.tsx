@@ -1,6 +1,6 @@
 import { requireRole } from '@/lib/session';
 import { institutionOptions } from '@/lib/domain/accounts';
-import { PageBody, PageHeader } from '@/components/shell/page';
+import { PageBody, PageContent, PageHeader } from '@/components/shell/page';
 import { CreateAccountForm } from './create-account-form';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
@@ -16,7 +16,10 @@ export default async function NewAccountPage() {
                 title="Tambah akun"
                 context="Akun dibuat langsung aktif; tidak perlu persetujuan lanjutan."
             />
-            <CreateAccountForm institutions={institutions} />
+
+            <PageContent>
+                <CreateAccountForm institutions={institutions} />
+            </PageContent>
         </PageBody>
     );
 }

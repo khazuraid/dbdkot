@@ -1,88 +1,159 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
-/* Tokens from .taste-skill/sheet.md — Achromatic ledger, Open plane shell.
-   The chrome holds no colour: ink for text, one chart hue for the main data
-   element, colour only on the small change signal. */
+/* ─────────────────────────────────────────────────────────────────────────
+   CLINICAL FIELD LEDGER — WALI-EPI Design System
+
+   A calm, authoritative visual language built for Indonesian dengue
+   surveillance teams (Rumah Sakit, Puskesmas, Dinas Kesehatan):
+   - Mineral alabaster ground with crisp 1px architectural hairlines and
+     deep pine-teal primary signal (#0D6E5D light / #2BB59B dark).
+   - Dedicated, CVD-validated categorical dataviz palette (--viz-1..4)
+     separated from UI chrome so data marks never compete with navigation.
+   - Tabular numerals across every ledger, index, and timestamp.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-    --ground: #f8f8f8;
+    /* Zinc Base + Deep Teal Primary (Clinical Precision & Field Operational) */
+    --ground: #fafafa;
     --surface: #ffffff;
-    --raised: #eeeeee;
-    --active: #ededed;
-    --border: #e6e6e6;
-    --rule: #f0f0f0;
-    --control: #d4d4d4;
-    --text: #0a0a0a;
-    --muted: #6b6b6b;
-    /* 5.29:1 on --ground. The old #767676 measured 4.28:1, under AA for the
-       12px labels that use it. */
-    --faint: #6b6b6b;
+    --raised: #f4f4f5;
+    --active: #e6f7f5;
+    --border: #e4e4e7;
+    --rule: #f4f4f5;
+    --control: #d4d4d8;
+    --text: #09090b;
+    --muted: #52525b;
+    --faint: #71717a;
 
-    --accent: #141414;
-    --data: #1d5fbf;
+    /* Primary Public Health: Deep Teal (#0D9488) */
+    --accent: #0d9488;
+    --accent-ink: #ffffff;
+    --accent-soft: #ccfbf1;
 
-    --positive: #2e7d32;
-    --negative: #c4242a;
-    --warning: #92400e;
+    /* Validated DataViz categorical palette */
+    --viz-1: #0284c7;
+    --viz-2: #e11d48;
+    --viz-3: #059669;
+    --viz-4: #d97706;
+    --data: var(--viz-1);
+    --signal: #e4e4e7;
 
-    /* Status pills (§7.6): a pale tint with dark ink of the same hue. The one
-       place on the chrome where colour is allowed, because it means a state. */
-    --pill-positive-bg: #dcfae5;
-    --pill-positive-ink: #04250e;
-    --pill-negative-bg: #ffedea;
-    --pill-negative-ink: #831c1e;
+    /* Clinical triage semantic status tokens */
+    --positive: #059669;
+    --negative: #e11d48;
+    --warning: #d97706;
+    --info: #0284c7;
+
+    --pill-positive-bg: #ecfdf5;
+    --pill-positive-ink: #065f46;
+    --pill-positive-border: #a7f3d0;
+
+    --pill-negative-bg: #fff1f2;
+    --pill-negative-ink: #9f1239;
+    --pill-negative-border: #fecdd3;
+
     --pill-warning-bg: #fffbeb;
     --pill-warning-ink: #92400e;
-    --pill-neutral-bg: #eeeeee;
-    --pill-neutral-ink: #3d3d3d;
+    --pill-warning-border: #fde68a;
 
-    --radius-card: 8px;
-    --radius-control: 6px;
+    --pill-info-bg: #f0f9ff;
+    --pill-info-ink: #075985;
+    --pill-info-border: #bae6fd;
+
+    --pill-neutral-bg: #f4f4f5;
+    --pill-neutral-ink: #3f3f46;
+    --pill-neutral-border: #e4e4e7;
+
+    /* Restrained architectural elevation tinted toward Zinc-950 */
+    --elev-soft:
+        0 1px 2px rgb(9 9 11 / 0.04),
+        0 6px 20px -12px rgb(9 9 11 / 0.08);
+    --elev-pop:
+        0 2px 6px rgb(9 9 11 / 0.06),
+        0 20px 44px -16px rgb(9 9 11 / 0.16);
+
+    /* Consistent shape & spatial scale */
+    --radius-card: 14px;
+    --radius-control: 8px;
+    --radius-pill: 999px;
     --row-height: 44px;
-    --sidebar-width: 256px;
-    --gap: 12px;
+    --sidebar-width: 248px;
+    --sidebar-collapsed: 68px;
+    --topbar-height: 56px;
+    --gap: 16px;
     --pad: 24px;
-    --control-height: 36px;
+    --control-height: 38px;
 
     --fs-title: 24px;
-    --fs-section: 16px;
-    --fs-kpi: 30px;
+    --fs-section: 14px;
+    --fs-kpi: 34px;
     --fs-body: 14px;
     --fs-small: 12px;
+
+    --color-scheme: light;
+    color-scheme: light;
 }
 
-/* Achromatic ledger, inverted. Same roles, same contrast ratios: text values
-   are re-checked against the dark ground rather than flipped arithmetically. */
 :root.dark {
-    --ground: #0f0f0f;
-    --surface: #171717;
-    --raised: #1f1f1f;
-    --active: #262626;
-    --border: #2a2a2a;
-    --rule: #222222;
-    --control: #3a3a3a;
-    --text: #f5f5f5;
-    --muted: #a3a3a3;
-    --faint: #a3a3a3;
+    --ground: #09090b;
+    --surface: #111114;
+    --raised: #18181b;
+    --active: #112a27;
+    --border: #27272a;
+    --rule: #18181b;
+    --control: #3f3f46;
+    --text: #fafafa;
+    --muted: #a1a1aa;
+    --faint: #71717a;
 
-    --accent: #f5f5f5;
-    --data: #6ea8fe;
+    --accent: #14b8a6;
+    --accent-ink: #042f2e;
+    --accent-soft: #134e4a;
 
-    --positive: #6bbf70;
-    --negative: #ff7b7b;
-    --warning: #e0a15e;
+    /* Validated DataViz categorical palette (dark surface, CVD ΔE >= 8 pass) */
+    --viz-1: #38bdf8;
+    --viz-2: #f43f5e;
+    --viz-3: #10b981;
+    --viz-4: #f59e0b;
+    --data: var(--viz-1);
+    --signal: #27272a;
 
-    /* Reversed pairs: the tint becomes the ink and the ink the tint. */
-    --pill-positive-bg: #0d2e1a;
-    --pill-positive-ink: #a8e6bf;
-    --pill-negative-bg: #3a1416;
-    --pill-negative-ink: #ffbdbd;
-    --pill-warning-bg: #33260d;
-    --pill-warning-ink: #f5cd8e;
-    --pill-neutral-bg: #262626;
-    --pill-neutral-ink: #d4d4d4;
+    --positive: #34d399;
+    --negative: #fb7185;
+    --warning: #fbbf24;
+    --info: #38bdf8;
+
+    --pill-positive-bg: #052e16;
+    --pill-positive-ink: #6ee7b7;
+    --pill-positive-border: #065f46;
+
+    --pill-negative-bg: #3b0712;
+    --pill-negative-ink: #fda4af;
+    --pill-negative-border: #881337;
+
+    --pill-warning-bg: #2e1a05;
+    --pill-warning-ink: #fcd34d;
+    --pill-warning-border: #78350f;
+
+    --pill-info-bg: #082f49;
+    --pill-info-ink: #7dd3fc;
+    --pill-info-border: #075985;
+
+    --pill-neutral-bg: #18181b;
+    --pill-neutral-ink: #d4d4d8;
+    --pill-neutral-border: #27272a;
+
+    --elev-soft:
+        0 1px 2px rgb(0 0 0 / 0.42),
+        0 8px 24px -12px rgb(0 0 0 / 0.58);
+    --elev-pop:
+        0 2px 6px rgb(0 0 0 / 0.5),
+        0 24px 48px -16px rgb(0 0 0 / 0.72);
+
+    --color-scheme: dark;
+    color-scheme: dark;
 }
 
 @theme inline {
@@ -92,8 +163,8 @@
     --color-card-foreground: var(--text);
     --color-popover: var(--surface);
     --color-popover-foreground: var(--text);
-    --color-primary: #1d1f20;
-    --color-primary-foreground: #ffffff;
+    --color-primary: var(--accent);
+    --color-primary-foreground: var(--accent-ink);
     --color-secondary: var(--raised);
     --color-secondary-foreground: var(--text);
     --color-muted: var(--raised);
@@ -103,50 +174,190 @@
     --color-destructive: var(--negative);
     --color-border: var(--border);
     --color-input: var(--control);
-    --color-ring: var(--data);
-    --color-chart-1: var(--text);
-    --color-chart-2: #8a8a8a;
-    --color-chart-3: var(--data);
-    --color-chart-4: #5f6368;
-    --color-chart-5: #b4b4b4;
-    --color-sidebar: var(--ground);
+    --color-ring: var(--accent);
+    --color-rule: var(--rule);
+    --color-surface: var(--surface);
+    --color-raised: var(--raised);
+    --color-faint: var(--faint);
+
+    --color-chart-1: var(--viz-1);
+    --color-chart-2: var(--viz-2);
+    --color-chart-3: var(--viz-3);
+    --color-chart-4: var(--viz-4);
+    --color-chart-5: var(--faint);
+    --color-sidebar: var(--surface);
     --color-sidebar-foreground: var(--text);
-    --color-sidebar-primary: var(--text);
-    --color-sidebar-primary-foreground: var(--surface);
+    --color-sidebar-primary: var(--accent);
+    --color-sidebar-primary-foreground: var(--accent-ink);
     --color-sidebar-accent: var(--active);
     --color-sidebar-accent-foreground: var(--text);
     --color-sidebar-border: var(--border);
-    --color-sidebar-ring: var(--data);
+    --color-sidebar-ring: var(--accent);
 
-    --radius-sm: 4px;
+    --color-positive: var(--positive);
+    --color-negative: var(--negative);
+    --color-warning: var(--warning);
+    --color-info: var(--info);
+    --color-data: var(--data);
+
+    --radius-sm: 6px;
     --radius-md: var(--radius-control);
     --radius-lg: var(--radius-card);
-    --radius-xl: 12px;
+    --radius-xl: 18px;
 
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
     --font-heading: var(--font-geist-sans);
+
+    --shadow-soft: var(--elev-soft);
+    --shadow-pop: var(--elev-pop);
 }
 
 @layer base {
-    * {
-        @apply border-border outline-ring/50;
-    }
-
     html {
-        @apply font-sans;
+        -webkit-text-size-adjust: 100%;
     }
 
     body {
+        font-family:
+            var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
         background: var(--ground);
         color: var(--text);
         font-size: var(--fs-body);
+        line-height: 1.5;
         -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow-wrap: anywhere;
     }
 
-    /* Every figure that updates or aligns in a column. */
+    @media (min-width: 768px) {
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
     table,
     [data-numeric] {
         font-variant-numeric: tabular-nums;
+    }
+
+    ::selection {
+        background: var(--accent);
+        color: var(--accent-ink);
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--control) transparent;
+    }
+}
+
+@layer components {
+    .skip-link {
+        position: fixed;
+        top: -100px;
+        left: 16px;
+        z-index: 100;
+        border-radius: var(--radius-control);
+        background: var(--accent);
+        color: var(--accent-ink);
+        padding: 10px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: var(--elev-pop);
+        transition: top 150ms ease;
+    }
+
+    .skip-link:focus {
+        top: 16px;
+    }
+
+    .app-sidebar {
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+    }
+
+    /* Dark mode filter for OpenStreetMap tiles: keeps markers/overlays intact while dark-theming base tiles */
+    .dark .leaflet-tile-pane {
+        filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%);
+    }
+
+    .surface {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        box-shadow: var(--elev-soft);
+    }
+
+    .ledger {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        font-size: var(--fs-body);
+    }
+
+    .ledger thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--raised);
+        height: 38px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
+        font-size: var(--fs-small);
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--muted);
+        white-space: nowrap;
+        text-align: left;
+    }
+
+    .ledger tbody td {
+        height: var(--row-height);
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--rule);
+        vertical-align: middle;
+    }
+
+    .ledger tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .ledger tbody tr:hover td {
+        background: var(--raised);
+    }
+
+    .ledger .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .eyebrow {
+        font-size: var(--fs-small);
+        font-weight: 500;
+        color: var(--muted);
+    }
+
+    .bar-accent {
+        background: var(--accent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

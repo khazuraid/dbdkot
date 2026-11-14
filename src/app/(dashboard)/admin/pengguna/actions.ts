@@ -8,6 +8,8 @@ import {
     createAccountSchema,
     rejectAccount,
     setAccountActive,
+    updateAccount,
+    updateAccountSchema,
 } from '@/lib/domain/accounts';
 import type { Role } from '@/lib/roles';
 
@@ -91,7 +93,7 @@ export async function createAccountAction(
         email: formData.get('email'),
         password: formData.get('password'),
         role: formData.get('role'),
-        institutionId: formData.get('institutionId'),
+        institutionId: formData.get('institutionId') || undefined,
     });
 
     if (!parsed.success) {
@@ -108,4 +110,34 @@ export async function createAccountAction(
     // rather than the form; there is nothing else to do on this screen.
     revalidatePath('/admin/pengguna');
     return { ok: true, message: 'Akun dibuat dan langsung aktif.' };
+}
+
+export async function updateAccountAction(
+    _state: ActionState,
+    formData: FormData,
+): Promise<ActionState> {
+    const { actor, error } = await actorOrError();
+    if (!actor) return { ok: false, error };
+
+    const parsed = updateAccountSchema.safeParse({
+        userId: formData.get('userId'),
+        name: formData.get('name'),
+        email: formData.get('email'),
+        password: formData.get('password') || undefined,
+        role: formData.get('role') || undefined,
+        institutionId: formData.get('institutionId') || undefined,
+    });
+
+    if (!parsed.success) {
+        return {
+            ok: false,
+            error: parsed.error.issues[0]?.message ?? 'Data belum lengkap.',
+        };
+    }
+
+    const result = await updateAccount(actor, parsed.data);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    revalidatePath('/admin/pengguna');
+    return { ok: true, message: 'Perubahan akun disimpan.' };
 }

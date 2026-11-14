@@ -18,6 +18,8 @@ export type AuditEntity =
     | 'PE_TASK'
     | 'USER'
     | 'INSTITUTION'
+    | 'KELURAHAN'
+    | 'ASSET'
     | 'ATTACHMENT'
     | 'KOREKSI_WILAYAH';
 

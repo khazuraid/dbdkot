@@ -31,9 +31,11 @@ function readConfig() {
     if (!email) problems.push('ADMIN_EMAIL belum diisi');
     if (!password) problems.push('ADMIN_PASSWORD belum diisi');
     // Mirrors `minPasswordLength: 10` in lib/auth.ts.
-    else if (password.length < 10) problems.push('ADMIN_PASSWORD minimal 10 karakter');
+    else if (password.length < 10)
+        problems.push('ADMIN_PASSWORD minimal 10 karakter');
     if (!process.env.DATABASE_URL) problems.push('DATABASE_URL belum diisi');
-    if (!process.env.BETTER_AUTH_SECRET) problems.push('BETTER_AUTH_SECRET belum diisi');
+    if (!process.env.BETTER_AUTH_SECRET)
+        problems.push('BETTER_AUTH_SECRET belum diisi');
 
     if (problems.length) {
         console.error(
@@ -65,7 +67,9 @@ async function main() {
 
     if (existing) {
         if (existing.role === 'ADMIN') {
-            console.log(`Akun ${email} sudah ada dan sudah ADMIN. Tidak ada yang diubah.`);
+            console.log(
+                `Akun ${email} sudah ada dan sudah ADMIN. Tidak ada yang diubah.`,
+            );
             return;
         }
 
@@ -93,9 +97,12 @@ async function main() {
     // is the approval gate working, not a failure to create the account. The
     // row is already there by the time it is thrown; the update below is what
     // makes the account usable.
-    await auth.api.signUpEmail({ body: { name, email, password } }).catch((error) => {
-        if (!(error instanceof APIError) || error.status !== 'FORBIDDEN') throw error;
-    });
+    await auth.api
+        .signUpEmail({ body: { name, email, password } })
+        .catch((error) => {
+            if (!(error instanceof APIError) || error.status !== 'FORBIDDEN')
+                throw error;
+        });
 
     const [created] = await db
         .select({ id: users.id })
@@ -126,6 +133,9 @@ async function main() {
 main()
     .then(() => process.exit(0))
     .catch((error) => {
-        console.error('Gagal membuat admin:', error instanceof Error ? error.message : error);
+        console.error(
+            'Gagal membuat admin:',
+            error instanceof Error ? error.message : error,
+        );
         process.exit(1);
     });

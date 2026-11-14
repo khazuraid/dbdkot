@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
     createColumnHelper,
     FlexRender,
@@ -11,19 +12,19 @@ import {
     type RowData,
     type TableFeatures,
 } from '@tanstack/react-table';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { Dash } from '@/components/shell/data-table';
+import { Empty } from '@/components/shell/page';
+import { StatusText } from '@/components/shell/status-text';
 import {
     CASE_TYPE_LABEL,
     STATUS_LABEL,
+    STATUS_TONE,
     type ReportListRow,
 } from '@/lib/domain/report-labels';
 import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
-/**
- * Alignment is carried on the column, not on each `cell` render, so the header
- * and its body cells can never disagree about which side the numbers sit on.
- */
-// The type parameters must match the interface being merged, though only its
-// members are ever read here.
 /* eslint-disable @typescript-eslint/no-unused-vars */
 declare module '@tanstack/table-core' {
     interface ColumnMeta<
@@ -37,54 +38,82 @@ declare module '@tanstack/table-core' {
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
 const features = tableFeatures({ rowSortingFeature });
-
 const helper = createColumnHelper<typeof features, ReportListRow>();
 
 /**
- * One report table for every screen that lists reports. Rules and alignment:
- * hairline rows, no zebra, numbers right, tabular figures — the operator scans
- * a column of digits, and proportional numerals make that slower.
- *
- * Sorting is the reason this is a client component: it is a view concern, so
- * it reorders the rows already on screen rather than re-querying. The page
- * stays server-paginated, which is what keeps a page a URL.
+ * Shared report ledger table using the unified `.ledger` stylesheet,
+ * hairline borders, horizontal overflow guard, StatusText badges, and
+ * keyboard-accessible column sorting.
  */
 export function ReportTable({
     rows,
     empty,
+    onSelectRow,
+    selectedId,
 }: {
     rows: ReportListRow[];
     empty: string;
+    onSelectRow?: (id: string) => void;
+    selectedId?: string;
 }) {
     const columns = helper.columns([
         helper.accessor('reportNumber', {
             header: 'No. laporan',
             cell: (c) => (
-                <Link href={`/laporan/${c.row.original.id}`} className="underline">
+                <Link
+                    href={`/laporan/${c.row.original.id}`}
+                    className="font-mono text-[13px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                >
                     {c.getValue()}
                 </Link>
             ),
         }),
         helper.accessor('caseType', {
             header: 'Kasus',
-            cell: (c) => CASE_TYPE_LABEL[c.getValue()] ?? c.getValue(),
+            cell: (c) => (
+                <span className="font-medium">
+                    {CASE_TYPE_LABEL[c.getValue()] ?? c.getValue()}
+                </span>
+            ),
+        }),
+        helper.accessor('sourceType', {
+            header: 'Sumber',
+            cell: (c) => {
+                const src = c.getValue();
+                const isPuskesmas = src === 'PUSKESMAS_POLI' || src === 'PUSKESMAS';
+                return (
+                    <span
+                        className={cn(
+                            'inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium tracking-tight',
+                            isPuskesmas
+                                ? 'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-600/20 dark:bg-teal-950/40 dark:text-teal-300 dark:ring-teal-500/30'
+                                : 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-500/30',
+                        )}
+                    >
+                        {isPuskesmas ? 'Puskesmas' : 'Rumah Sakit'}
+                    </span>
+                );
+            },
         }),
         helper.accessor((r) => r.kelurahan ?? r.kecamatan ?? '', {
             id: 'wilayah',
             header: 'Wilayah',
             cell: (c) => {
                 const { kelurahan, kecamatan } = c.row.original;
-                return (
-                    <span className="text-muted-foreground">
-                        {[kelurahan, kecamatan].filter(Boolean).join(', ') ||
-                            '—'}
-                    </span>
+                const place = [kelurahan, kecamatan]
+                    .filter(Boolean)
+                    .join(', ');
+                return place ? (
+                    <span className="text-muted-foreground">{place}</span>
+                ) : (
+                    <Dash />
                 );
             },
         }),
         helper.accessor('age', {
             header: 'Umur',
             meta: { align: 'right' },
+            cell: (c) => `${c.getValue()} th`,
         }),
         helper.accessor('gender', {
             header: 'JK',
@@ -92,109 +121,129 @@ export function ReportTable({
         }),
         helper.accessor('status', {
             header: 'Status',
-            cell: (c) => STATUS_LABEL[c.getValue()],
+            cell: (c) => {
+                const status = c.getValue();
+                return (
+                    <StatusText tone={STATUS_TONE[status] ?? 'neutral'}>
+                        {STATUS_LABEL[status] ?? status}
+                    </StatusText>
+                );
+            },
         }),
         helper.accessor('createdAt', {
             header: 'Masuk',
             meta: { align: 'right' },
-            // `Date` objects sort by value; the formatted string would sort
-            // alphabetically, which on `id-ID` is neither chronological nor
-            // stable across locales.
             cell: (c) => (
                 <span className="text-muted-foreground">
                     {formatDate(c.getValue())}
                 </span>
             ),
         }),
+        helper.display({
+            id: 'actions',
+            header: '',
+            meta: { align: 'right' },
+            cell: (c) => (
+                <Link
+                    href={`/laporan/${c.row.original.id}`}
+                    className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <span>Detail</span>
+                    <ChevronRight className="size-3.5" aria-hidden />
+                </Link>
+            ),
+        }),
     ]);
 
-    // Column defs are rebuilt when `rows` changes, which invalidates the row
-    // models; passing a fresh `[]` for empty rows would do the same on every
-    // render, so the response is used as-is.
+    const router = useRouter();
     const table = useTable({ features, columns, data: rows });
 
-    return (
-        <table className="w-full border-collapse text-[14px]">
-            <thead>
-                {table.getHeaderGroups().map((group) => (
-                    <tr
-                        key={group.id}
-                        className="border-y border-border text-left text-[12px] text-muted-foreground"
-                    >
-                        {group.headers.map((header) => {
-                            const sort = header.column.getIsSorted();
-                            const align =
-                                header.column.columnDef.meta?.align ===
-                                'right'
-                                    ? 'text-right'
-                                    : undefined;
+    if (rows.length === 0) {
+        return <Empty>{empty}</Empty>;
+    }
 
-                            return (
-                                <th
-                                    key={header.id}
-                                    scope="col"
-                                    aria-sort={ariaSort(sort)}
-                                    className={`py-2 font-normal ${align ?? ''}`}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={header.column.getToggleSortingHandler()}
-                                        className="inline-flex items-center gap-1"
+    return (
+        <div className="overflow-x-auto">
+            <table className="ledger min-w-[760px]">
+                <thead>
+                    {table.getHeaderGroups().map((group) => (
+                        <tr key={group.id}>
+                            {group.headers.map((header) => {
+                                const sort = header.column.getIsSorted();
+                                const right =
+                                    header.column.columnDef.meta?.align ===
+                                    'right';
+
+                                return (
+                                    <th
+                                        key={header.id}
+                                        scope="col"
+                                        aria-sort={ariaSort(sort)}
+                                        className={
+                                            right ? 'text-right' : undefined
+                                        }
                                     >
-                                        <FlexRender header={header} />
-                                        <SortMark state={sort} />
-                                    </button>
-                                </th>
-                            );
-                        })}
-                    </tr>
-                ))}
-            </thead>
-            <tbody className="divide-y divide-border">
-                {table.getRowModel().rows.map((row) => (
-                    <tr
-                        key={row.id}
-                        className="h-[var(--row-height)] hover:bg-[var(--raised)]"
-                    >
-                        {row.getAllCells().map((cell) => (
-                            <td
-                                key={cell.id}
-                                data-numeric={
-                                    cell.column.columnDef.meta?.align ===
-                                    'right'
-                                        ? true
-                                        : undefined
-                                }
-                                className={`py-2 ${
-                                    cell.column.columnDef.meta?.align ===
-                                    'right'
-                                        ? 'text-right'
-                                        : ''
-                                }`}
+                                        <button
+                                            type="button"
+                                            onClick={header.column.getToggleSortingHandler()}
+                                            className={cn(
+                                                'inline-flex items-center gap-1 rounded-[4px] py-1 transition-colors hover:text-foreground',
+                                                right && 'flex-row-reverse',
+                                            )}
+                                        >
+                                            <FlexRender header={header} />
+                                            <SortMark state={sort} />
+                                        </button>
+                                    </th>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </thead>
+                <tbody>
+                    {table.getRowModel().rows.map((row) => {
+                        const isSelected = selectedId === row.original.id;
+                        return (
+                            <tr
+                                key={row.id}
+                                onClick={(e) => {
+                                    if ((e.target as HTMLElement).closest('a, button')) return;
+                                    if (onSelectRow) {
+                                        onSelectRow(row.original.id);
+                                    } else {
+                                        router.push(`/laporan/${row.original.id}`);
+                                    }
+                                }}
+                                className={cn(
+                                    'group cursor-pointer transition-colors hover:bg-[var(--raised)]/70',
+                                    isSelected
+                                        ? 'bg-[var(--active)] font-medium shadow-xs'
+                                        : undefined,
+                                )}
                             >
-                                <FlexRender
-                                    cell={cell}
-                                />
-                            </td>
-                        ))}
-                    </tr>
-                ))}
-                {rows.length === 0 && (
-                    <tr>
-                        <td
-                            colSpan={columns.length}
-                            className="py-10 text-center text-muted-foreground"
-                        >
-                            {empty}
-                        </td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
+                                {row.getAllCells().map((cell) => (
+                                    <td
+                                        key={cell.id}
+                                        className={
+                                            cell.column.columnDef.meta?.align ===
+                                            'right'
+                                                ? 'num'
+                                                : undefined
+                                        }
+                                    >
+                                        <FlexRender cell={cell} />
+                                    </td>
+                                ))}
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
     );
 }
 
-/** The one place a sort is not inherited from the caller. */
 function ariaSort(state: false | 'asc' | 'desc') {
     if (state === 'asc') return 'ascending' as const;
     if (state === 'desc') return 'descending' as const;
@@ -202,10 +251,21 @@ function ariaSort(state: false | 'asc' | 'desc') {
 }
 
 function SortMark({ state }: { state: false | 'asc' | 'desc' }) {
-    if (!state) return null;
-    return (
-        <span aria-hidden className="text-[10px]">
-            {state === 'asc' ? '▲' : '▼'}
-        </span>
-    );
+    if (state === 'asc') {
+        return (
+            <ArrowUp
+                className="size-3 text-[var(--accent)]"
+                aria-hidden
+            />
+        );
+    }
+    if (state === 'desc') {
+        return (
+            <ArrowDown
+                className="size-3 text-[var(--accent)]"
+                aria-hidden
+            />
+        );
+    }
+    return <ArrowUpDown className="size-3 opacity-40" aria-hidden />;
 }

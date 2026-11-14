@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { institutions, reportsRS, users } from '@/db/schema';
 
@@ -51,13 +51,14 @@ export async function assignReportByKelurahan(
                 eq(institutions.type, 'PUSKESMAS'),
                 eq(institutions.isActive, true),
                 // Array containment: the institution's coverage list holds
-                // this kelurahan. Case-insensitive so 'Cilodong' matches.
+                // this kelurahan. Case- and whitespace-insensitive so ' Cilodong ' matches.
                 sql`exists (
                     select 1 from unnest(${institutions.kelurahanList}) as k
-                    where lower(k) = lower(${report.kelurahan})
+                    where lower(btrim(k)) = lower(btrim(${report.kelurahan}))
                 )`,
             ),
         )
+        .orderBy(asc(institutions.id))
         .limit(1);
 
     if (!puskesmas) {
@@ -76,6 +77,7 @@ export async function assignReportByKelurahan(
                 eq(users.role, 'PUSKESMAS'),
             ),
         )
+        .orderBy(asc(users.id))
         .limit(1);
 
     // `.returning()` is the arbiter: if a concurrent worker assigned this
@@ -86,12 +88,17 @@ export async function assignReportByKelurahan(
         .set({
             assignedPuskesmasId: puskesmas.id,
             assignedToId: officer?.id ?? null,
+            assignedAt: new Date(),
             status: 'ASSIGNED',
         })
         .where(
             and(
                 eq(reportsRS.id, reportId),
                 sql`${reportsRS.assignedPuskesmasId} is null`,
+                // Only a report still waiting for a puskesmas may be
+                // assigned; a draft or an already-verified row must not be
+                // dragged back into the queue by an orphan-sweep.
+                eq(reportsRS.status, 'SUBMITTED'),
             ),
         )
         .returning({ id: reportsRS.id });
@@ -108,14 +115,17 @@ export async function assignReportByKelurahan(
 }
 
 /**
- * Reports past the 4-day SLA that nobody accepted. Used by the SLA worker.
- */
-/**
  * SLA is four days from submission, by one definition only: `createdAt`.
  * The delayed job and the nightly sweep both read this function, so they can
  * never disagree about what "4 days" means.
  */
-const SLA_INTERVAL = sql`interval '4 days'`;
+const SLA_INTERVAL = sql`interval '24 hours'`;
+
+/**
+ * Rows one sweep run may touch. The night job repeats, so a backlog drains
+ * oldest-first over successive runs instead of being truncated silently.
+ */
+const SWEEP_BATCH = 500;
 
 export async function findOverdueReportIds(): Promise<string[]> {
     const rows = await getDb()
@@ -126,7 +136,10 @@ export async function findOverdueReportIds(): Promise<string[]> {
                 and ${reportsRS.puskesmasReviewedAt} is null
                 and ${reportsRS.createdAt} < now() - ${SLA_INTERVAL}`,
         )
-        .limit(500);
+        // Oldest first, so a backlog larger than one sweep is worked through
+        // in order instead of re-selecting the same arbitrary rows.
+        .orderBy(asc(reportsRS.createdAt))
+        .limit(SWEEP_BATCH);
 
     return rows.map((r) => r.id);
 }
@@ -146,7 +159,8 @@ export async function findUnassignedReportIds(): Promise<string[]> {
                 and ${reportsRS.assignedPuskesmasId} is null
                 and ${reportsRS.createdAt} > now() - interval '30 days'`,
         )
-        .limit(500);
+        .orderBy(asc(reportsRS.createdAt))
+        .limit(SWEEP_BATCH);
 
     return rows.map((r) => r.id);
 }

@@ -21,7 +21,10 @@ export function redisConnection(): RedisOptions {
 
 export const QUEUE_NAMES = {
     assign: 'report-assignment',
+    whatsappDispatch: 'whatsapp-dispatch',
     sla: 'pe-task-reminder',
+    clusterDetector: 'cluster-detector',
+    foggingScheduler: 'fogging-scheduler',
     notify: 'notification',
     export: 'export',
 } as const;

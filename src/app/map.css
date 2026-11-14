@@ -1,0 +1,42 @@
+/* Leaflet chrome themed to Clinical Field Ledger tokens */
+.leaflet-container {
+    font: inherit;
+    background: var(--raised);
+    isolation: isolate;
+    z-index: 0;
+}
+
+.leaflet-control-attribution {
+    background: color-mix(in oklab, var(--surface) 86%, transparent) !important;
+    color: var(--muted) !important;
+    font-size: 11px !important;
+}
+
+.leaflet-control-attribution a {
+    color: var(--muted) !important;
+}
+
+.leaflet-bar a {
+    background: var(--surface);
+    color: var(--text);
+    border-bottom-color: var(--border);
+}
+
+.leaflet-bar a:hover {
+    background: var(--active);
+    color: var(--text);
+}
+
+.leaflet-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--elev-pop);
+    font-size: 12.5px;
+    padding: 6px 10px;
+}
+
+.leaflet-tooltip-top::before {
+    border-top-color: var(--border);
+}

@@ -1,70 +1,89 @@
-import { requireRole } from '@/lib/session';
+import { eq } from 'drizzle-orm';
+import { getDb } from '@/db';
+import { institutions, users } from '@/db/schema';
+import { requireActor } from '@/lib/session';
 import { listSettings } from '@/lib/domain/admin';
-import { PageBody, PageHeader } from '@/components/shell/page';
+import { PageBody, PageContent, PageHeader } from '@/components/shell/page';
+import { SettingsClient } from './settings-client';
+import type { SettingRow } from './settings-editor';
 
-// Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
+// Data pasien / sesi: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
 
-/**
- * Settings are label-beside-panel rows, not a table: each key is a decision with
- * a default and a current value, and a reader scans the left column for the one
- * they came to change. Public settings only: an admin screen must never print a
- * stored secret.
- */
 export default async function PengaturanPage() {
-    const actor = await requireRole('DINKES', 'ADMIN');
-    const rows = await listSettings(actor.role !== 'ADMIN');
+    const actor = await requireActor();
+    const isAdmin = actor.role === 'ADMIN';
+    const canManageSystem = actor.role === 'ADMIN' || actor.role === 'DINKES';
 
-    const groups = new Map<string, typeof rows>();
-    for (const row of rows) {
-        const category = row.category ?? 'Lainnya';
-        const list = groups.get(category) ?? [];
-        list.push(row);
-        groups.set(category, list);
+    const db = getDb();
+
+    const [userRows, settingsData] = await Promise.all([
+        db
+            .select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                role: users.role,
+                status: users.status,
+                institutionId: users.institutionId,
+                whatsappPhone: users.whatsappPhone,
+                whatsappOptIn: users.whatsappOptIn,
+                createdAt: users.createdAt,
+            })
+            .from(users)
+            .where(eq(users.id, actor.userId))
+            .limit(1),
+        canManageSystem
+            ? listSettings(!isAdmin)
+            : Promise.resolve({ rows: [] as SettingRow[], total: 0 }),
+    ]);
+
+    const me = userRows[0];
+    let institutionName: string | null = null;
+
+    if (me?.institutionId) {
+        const [inst] = await db
+            .select({ name: institutions.name })
+            .from(institutions)
+            .where(eq(institutions.id, me.institutionId))
+            .limit(1);
+        institutionName = inst?.name ?? null;
     }
+
+    const { rows: systemSettings, total: totalSettings } = settingsData;
+    const categorySet = new Set<string>();
+    for (const s of systemSettings) {
+        if (s.category) categorySet.add(s.category);
+    }
+    const categories = Array.from(categorySet).sort();
 
     return (
         <PageBody>
             <PageHeader
                 title="Pengaturan"
-                context="Parameter sistem dan SLA, dikelompokkan per kategori."
+                context="Pusat konfigurasi akun, preferensi notifikasi, keamanan, dan parameter operasional surveilans."
             />
 
-            {rows.length === 0 ? (
-                <p className="mt-8 rounded-[var(--radius-card)] bg-[var(--raised)] px-4 py-10 text-center text-[14px] text-muted-foreground">
-                    Belum ada pengaturan tersimpan.
-                </p>
-            ) : (
-                <div className="mt-8 space-y-10">
-                    {[...groups.entries()].map(([category, items]) => (
-                        <section key={category}>
-                            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
-                                {category}
-                            </h2>
-                            <dl className="mt-3 divide-y divide-[var(--rule)]">
-                                {items.map((s) => (
-                                    <div
-                                        key={s.id}
-                                        className="grid items-baseline gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6"
-                                    >
-                                        <dt className="text-[14px]">
-                                            {s.description ?? s.key}
-                                            {s.description && (
-                                                <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                                                    {s.key}
-                                                </span>
-                                            )}
-                                        </dt>
-                                        <dd className="tabular-nums text-[14px] font-medium sm:text-right">
-                                            {String(s.value)}
-                                        </dd>
-                                    </div>
-                                ))}
-                            </dl>
-                        </section>
-                    ))}
-                </div>
-            )}
+            <PageContent>
+                <SettingsClient
+                    user={{
+                        id: actor.userId,
+                        name: me?.name ?? 'Petugas Surveilans',
+                        email: actor.email,
+                        role: actor.role,
+                        status: me?.status ?? 'APPROVED',
+                        institution: institutionName,
+                        whatsappPhone: me?.whatsappPhone ?? '',
+                        whatsappOptIn: me?.whatsappOptIn ?? true,
+                        createdAt: me?.createdAt,
+                    }}
+                    systemSettings={systemSettings as SettingRow[]}
+                    totalSettings={totalSettings}
+                    categories={categories}
+                    canManageSystem={canManageSystem}
+                    isAdmin={isAdmin}
+                />
+            </PageContent>
         </PageBody>
     );
 }

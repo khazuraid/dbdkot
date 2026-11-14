@@ -1,63 +1,82 @@
 import { requireActor } from '@/lib/session';
-import { listReports, type ReportStatus } from '@/lib/domain/reports';
+import { listReports } from '@/lib/domain/reports';
+import { needActionStatusesFor } from '@/lib/domain/report-labels';
 import { formatNumber } from '@/lib/format';
-import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import {
+    PageBody,
+    PageContent,
+    PageHeader,
+    Panel,
+} from '@/components/shell/page';
+import { Pager, readPage } from '@/components/shell/pager-view';
 import { ReportTable } from '@/components/reports/report-table';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
 
-/** What "needs action" means depends entirely on who is looking at it. */
-const QUEUE: Record<
-    string,
-    { title: string; context: string; statuses: ReportStatus[] }
-> = {
+/** Copy stays per-role here; the status list itself lives in report-labels.ts. */
+const QUEUE: Record<string, { title: string; context: string }> = {
     RUMAH_SAKIT: {
-        title: 'Perlu action',
+        title: 'Perlu tindakan',
         context: 'Ditolak puskesmas atau dikembalikan Dinas Kesehatan.',
-        statuses: ['PUSKESMAS_REJECTED', 'REJECTED'],
     },
     PUSKESMAS: {
-        title: 'Perlu action',
+        title: 'Perlu tindakan',
         context:
             'Laporan yang ditugaskan ke puskesmas Anda dan belum ditinjau.',
-        statuses: ['ASSIGNED'],
     },
     DINKES: {
-        title: 'Perlu action',
+        title: 'Perlu tindakan',
         context: 'Penyelidikan epidemiologi selesai dan menunggu verifikasi.',
-        statuses: ['PE_COMPLETED'],
     },
     ADMIN: {
-        title: 'Perlu action',
+        title: 'Perlu tindakan',
         context: 'Laporan belum ditugaskan ke puskesmas mana pun.',
-        statuses: ['SUBMITTED'],
     },
 };
 
-export default async function PerluActionPage() {
+export default async function PerluActionPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ page?: string }>;
+}) {
+    const sp = await searchParams;
     const actor = await requireActor();
-    const queue = QUEUE[actor.role];
-    const { rows } = await listReports(actor, {
-        statuses: queue.statuses,
-        perPage: 100,
+    const queue = QUEUE[actor.role] ?? {
+        title: 'Perlu tindakan',
+        context: 'Laporan yang menunggu tindakan Anda.',
+    };
+    const statuses = [...needActionStatusesFor(actor.role)];
+    const page = readPage(sp.page);
+    const { rows, perPage, total } = await listReports(actor, {
+        statuses,
+        page,
+        perPage: 25,
     });
 
     return (
         <PageBody>
-            <PageHeader title={queue.title} context={queue.context} />
-            <Panel
-                title={
-                    rows.length === 0
-                        ? 'Tidak ada antrian'
-                        : `${formatNumber(rows.length)} laporan`
-                }
-            >
-                <ReportTable
-                    rows={rows}
-                    empty="Tidak ada yang menunggu tindakan."
-                />
-            </Panel>
+            <PageHeader
+                title={queue.title}
+                context={`${queue.context} ${formatNumber(total)} laporan.`}
+            />
+            <PageContent>
+                <Panel title={total === 0 ? 'Tidak ada antrian' : 'Antrian'}>
+                    <ReportTable
+                        rows={rows}
+                        empty="Tidak ada yang menunggu tindakan."
+                    />
+                    <Pager
+                        info={{ page, perPage, total }}
+                        label="laporan"
+                        buildHref={(n) =>
+                            n > 1
+                                ? `/laporan/perlu-action?page=${n}`
+                                : '/laporan/perlu-action'
+                        }
+                    />
+                </Panel>
+            </PageContent>
         </PageBody>
     );
 }

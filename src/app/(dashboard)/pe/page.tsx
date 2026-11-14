@@ -1,10 +1,16 @@
 import Link from 'next/link';
+import { FileDown } from 'lucide-react';
 import { requireActor } from '@/lib/session';
 import { listReportsPE } from '@/lib/domain/queries';
 import { formatDate } from '@/lib/format';
-import { PageBody, PageHeader, Panel } from '@/components/shell/page';
+import {
+    PageBody,
+    PageContent,
+    PageHeader,
+    Panel,
+} from '@/components/shell/page';
 import { DataTable, Dash } from '@/components/shell/data-table';
-import { Pager, readPage } from '@/components/shell/pager';
+import { Pager, readPage } from '@/components/shell/pager-view';
 import { StatusText } from '@/components/shell/status-text';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
@@ -43,76 +49,107 @@ export default async function PePage({
                 title="Penyelidikan epidemiologi"
                 context="Laporan PE di wilayah kerja Anda."
             />
-            <Panel title={`${total} laporan PE`}>
-                <DataTable<PeRow>
-                    rows={rows}
-                    empty="Belum ada laporan PE di wilayah Anda."
-                    caption="Daftar laporan penyelidikan epidemiologi"
-                    columns={[
-                        {
-                            key: 'report',
-                            header: 'No. laporan RS',
-                            cell: (r) => (
-                                <Link
-                                    href={`/laporan/${r.reportRSId}`}
-                                    className="underline decoration-[var(--control)] underline-offset-4 hover:decoration-[var(--text)]"
-                                >
-                                    {r.reportNumber}
-                                </Link>
-                            ),
-                        },
-                        {
-                            key: 'date',
-                            header: 'Tanggal PE',
-                            align: 'right',
-                            cell: (r) => (
-                                <span className="whitespace-nowrap text-muted-foreground">
-                                    {formatDate(r.peDate)}
-                                </span>
-                            ),
-                        },
-                        {
-                            key: 'officer',
-                            header: 'Petugas',
-                            cell: (r) => r.officerName,
-                        },
-                        {
-                            key: 'hi',
-                            header: 'HI',
-                            align: 'right',
-                            cell: (r) => index(r.houseIndex),
-                        },
-                        {
-                            key: 'ci',
-                            header: 'CI',
-                            align: 'right',
-                            cell: (r) => index(r.containerIndex),
-                        },
-                        {
-                            key: 'status',
-                            header: 'Status',
-                            cell: (r) => (
-                                <StatusText
-                                    tone={
-                                        r.status === 'VERIFIED'
-                                            ? 'good'
-                                            : r.status === 'REJECTED'
-                                              ? 'bad'
-                                              : 'neutral'
-                                    }
-                                >
-                                    {PE_STATUS_LABEL[r.status] ?? r.status}
-                                </StatusText>
-                            ),
-                        },
-                    ]}
-                />
-            </Panel>
-            <Pager
-                info={{ page, perPage, total }}
-                label="laporan"
-                buildHref={(n) => (n > 1 ? `/pe?page=${n}` : '/pe')}
-            />
+
+            <PageContent>
+                <Panel title={`${total} laporan PE`}>
+                    <DataTable<PeRow>
+                        rows={rows}
+                        empty="Belum ada laporan PE di wilayah Anda."
+                        caption="Daftar laporan penyelidikan epidemiologi"
+                        columns={[
+                            {
+                                key: 'report',
+                                header: 'No. laporan RS',
+                                cell: (r) => (
+                                    <Link
+                                        href={`/laporan/${r.reportRSId}`}
+                                        className="font-mono text-[13px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                                    >
+                                        {r.reportNumber}
+                                    </Link>
+                                ),
+                            },
+                            {
+                                key: 'date',
+                                header: 'Tanggal PE',
+                                align: 'right',
+                                cell: (r) => (
+                                    <span className="whitespace-nowrap text-muted-foreground">
+                                        {formatDate(r.peDate)}
+                                    </span>
+                                ),
+                            },
+                            {
+                                key: 'officer',
+                                header: 'Petugas',
+                                cell: (r) => r.officerName,
+                            },
+                            {
+                                key: 'hi',
+                                header: 'HI',
+                                align: 'right',
+                                cell: (r) => index(r.houseIndex),
+                            },
+                            {
+                                key: 'ci',
+                                header: 'CI',
+                                align: 'right',
+                                cell: (r) => index(r.containerIndex),
+                            },
+                            {
+                                key: 'status',
+                                header: 'Status',
+                                cell: (r) => (
+                                    <StatusText
+                                        tone={
+                                            r.status === 'VERIFIED'
+                                                ? 'good'
+                                                : r.status === 'REJECTED'
+                                                  ? 'bad'
+                                                  : r.status === 'SUBMITTED'
+                                                    ? 'warn'
+                                                    : 'neutral'
+                                        }
+                                    >
+                                        {PE_STATUS_LABEL[r.status] ?? r.status}
+                                    </StatusText>
+                                ),
+                            },
+                            {
+                                key: 'export',
+                                header: 'Export Berkas',
+                                align: 'right',
+                                cell: (r) => (
+                                    <div className="inline-flex items-center justify-end gap-2">
+                                        <a
+                                            href={`/api/pdf/pe-lengkap/${r.reportRSId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11.5px] font-medium text-foreground transition-colors hover:bg-[var(--raised)]"
+                                        >
+                                            <FileDown className="size-3 text-[var(--accent)]" aria-hidden />
+                                            PDF Lengkap
+                                        </a>
+                                        <a
+                                            href={`/api/export/pe/${r.reportRSId}/excel`}
+                                            download
+                                            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[11.5px] font-medium text-foreground transition-colors hover:bg-[var(--raised)]"
+                                        >
+                                            <FileDown className="size-3" aria-hidden />
+                                            Excel
+                                        </a>
+                                    </div>
+                                ),
+                            },
+                        ]}
+                    />
+                    <Pager
+                        info={{ page, perPage, total }}
+                        label="laporan"
+                        buildHref={(n) => (n > 1 ? `/pe?page=${n}` : '/pe')}
+                    />
+                </Panel>
+            </PageContent>
         </PageBody>
     );
 }

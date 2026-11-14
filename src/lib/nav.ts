@@ -40,17 +40,27 @@ export const NAV: Record<Role, NavGroup[]> = {
     ],
     PUSKESMAS: [
         {
-            label: 'Ringkasan',
-            items: [{ href: '/dasbor', label: 'Dasbor' }],
+            label: 'Surveilans Kasus',
+            items: [
+                { href: '/dasbor', label: 'Dasbor' },
+                { href: '/laporan', label: 'Daftar Laporan' },
+                { href: '/laporan/perlu-action', label: 'Perlu Tindakan' },
+                { href: '/laporan/baru', label: 'Lapor Poli' },
+            ],
         },
         {
-            label: 'Laporan',
+            label: 'Penyelidikan Lapangan (PE)',
             items: [
-                { href: '/laporan', label: 'Semua laporan' },
-                { href: '/laporan/perlu-action', label: 'Perlu action' },
-                { href: '/pe', label: 'Penyelidikan epidemiologi' },
-                { href: '/pe/tugas', label: 'Tugas PE' },
-                { href: '/pe/baru', label: 'Buat PE' },
+                { href: '/pe/tugas', label: 'Tugas PE Aktif' },
+                { href: '/pe/baru', label: 'Formulir PE' },
+                { href: '/pe', label: 'Riwayat PE' },
+            ],
+        },
+        {
+            label: 'Pengendalian & Logistik',
+            items: [
+                { href: '/tindak-lanjut', label: 'Tindak Lanjut' },
+                { href: '/logistik', label: 'Logistik & Aset' },
             ],
         },
         {
@@ -71,7 +81,7 @@ export const NAV: Record<Role, NavGroup[]> = {
             items: [
                 { href: '/laporan', label: 'Semua laporan' },
                 { href: '/laporan/perlu-action', label: 'Perlu action' },
-                { href: '/laporan/monitoring', label: 'Monitoring' },
+                { href: '/laporan/lintas-wilayah', label: 'Lintas wilayah' },
                 { href: '/laporan/analitik', label: 'Analitik' },
             ],
         },
@@ -81,6 +91,8 @@ export const NAV: Record<Role, NavGroup[]> = {
                 { href: '/pe', label: 'Laporan PE' },
                 { href: '/pe/verifikasi', label: 'Verifikasi PE' },
                 { href: '/pe/analitik', label: 'Analitik PE' },
+                { href: '/tindak-lanjut', label: 'Tindak lanjut' },
+                { href: '/logistik', label: 'Logistik vektor' },
             ],
         },
         {
@@ -118,6 +130,7 @@ export const NAV: Record<Role, NavGroup[]> = {
             items: [
                 { href: '/admin/audit-log', label: 'Audit log' },
                 { href: '/aset', label: 'Aset' },
+                { href: '/pengaturan', label: 'Pengaturan' },
             ],
         },
     ],

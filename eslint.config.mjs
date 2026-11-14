@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
         // Vendored skill bundles & generated output:
         '.claude/**',
         '.agents/**',
+        '.taste-skill/**',
         'drizzle/**',
         'coverage/**',
     ]),

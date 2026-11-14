@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatTime } from '@/lib/format';
 
 type Props = {
     /** Milliseconds between refreshes. Minimum enforced: see MIN_INTERVAL. */
@@ -44,9 +45,7 @@ export function LiveData({ intervalMs = 15_000, since }: Props) {
 
         const tick = () => {
             router.refresh();
-            setUpdatedAt(
-                new Date().toLocaleTimeString('id-ID', { timeStyle: 'short' }),
-            );
+            setUpdatedAt(formatTime(new Date()));
             timer = setTimeout(tick, interval);
         };
 

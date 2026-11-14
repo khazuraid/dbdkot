@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowRight, Loader2 } from 'lucide-react';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -13,6 +14,29 @@ import {
     FieldGroup,
     FieldLabel,
 } from '@/components/ui/field';
+
+const registerSchema = z
+    .object({
+        name: z
+            .string()
+            .trim()
+            .min(3, 'Nama lengkap minimal 3 karakter')
+            .max(100, 'Nama lengkap maksimal 100 karakter'),
+        email: z
+            .string()
+            .trim()
+            .min(1, 'Email wajib diisi')
+            .email('Format email tidak valid (contoh: nama@instansi.go.id)'),
+        password: z
+            .string()
+            .min(10, 'Password minimal 10 karakter')
+            .max(100, 'Password maksimal 100 karakter'),
+        confirm: z.string().min(1, 'Konfirmasi password wajib diisi'),
+    })
+    .refine((data) => data.password === data.confirm, {
+        message: 'Password dan konfirmasi tidak sama.',
+        path: ['confirm'],
+    });
 
 /**
  * Requesting an account is only a request: the server leaves it PENDING and
@@ -24,29 +48,42 @@ export function RegisterForm() {
     const router = useRouter();
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [done, setDone] = useState(false);
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        setError(null);
+        setFieldErrors({});
+
         const data = new FormData(event.currentTarget);
+        const name = String(data.get('name') ?? '').trim();
+        const email = String(data.get('email') ?? '').trim();
         const password = String(data.get('password') ?? '');
         const confirm = String(data.get('confirm') ?? '');
 
-        if (password !== confirm) {
-            setError('Password dan konfirmasi tidak sama.');
+        const parsed = registerSchema.safeParse({ name, email, password, confirm });
+        if (!parsed.success) {
+            const errs: Record<string, string> = {};
+            for (const issue of parsed.error.issues) {
+                if (issue.path[0]) errs[String(issue.path[0])] = issue.message;
+            }
+            setFieldErrors(errs);
+            if (errs.confirm && !errs.password) {
+                setError(errs.confirm);
+            }
             return;
         }
 
         setPending(true);
-        setError(null);
 
         const response = await fetch('/api/auth/sign-up/email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                name: data.get('name'),
-                email: data.get('email'),
-                password,
+                name: parsed.data.name,
+                email: parsed.data.email,
+                password: parsed.data.password,
             }),
         });
 
@@ -68,12 +105,10 @@ export function RegisterForm() {
     if (done) {
         return (
             <div className="rounded-[var(--radius-card)] border border-border bg-[var(--surface)] p-4">
-                <p className="text-[14px] font-medium">
-                    Pendaftaran diterima
-                </p>
+                <p className="text-[14px] font-medium">Pendaftaran diterima</p>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                    Administrator Dinas Kesehatan akan meninjau akun Anda.
-                    Anda belum bisa masuk sampai akun disetujui.
+                    Administrator Dinas Kesehatan akan meninjau akun Anda. Anda
+                    belum bisa masuk sampai akun disetujui.
                 </p>
                 <Button
                     type="button"
@@ -90,7 +125,7 @@ export function RegisterForm() {
     return (
         <form onSubmit={onSubmit} noValidate>
             <FieldGroup className="gap-4">
-                <Field data-invalid={error ? true : undefined}>
+                <Field data-invalid={Boolean(fieldErrors.name)}>
                     <FieldLabel htmlFor="name" className="text-[13px]">
                         Nama lengkap
                     </FieldLabel>
@@ -100,11 +135,14 @@ export function RegisterForm() {
                         type="text"
                         autoComplete="name"
                         required
-                        aria-invalid={error ? true : undefined}
+                        aria-invalid={Boolean(fieldErrors.name)}
                         className="h-10"
                     />
+                    {fieldErrors.name && (
+                        <FieldError>{fieldErrors.name}</FieldError>
+                    )}
                 </Field>
-                <Field data-invalid={error ? true : undefined}>
+                <Field data-invalid={Boolean(fieldErrors.email)}>
                     <FieldLabel htmlFor="email" className="text-[13px]">
                         Email
                     </FieldLabel>
@@ -115,11 +153,14 @@ export function RegisterForm() {
                         autoComplete="email"
                         required
                         placeholder="nama@instansi.go.id"
-                        aria-invalid={error ? true : undefined}
+                        aria-invalid={Boolean(fieldErrors.email)}
                         className="h-10"
                     />
+                    {fieldErrors.email && (
+                        <FieldError>{fieldErrors.email}</FieldError>
+                    )}
                 </Field>
-                <Field data-invalid={error ? true : undefined}>
+                <Field data-invalid={Boolean(fieldErrors.password)}>
                     <FieldLabel htmlFor="password" className="text-[13px]">
                         Password
                     </FieldLabel>
@@ -130,14 +171,18 @@ export function RegisterForm() {
                         autoComplete="new-password"
                         minLength={10}
                         required
-                        aria-invalid={error ? true : undefined}
+                        aria-invalid={Boolean(fieldErrors.password)}
                         className="h-10"
                     />
-                    <FieldDescription className="text-[12px]">
-                        Minimal 10 karakter.
-                    </FieldDescription>
+                    {fieldErrors.password ? (
+                        <FieldError>{fieldErrors.password}</FieldError>
+                    ) : (
+                        <FieldDescription className="text-[12px]">
+                            Minimal 10 karakter.
+                        </FieldDescription>
+                    )}
                 </Field>
-                <Field data-invalid={error ? true : undefined}>
+                <Field data-invalid={Boolean(fieldErrors.confirm || error)}>
                     <FieldLabel htmlFor="confirm" className="text-[13px]">
                         Ulangi password
                     </FieldLabel>
@@ -148,9 +193,12 @@ export function RegisterForm() {
                         autoComplete="new-password"
                         minLength={10}
                         required
-                        aria-invalid={error ? true : undefined}
+                        aria-invalid={Boolean(fieldErrors.confirm || error)}
                         className="h-10"
                     />
+                    {fieldErrors.confirm && (
+                        <FieldError>{fieldErrors.confirm}</FieldError>
+                    )}
                 </Field>
 
                 {error && <FieldError>{error}</FieldError>}

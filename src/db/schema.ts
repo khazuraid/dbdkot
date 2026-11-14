@@ -1,4 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
+import type { BoundaryGeoJson } from '@/lib/geo/boundary-schema';
 import {
     boolean,
     doublePrecision,
@@ -55,11 +56,19 @@ export const gender = pgEnum('Gender', ['L', 'P']);
 export const reportRSStatus = pgEnum('ReportRSStatus', [
     'DRAFT',
     'SUBMITTED',
+    'CROSS_BORDER_PENDING',
+    'ARCHIVED_CROSS_BORDER',
     'ASSIGNED',
     'ASSIGNED_ACCEPTED',
     'PUSKESMAS_REJECTED',
+    'PE_IN_PROGRESS',
     'PE_COMPLETED',
     'VERIFIED',
+    'FOGGING_REQUIRED',
+    'SIKLUS_1_DONE',
+    'SIKLUS_2_SCHEDULED',
+    'SIKLUS_2_DONE',
+    'CLOSED',
     'REJECTED',
 ]);
 export const reportPEStatus = pgEnum('ReportPEStatus', [
@@ -171,6 +180,8 @@ export const users = pgTable(
             },
         ),
         isActive: boolean('is_active').notNull().default(true),
+        whatsappPhone: text('whatsapp_phone'),
+        whatsappOptIn: boolean('whatsapp_opt_in').notNull().default(true),
         /**
          * Existing rows predate approval and were created by an administrator,
          * so the default is APPROVED. Public sign-up sets PENDING explicitly.
@@ -290,6 +301,14 @@ export const reportsRS = pgTable(
         provinsi: text('provinsi'),
         kelurahan: text('kelurahan'),
         kecamatan: text('kecamatan'),
+        latitude: doublePrecision('latitude'),
+        longitude: doublePrecision('longitude'),
+        clusterId: uuid('cluster_id'),
+        sourceType: text('source_type').notNull().default('RS'),
+        crossBorderTargetCity: text('cross_border_target_city'),
+        crossBorderNotes: text('cross_border_notes'),
+        assignedAt: timestamp('assigned_at', { withTimezone: true }),
+        acceptedAt: timestamp('accepted_at', { withTimezone: true }),
         institutionId: uuid('institution_id')
             .notNull()
             .references(() => institutions.id),
@@ -345,6 +364,20 @@ export const reportsPE = pgTable(
         houseIndex: numeric('house_index', { precision: 5, scale: 2 }),
         containerIndex: numeric('container_index', { precision: 5, scale: 2 }),
         breteauIndex: numeric('breteau_index', { precision: 5, scale: 2 }),
+        abj: numeric('abj', { precision: 5, scale: 2 }),
+        housesInspected: integer('houses_inspected').notNull().default(0),
+        housesPositive: integer('houses_positive').notNull().default(0),
+        containersInspected: integer('containers_inspected').notNull().default(0),
+        containersPositive: integer('containers_positive').notNull().default(0),
+        otherFeverCasesCount: integer('other_fever_cases_count').notNull().default(0),
+        transmissionRisk: text('transmission_risk'),
+        foggingRecommended: boolean('fogging_recommended').notNull().default(false),
+        respondentName: text('respondent_name'),
+        respondentRelation: text('respondent_relation'),
+        travelHistory14d: text('travel_history_14d'),
+        officerNip: text('officer_nip'),
+        headOfPuskesmasName: text('head_of_puskesmas_name'),
+        headOfPuskesmasNip: text('head_of_puskesmas_nip'),
         sourceInvestigationDone: boolean('source_investigation_done'),
         sourceLocation: text('source_location'),
         formData: jsonb('form_data'),
@@ -785,12 +818,83 @@ export const kelurahan = pgTable(
         kecamatan: text('kecamatan').notNull(),
         kota: text('kota').notNull(),
         provinsi: text('provinsi').notNull(),
+        boundaryGeojson: jsonb('boundary_geojson').$type<BoundaryGeoJson | null>(),
         createdAt: createdAt(),
         updatedAt: updatedAt(),
     },
     (t) => [
         index('kelurahan_kecamatan_idx').on(t.kecamatan),
         index('kelurahan_kota_idx').on(t.kota),
+    ],
+);
+
+export const foggingCycles = pgTable(
+    'fogging_cycles',
+    {
+        id: id(),
+        reportRSId: uuid('report_rs_id')
+            .notNull()
+            .references(() => reportsRS.id, { onDelete: 'cascade' }),
+        reportPEId: uuid('report_pe_id').references(() => reportsPE.id, {
+            onDelete: 'set null',
+        }),
+        institutionId: uuid('institution_id')
+            .notNull()
+            .references(() => institutions.id),
+        cycleNumber: integer('cycle_number').notNull(), // 1 or 2
+        status: text('status').notNull().default('SCHEDULED'), // SCHEDULED | DONE | CANCELLED
+        scheduledDate: timestamp('scheduled_date', { withTimezone: true }).notNull(),
+        executedAt: timestamp('executed_at', { withTimezone: true }),
+        abateUsedKg: numeric('abate_used_kg', { precision: 8, scale: 2 })
+            .notNull()
+            .default('0'),
+        insecticideUsedLiter: numeric('insecticide_used_liter', {
+            precision: 8,
+            scale: 2,
+        })
+            .notNull()
+            .default('0'),
+        foggerMachinesCount: integer('fogger_machines_count').notNull().default(1),
+        materialCost: integer('material_cost').notNull().default(0),
+        honorCost: integer('honor_cost').notNull().default(0),
+        maintenanceCost: integer('maintenance_cost').notNull().default(0),
+        totalBudget: integer('total_budget').notNull().default(0),
+        notes: text('notes'),
+        executedById: uuid('executed_by_id').references(() => users.id),
+        createdAt: createdAt(),
+        updatedAt: updatedAt(),
+    },
+    (t) => [
+        index('fogging_cycles_report_idx').on(t.reportRSId),
+        index('fogging_cycles_institution_idx').on(t.institutionId),
+        index('fogging_cycles_status_idx').on(t.status),
+        unique('fogging_cycles_report_cycle_key').on(t.reportRSId, t.cycleNumber),
+    ],
+);
+
+export const waDispatches = pgTable(
+    'wa_dispatches',
+    {
+        id: id(),
+        recipientPhone: text('recipient_phone').notNull(),
+        recipientRole: text('recipient_role'),
+        institutionId: uuid('institution_id').references(() => institutions.id, {
+            onDelete: 'set null',
+        }),
+        reportRSId: uuid('report_rs_id').references(() => reportsRS.id, {
+            onDelete: 'set null',
+        }),
+        eventKind: text('event_kind').notNull(),
+        message: text('message').notNull(),
+        providerMode: text('provider_mode').notNull().default('LOCAL_FALLBACK'),
+        deliveryStatus: text('delivery_status').notNull().default('FALLBACK_LOGGED'),
+        responseMeta: jsonb('response_meta'),
+        createdAt: createdAt(),
+    },
+    (t) => [
+        index('wa_dispatches_report_idx').on(t.reportRSId),
+        index('wa_dispatches_institution_idx').on(t.institutionId),
+        index('wa_dispatches_created_idx').on(t.createdAt),
     ],
 );
 
@@ -833,6 +937,8 @@ export const schema = {
     peHouseholdSurveys,
     entityHistory,
     kelurahan,
+    foggingCycles,
+    waDispatches,
 };
 
 export const institutionsRelations = relations(institutions, ({ many }) => ({

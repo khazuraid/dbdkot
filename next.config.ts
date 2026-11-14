@@ -29,9 +29,9 @@ const securityHeaders = [
             "default-src 'self'",
             `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
             // Styles stay inline: Tailwind and React both emit style attributes.
-            "style-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob:",
-            "font-src 'self' data:",
+            "font-src 'self' data: https://fonts.gstatic.com",
             // No third-party origin may be reached, including for exfiltration.
             "connect-src 'self'",
             "object-src 'none'",
@@ -47,6 +47,7 @@ const nextConfig: NextConfig = {
     cacheComponents: true,
     partialPrefetching: true,
     poweredByHeader: false,
+    serverExternalPackages: ['@react-pdf/renderer'],
     turbopack: {
         rules: {
             '*.css': {
