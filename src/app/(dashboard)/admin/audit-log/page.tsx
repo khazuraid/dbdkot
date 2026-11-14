@@ -21,6 +21,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { Stat, StatRow } from '@/components/shell/stat';
@@ -131,7 +132,7 @@ export default async function AuditLogPage({
                     subtitle="Saring audit trail berdasarkan nama operator, email, IP address, atau ID entitas"
                 >
                     <div className="p-4">
-                        <form
+                        <AutoFilterForm
                             action="/admin/audit-log"
                             className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
                         >
@@ -165,15 +166,6 @@ export default async function AuditLogPage({
                                 <option value="LOGIN">LOGIN (Sesi Autentikasi)</option>
                             </select>
 
-                            <Button
-                                type="submit"
-                                size="sm"
-                                className="h-9 px-4 gap-1.5 bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 font-medium text-xs shrink-0"
-                            >
-                                <SlidersHorizontal className="size-3.5" />
-                                Terapkan Filter
-                            </Button>
-
                             {(q || action) && (
                                 <Button
                                     asChild
@@ -184,7 +176,7 @@ export default async function AuditLogPage({
                                     <a href="/admin/audit-log">Reset</a>
                                 </Button>
                             )}
-                        </form>
+                        </AutoFilterForm>
                     </div>
                 </Panel>
 

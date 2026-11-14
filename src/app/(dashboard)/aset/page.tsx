@@ -9,6 +9,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { StatusText } from '@/components/shell/status-text';
@@ -139,7 +140,7 @@ export default async function AsetPage({
                     </>
                 }
             >
-                <form
+                <AutoFilterForm
                     action="/aset"
                     className="flex flex-wrap items-center gap-2"
                 >
@@ -155,7 +156,12 @@ export default async function AsetPage({
                             aria-label="Cari aset"
                         />
                     </InputGroup>
-                </form>
+                    {q && (
+                        <Button asChild variant="ghost" size="sm">
+                            <Link href="/aset">Reset</Link>
+                        </Button>
+                    )}
+                </AutoFilterForm>
             </PageHeader>
 
             <PageContent>

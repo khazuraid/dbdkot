@@ -22,6 +22,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { Stat } from '@/components/shell/stat';
@@ -144,7 +145,7 @@ export default async function PenggunaPage({
                 }}
             >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <form
+                    <AutoFilterForm
                         action="/admin/pengguna"
                         className="flex flex-wrap items-center gap-2"
                     >
@@ -163,15 +164,12 @@ export default async function PenggunaPage({
                                 aria-label="Cari akun pengguna"
                             />
                         </InputGroup>
-                        <Button type="submit" variant="outline" size="sm">
-                            Cari
-                        </Button>
                         {(q || filter !== 'ALL') && (
                             <Button asChild variant="ghost" size="sm">
                                 <Link href="/admin/pengguna">Reset</Link>
                             </Button>
                         )}
-                    </form>
+                    </AutoFilterForm>
 
                     <div
                         role="group"

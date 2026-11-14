@@ -20,6 +20,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { Stat } from '@/components/shell/stat';
@@ -206,7 +207,7 @@ export default async function InstitusiPage({
                 context="Fasilitas kesehatan dan wilayah kerjanya. Wilayah inilah yang menentukan laporan masuk ke puskesmas mana."
             >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <form
+                    <AutoFilterForm
                         action="/admin/institusi"
                         className="flex flex-wrap items-center gap-2"
                     >
@@ -225,15 +226,12 @@ export default async function InstitusiPage({
                                 aria-label="Cari institusi"
                             />
                         </InputGroup>
-                        <Button type="submit" variant="outline" size="sm">
-                            Cari
-                        </Button>
                         {(q || type) && (
                             <Button asChild variant="ghost" size="sm">
                                 <Link href="/admin/institusi">Reset</Link>
                             </Button>
                         )}
-                    </form>
+                    </AutoFilterForm>
 
                     <div
                         role="group"

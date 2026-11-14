@@ -19,6 +19,7 @@ import {
 import { LiveData } from '@/components/shell/live-data';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { ReportTable } from '@/components/reports/report-table';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { Button } from '@/components/ui/button';
 import {
     InputGroup,
@@ -138,7 +139,7 @@ export default async function LaporanPage({
             <PageContent>
                 {/* Filter Form Toolbar */}
                 <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-                    <form method="get" action="/laporan" className="space-y-4">
+                    <AutoFilterForm action="/laporan" className="space-y-4">
                         {/* Periode Laporan Quick Selector */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -307,26 +308,18 @@ export default async function LaporanPage({
                                 </InputGroup>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    className="h-9 px-4 font-medium"
-                                >
-                                    Terapkan Filter
-                                </Button>
-
-                                {hasActiveFilters && (
+                            {hasActiveFilters && (
+                                <div className="flex items-center gap-2">
                                     <Button asChild variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground">
                                         <Link href="/laporan">
                                             <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
                                             Reset Filter
                                         </Link>
                                     </Button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
-                    </form>
+                    </AutoFilterForm>
                 </div>
 
                 {/* Table Data Panel */}

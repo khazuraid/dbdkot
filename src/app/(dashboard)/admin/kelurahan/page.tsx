@@ -19,6 +19,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { AutoFilterForm } from '@/components/shell/auto-filter-form';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { Stat } from '@/components/shell/stat';
 import { StatusText } from '@/components/shell/status-text';
@@ -134,7 +135,7 @@ export default async function KelurahanPage({
                 title="Kelurahan"
                 context="Wilayah yang muncul sebagai pilihan saat melapor. Nama di sini harus sama dengan wilayah kerja puskesmas."
             >
-                <form
+                <AutoFilterForm
                     action="/admin/kelurahan"
                     className="flex flex-wrap items-center gap-2"
                 >
@@ -150,15 +151,12 @@ export default async function KelurahanPage({
                             aria-label="Cari kelurahan"
                         />
                     </InputGroup>
-                    <Button type="submit" variant="outline" size="sm">
-                        Cari
-                    </Button>
                     {q && (
                         <Button asChild variant="ghost" size="sm">
                             <Link href="/admin/kelurahan">Reset</Link>
                         </Button>
                     )}
-                </form>
+                </AutoFilterForm>
             </PageHeader>
 
             <PageContent className="space-y-5">
