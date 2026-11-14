@@ -18,8 +18,10 @@ import {
     ShieldAlert,
     ShieldCheck,
     Smartphone,
+    Sparkles,
     Sun,
     User,
+    Globe2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -41,6 +43,8 @@ import {
     SettingRowActions,
     type SettingRow,
 } from './settings-editor';
+import { RegionalApiSettings } from './regional-api-settings';
+import { BrandingSettings } from './branding-settings';
 
 type UserProfileData = {
     id: string;
@@ -233,13 +237,29 @@ export function SettingsClient({
                             Notifikasi & Tampilan
                         </TabsTrigger>
                         {canManageSystem && (
-                            <TabsTrigger
-                                value="sistem"
-                                className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
-                            >
-                                <Settings className="size-4" />
-                                Parameter Sistem & SLA
-                            </TabsTrigger>
+                            <>
+                                <TabsTrigger
+                                    value="branding"
+                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                >
+                                    <Sparkles className="size-4" />
+                                    Identitas & Logo
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="wilayah"
+                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                >
+                                    <Globe2 className="size-4" />
+                                    API Wilayah (Sumopod)
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="sistem"
+                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                >
+                                    <Settings className="size-4" />
+                                    Parameter SLA & DB
+                                </TabsTrigger>
+                            </>
                         )}
                     </TabsList>
                 </div>
@@ -696,7 +716,27 @@ export function SettingsClient({
                     </div>
                 </TabsContent>
 
-                {/* 4. Parameter Sistem & SLA (Dinkes / Admin) */}
+                {/* 4. Identitas & Branding Portal (Dinkes / Admin) */}
+                {canManageSystem && (
+                    <TabsContent value="branding" className="space-y-6 pt-4">
+                        <BrandingSettings
+                            settings={systemSettings}
+                            canManage={canManageSystem}
+                        />
+                    </TabsContent>
+                )}
+
+                {/* 5. Konfigurasi API Wilayah / Sumopod (Dinkes / Admin) */}
+                {canManageSystem && (
+                    <TabsContent value="wilayah" className="space-y-6 pt-4">
+                        <RegionalApiSettings
+                            settings={systemSettings}
+                            canManage={canManageSystem}
+                        />
+                    </TabsContent>
+                )}
+
+                {/* 6. Parameter Sistem & SLA (Dinkes / Admin) */}
                 {canManageSystem && (
                     <TabsContent value="sistem" className="space-y-6 pt-4">
                         {/* SLA Standard Reference Cards */}

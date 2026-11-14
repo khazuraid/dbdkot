@@ -8,6 +8,8 @@ export type FormState = {
     error?: string;
     fieldErrors?: Record<string, string>;
     ok?: boolean;
+    id?: string;
+    isDraft?: boolean;
 };
 
 export async function submitReport(
@@ -35,7 +37,11 @@ export async function submitReport(
     revalidatePath('/laporan');
     revalidatePath('/dasbor');
 
-    return { ok: true };
+    return {
+        ok: true,
+        id: result.id,
+        isDraft: result.isDraft,
+    };
 }
 
 export type GeocodeResult = {

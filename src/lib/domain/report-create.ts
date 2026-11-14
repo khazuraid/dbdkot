@@ -19,7 +19,13 @@ export { createReportSchema, type CreateReportInput } from './form-contracts';
 import type { CreateReportInput } from './form-contracts';
 
 export type CreateReportResult =
-    | { ok: true; id: string; reportNumber: string; crossBorder?: boolean }
+    | {
+          ok: true;
+          id: string;
+          reportNumber: string;
+          crossBorder?: boolean;
+          isDraft?: boolean;
+      }
     | { ok: false; error: string };
 
 /**
@@ -112,11 +118,13 @@ export async function createReport(
     const reportPrefix: 'PKM' | 'RS' = isPuskesmasPoli ? 'PKM' : 'RS';
 
     let reportNumber = await nextReportNumber(reportPrefix);
-    const initialStatus = isCrossBorder
-        ? ('CROSS_BORDER_PENDING' as const)
-        : isPuskesmasPoli
-          ? ('ASSIGNED_ACCEPTED' as const)
-          : ('SUBMITTED' as const);
+    const initialStatus = input.isDraft
+        ? ('DRAFT' as const)
+        : isCrossBorder
+          ? ('CROSS_BORDER_PENDING' as const)
+          : isPuskesmasPoli
+            ? ('ASSIGNED_ACCEPTED' as const)
+            : ('SUBMITTED' as const);
 
     const values = {
         reportNumber,
@@ -189,7 +197,8 @@ export async function createReport(
         },
     });
 
-    if (isCrossBorder) {
+    if (!input.isDraft) {
+        if (isCrossBorder) {
         await insertNotifications(
             { kind: 'ROLE', role: 'DINKES' },
             {
@@ -281,12 +290,14 @@ export async function createReport(
             error,
         });
     }
+}
 
     return {
         ok: true,
         id: inserted.id,
         reportNumber,
         crossBorder: isCrossBorder,
+        isDraft: Boolean(input.isDraft),
     };
 }
 

@@ -2,18 +2,18 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import {
-    Activity,
     ArrowRight,
-    Building2,
-    ClipboardCheck,
-    FileText,
+    CheckCircle2,
     ShieldCheck,
+    Sparkles,
     Timer,
 } from 'lucide-react';
 import { getPublicSurveillanceSummary } from '@/lib/domain/reports';
 import { formatNumber } from '@/lib/format';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LandingNav } from '@/components/landing/landing-nav';
+import { HeroInteractive } from '@/components/landing/hero-interactive';
+import { BentoFeatures } from '@/components/landing/bento-features';
+import { PreventionSection } from '@/components/landing/prevention-section';
 
 async function PublicStatsStrip() {
     await connection();
@@ -21,263 +21,266 @@ async function PublicStatsStrip() {
 
     return (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-[12px] font-medium text-muted-foreground">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+                <p className="text-[11.5px] font-medium text-muted-foreground">
                     Laporan Bulan Ini
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[26px] font-semibold tracking-tight text-foreground"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-foreground md:text-[28px]"
                 >
                     {formatNumber(summary.totalThisMonth)}
                 </p>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">Kasus Klinis Terdaftar</p>
             </div>
-            <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-[12px] font-medium text-muted-foreground">
-                    PE Diselesaikan
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+                <p className="text-[11.5px] font-medium text-muted-foreground">
+                    PE Selesai Diverifikasi
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[26px] font-semibold tracking-tight text-foreground"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-teal-600 dark:text-teal-400 md:text-[28px]"
                 >
                     {formatNumber(summary.peCompleted)}
                 </p>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">Investigasi 72 Jam</p>
             </div>
-            <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-[12px] font-medium text-muted-foreground">
-                    Fokus Penanggulangan
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+                <p className="text-[11.5px] font-medium text-muted-foreground">
+                    Tindak Lanjut Aktif
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[26px] font-semibold tracking-tight text-[var(--warning)]"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-amber-600 dark:text-amber-400 md:text-[28px]"
                 >
                     {formatNumber(summary.foggingActive)}
                 </p>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">Siklus Fogging / PSN</p>
             </div>
-            <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-[12px] font-medium text-muted-foreground">
-                    Kasus Tuntas
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
+                <p className="text-[11.5px] font-medium text-muted-foreground">
+                    Kasus Ditutup Tuntas
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[26px] font-semibold tracking-tight text-[var(--positive)]"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-emerald-600 dark:text-emerald-400 md:text-[28px]"
                 >
                     {formatNumber(summary.closedCases)}
                 </p>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">Siklus Surveilans Selesai</p>
             </div>
         </div>
     );
 }
 
-async function KecamatanLeaderboard() {
-    await connection();
-    const summary = await getPublicSurveillanceSummary();
-
-    if (summary.topKecamatan.length === 0) {
-        return (
-            <p className="text-[13px] text-muted-foreground">
-                Belum ada ringkasan sebaran wilayah pada periode aktif.
-            </p>
-        );
-    }
-
-    const max = Math.max(...summary.topKecamatan.map((r) => r.count), 1);
-
+function StatsSkeleton() {
     return (
-        <ul className="flex flex-col gap-3">
-            {summary.topKecamatan.map((item) => (
-                <li key={item.kecamatan} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-[13px]">
-                        <span className="font-medium text-foreground">
-                            Kec. {item.kecamatan}
-                        </span>
-                        <span
-                            data-numeric
-                            className="font-mono text-[12px] text-muted-foreground"
-                        >
-                            {formatNumber(item.count)} kasus
-                        </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--raised)]">
-                        <div
-                            className="h-full rounded-full bg-[var(--accent)]"
-                            style={{
-                                width: `${Math.max(8, (item.count / max) * 100)}%`,
-                            }}
-                        />
-                    </div>
-                </li>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                    key={i}
+                    className="h-24 animate-pulse rounded-2xl border border-[var(--border)] bg-muted/40"
+                />
             ))}
-        </ul>
+        </div>
     );
 }
 
-export default function PublicLandingPage() {
+const STEPS = [
+    {
+        num: '01',
+        role: 'Rumah Sakit & Klinik',
+        title: 'Deteksi Dini & KDRS',
+        desc: 'Mencatat diagnosis klinis lab (trombosit & hematokrit) dalam 24 jam dengan validasi alamat otomatis.',
+    },
+    {
+        num: '02',
+        role: 'Puskesmas Wilayah',
+        title: 'Investigasi PE 72 Jam',
+        desc: 'Menerima disposisi kelurahan, memeriksa jentik 100 rumah sekitar, menghitung ABJ, serta memetakan risiko penularan.',
+    },
+    {
+        num: '03',
+        role: 'Dinas Kesehatan Kota',
+        title: 'Verifikasi & Kendali Wabah',
+        desc: 'Memvalidasi epidemiologi, memantau klaster geospasial 100m, dan menggerakkan fogging fokus 2 siklus terpadu.',
+    },
+];
+
+export default function LandingPage() {
     return (
-        <div className="flex min-h-dvh flex-col bg-[var(--ground)] text-foreground">
-            <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/92 backdrop-blur-md">
-                <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-                    <Link href="/" className="flex items-center gap-2.5">
-                        <span
-                            aria-hidden
-                            className="grid size-8 place-items-center rounded-[8px] bg-[var(--accent)] text-[var(--accent-ink)]"
-                        >
-                            <Activity className="size-4" strokeWidth={2.2} />
-                        </span>
-                        <span>
-                            <span className="block text-[14px] leading-tight font-semibold tracking-tight">
-                                WALI-EPI
-                            </span>
-                            <span className="block text-[11px] text-muted-foreground">
-                                Jejaring Surveilans DBD
-                            </span>
-                        </span>
-                    </Link>
+        <div className="min-h-[100dvh] bg-[var(--ground)] text-foreground flex flex-col">
+            {/* Floating Island Navigation */}
+            <LandingNav />
 
-                    <div className="flex items-center gap-2">
-                        <Button asChild variant="ghost" size="sm">
-                            <Link href="/daftar">Daftar faskes</Link>
-                        </Button>
-                        <Button asChild size="sm">
-                            <Link href="/masuk">Masuk sistem</Link>
-                        </Button>
-                    </div>
-                </div>
-            </header>
+            <main className="flex-1">
+                {/* Asymmetric Split Hero Section */}
+                <section className="relative overflow-hidden pt-12 pb-16 md:pt-20 md:pb-24">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
+                            {/* Left Text Block (7 Cols) */}
+                            <div className="lg:col-span-7 space-y-6">
+                                {/* Eyebrow Badge */}
+                                <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/20 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-400">
+                                    <Sparkles className="size-3.5 text-teal-600" />
+                                    Sistem Surveilans Terpadu Kota Bandung
+                                </div>
 
-            <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-10 sm:px-6 md:py-14">
-                <section className="grid items-start gap-8 lg:grid-cols-12">
-                    <div className="flex flex-col gap-5 lg:col-span-7">
-                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[12px] font-medium text-muted-foreground">
-                            <ShieldCheck className="size-3.5 text-[var(--accent)]" />
-                            <span>
-                                Standar Penyelidikan Epidemiologi Kemenkes RI
-                            </span>
-                        </div>
-                        <h1 className="text-[32px] leading-[1.12] font-semibold tracking-[-0.03em] text-foreground sm:text-[42px]">
-                            Koordinasi pelaporan DBD, PE 100 meter, dan fogging
-                            fokus dalam satu jalur terpadu.
-                        </h1>
-                        <p className="max-w-[60ch] text-[15px] leading-relaxed text-muted-foreground">
-                            Menghubungkan Rumah Sakit, Puskesmas, dan Dinas
-                            Kesehatan dengan SLA penugasan 24 jam, kalkulator
-                            entomologi otomatis (ABJ, HI, CI, BI), serta
-                            pengawasan siklus fogging H+0 dan H+7.
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 pt-1">
-                            <Button asChild size="lg">
-                                <Link href="/masuk">
-                                    Masuk petugas faskes
-                                    <ArrowRight data-icon="inline-end" />
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="lg">
-                                <Link href="/daftar">
-                                    Ajukan registrasi instansi
-                                </Link>
-                            </Button>
-                        </div>
-                    </div>
+                                <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:leading-[1.12]">
+                                    Surveilans DBD Cepat, Terarah, dan Terintegrasi
+                                </h1>
 
-                    <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--elev-soft)] lg:col-span-5">
-                        <div className="flex items-center justify-between border-b border-[var(--rule)] pb-3">
-                            <div>
-                                <h2 className="text-[14px] font-semibold text-foreground">
-                                    Sebaran Agregat Non-PII
-                                </h2>
-                                <p className="text-[12px] text-muted-foreground">
-                                    Data publik tanpa identitas pasien
+                                <p className="max-w-[54ch] text-base leading-relaxed text-muted-foreground sm:text-lg">
+                                    Menghubungkan notifikasi kasus Rumah Sakit, investigasi epidemiologi 72 jam Puskesmas, serta kendali operasional Dinas Kesehatan dalam satu sistem terpadu.
                                 </p>
+
+                                {/* Action Buttons */}
+                                <div className="flex flex-wrap items-center gap-3.5 pt-2">
+                                    <Link
+                                        href="/masuk"
+                                        className="group inline-flex items-center gap-2.5 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-[0.98]"
+                                    >
+                                        <span>Masuk Portal Petugas</span>
+                                        <span className="grid size-6 place-items-center rounded-full bg-primary-foreground/15 transition-transform group-hover:translate-x-1">
+                                            <ArrowRight className="size-3.5" />
+                                        </span>
+                                    </Link>
+
+                                    <a
+                                        href="#alur"
+                                        className="inline-flex items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-muted"
+                                    >
+                                        Pelajari Alur Kerja
+                                    </a>
+                                </div>
+
+                                {/* Privacy & Security Trust Badges */}
+                                <div className="flex flex-wrap items-center gap-6 pt-4 text-xs font-medium text-muted-foreground">
+                                    <span className="flex items-center gap-1.5">
+                                        <ShieldCheck className="size-4 text-teal-600" />
+                                        Terenkripsi AES-256 (PII Terlindungi)
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Timer className="size-4 text-teal-600" />
+                                        SLA Kemenkes 24 Jam & 72 Jam
+                                    </span>
+                                </div>
                             </div>
-                            <span className="rounded-full border border-[var(--pill-positive-border)] bg-[var(--pill-positive-bg)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--pill-positive-ink)]">
-                                Live
-                            </span>
+
+                            {/* Right Interactive Preview (5 Cols) */}
+                            <div className="lg:col-span-5">
+                                <HeroInteractive />
+                            </div>
                         </div>
-                        <div className="pt-4">
-                            <Suspense
-                                fallback={
-                                    <div className="flex flex-col gap-3">
-                                        <Skeleton className="h-8 w-full" />
-                                        <Skeleton className="h-8 w-4/5" />
-                                        <Skeleton className="h-8 w-3/5" />
-                                    </div>
-                                }
-                            >
-                                <KecamatanLeaderboard />
+
+                        {/* Live Telemetry Banner */}
+                        <div className="mt-16 md:mt-20">
+                            <div className="mb-3 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                <span>Status Surveilans Real-Time</span>
+                                <span className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
+                                    <span className="size-1.5 rounded-full bg-teal-500 animate-pulse" />
+                                    Data Terverifikasi
+                                </span>
+                            </div>
+                            <Suspense fallback={<StatsSkeleton />}>
+                                <PublicStatsStrip />
                             </Suspense>
                         </div>
                     </div>
                 </section>
 
-                <section aria-label="Ringkasan surveilans publik">
-                    <Suspense
-                        fallback={
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <Skeleton className="h-24 rounded-[var(--radius-card)]" />
-                                <Skeleton className="h-24 rounded-[var(--radius-card)]" />
-                                <Skeleton className="h-24 rounded-[var(--radius-card)]" />
-                                <Skeleton className="h-24 rounded-[var(--radius-card)]" />
-                            </div>
-                        }
-                    >
-                        <PublicStatsStrip />
-                    </Suspense>
+                {/* Workflow Section (Alur Kerja) */}
+                <section id="alur" className="border-t border-[var(--border)] bg-muted/15 py-20 md:py-24">
+                    <div className="mx-auto max-w-6xl px-4 md:px-6">
+                        <div className="max-w-2xl">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/20 bg-teal-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400">
+                                Alur Kolaborasi
+                            </span>
+                            <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
+                                3 Pilar Pengendalian Demam Berdarah
+                            </h2>
+                            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                                Setiap entitas memiliki peran spesifik dengan batas waktu respons (SLA) yang ketat untuk mencegah eskalasi kejadian luar biasa.
+                            </p>
+                        </div>
+
+                        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+                            {STEPS.map((s) => (
+                                <div
+                                    key={s.num}
+                                    className="rounded-[1.75rem] border border-[var(--border)] bg-muted/20 p-2 shadow-xs transition-all hover:shadow-md"
+                                >
+                                    <div className="flex h-full flex-col justify-between rounded-[calc(1.75rem-0.5rem)] border border-[var(--border)] bg-[var(--surface)] p-6">
+                                        <div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-mono text-2xl font-bold text-teal-600 dark:text-teal-400">
+                                                    {s.num}
+                                                </span>
+                                                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground">
+                                                    {s.role}
+                                                </span>
+                                            </div>
+                                            <h3 className="mt-4 text-lg font-bold text-foreground">
+                                                {s.title}
+                                            </h3>
+                                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                                                {s.desc}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center gap-1.5 text-[11px] font-medium text-teal-600 dark:text-teal-400">
+                                            <CheckCircle2 className="size-3.5" />
+                                            Alur Terstandarisasi
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </section>
 
-                <section className="grid gap-4 md:grid-cols-3">
-                    <article className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
-                        <div className="flex items-center gap-2.5 text-[var(--accent)]">
-                            <FileText className="size-4" />
-                            <h3 className="text-[14px] font-semibold text-foreground">
-                                1. Pelaporan Faskes & Enkripsi PII
-                            </h3>
-                        </div>
-                        <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-                            Rumah Sakit dan Poli Puskesmas menginput data klinis
-                            serta lokasi GPS. Identitas pasien terenkripsi
-                            AES-256-GCM dan otomatis terdisposisi ke Puskesmas
-                            wilayah.
-                        </p>
-                    </article>
+                {/* Bento Grid Feature Matrix */}
+                <BentoFeatures />
 
-                    <article className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
-                        <div className="flex items-center gap-2.5 text-[var(--accent)]">
-                            <Timer className="size-4" />
-                            <h3 className="text-[14px] font-semibold text-foreground">
-                                2. Survei PE Radius 100m (SLA 72 Jam)
-                            </h3>
-                        </div>
-                        <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-                            Petugas lapangan memeriksa minimal 20 rumah via
-                            wizard mobile. Sistem menghitung ABJ, HI, CI, dan BI
-                            secara otomatis sesuai pedoman Kemenkes.
-                        </p>
-                    </article>
-
-                    <article className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
-                        <div className="flex items-center gap-2.5 text-[var(--accent)]">
-                            <ClipboardCheck className="size-4" />
-                            <h3 className="text-[14px] font-semibold text-foreground">
-                                3. Verifikasi & Penanggulangan Fokus
-                            </h3>
-                        </div>
-                        <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-                            Dinas Kesehatan memverifikasi hasil PE, mencetak
-                            surat resmi PDF, dan memantau pelaksanaan Fogging
-                            Siklus 1 & Siklus 2 (H+7) beserta stok logistik.
-                        </p>
-                    </article>
-                </section>
+                {/* Prevention 3M Plus & Emergency Contacts */}
+                <PreventionSection />
             </main>
 
-            <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-5">
-                <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 text-[12px] text-muted-foreground sm:px-6">
-                    <span className="flex items-center gap-1.5">
-                        <Building2 className="size-3.5" />
-                        WALI-EPI — Sistem Informasi Surveilans DBD Lintas
-                        Faskes
-                    </span>
-                    <span>Enkripsi PII AES-256-GCM · Audit Trail Penuh</span>
+            {/* High-End Minimalist Footer */}
+            <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-10 text-xs text-muted-foreground">
+                <div className="mx-auto max-w-6xl px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-3">
+                        <span className="grid size-7 place-items-center rounded-lg bg-teal-600 text-white font-bold text-xs">
+                            W
+                        </span>
+                        <div>
+                            <p className="font-semibold text-foreground">
+                                WALI-EPI Surveillance Platform
+                            </p>
+                            <p className="text-[11px]">
+                                Dinas Kesehatan Kota Bandung
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-6">
+                        <Link href="/masuk" className="hover:text-foreground transition-colors">
+                            Portal Masuk
+                        </Link>
+                        <Link href="/daftar" className="hover:text-foreground transition-colors">
+                            Registrasi Instansi
+                        </Link>
+                        <a href="#edukasi" className="hover:text-foreground transition-colors">
+                            Panduan 3M+
+                        </a>
+                        <a href="#kontak" className="hover:text-foreground transition-colors">
+                            Kontak Darurat
+                        </a>
+                    </div>
+
+                    <p className="text-[11px]">
+                        © 2026 Pemerintah Kota Bandung. Hak Cipta Dilindungi.
+                    </p>
                 </div>
             </footer>
         </div>

@@ -1,5 +1,6 @@
 import { connection } from 'next/server';
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { auth } from './auth';
 import type { Role } from './roles';
 
@@ -22,10 +23,15 @@ export type Actor = {
 export async function requireActor(): Promise<Actor> {
     await connection();
 
-    const session = await auth.api.getSession({ headers: await headers() });
+    let session;
+    try {
+        session = await auth.api.getSession({ headers: await headers() });
+    } catch {
+        redirect('/masuk');
+    }
 
     if (!session?.user) {
-        throw new Error('UNAUTHENTICATED');
+        redirect('/masuk');
     }
 
     const user = session.user as typeof session.user & {
@@ -35,7 +41,7 @@ export async function requireActor(): Promise<Actor> {
     };
 
     if (user.isActive === false) {
-        throw new Error('ACCOUNT_DISABLED');
+        redirect('/masuk?error=disabled');
     }
 
     return {
@@ -50,7 +56,7 @@ export async function requireRole(...allowed: Role[]): Promise<Actor> {
     const actor = await requireActor();
 
     if (!allowed.includes(actor.role)) {
-        throw new Error('FORBIDDEN');
+        redirect('/dasbor?error=unauthorized');
     }
 
     return actor;
@@ -67,10 +73,9 @@ export function scopeToInstitution(actor: Actor): string | null {
     }
 
     if (!actor.institutionId) {
-        // A staff account detached from its institution has no data to see.
-        // Callers that can recover (a page) turn this into a 403; without the
-        // explicit code it would surface as a bare 500 on every screen.
-        throw new Error('NO_INSTITUTION');
+        // Return a nil UUID sentinel rather than throwing unhandled exception,
+        // so queries return 0 rows safely rather than crashing into the error boundary.
+        return '00000000-0000-0000-0000-000000000000';
     }
 
     return actor.institutionId;

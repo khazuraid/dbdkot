@@ -111,9 +111,15 @@ export default function FacilityMap({
         const el = containerRef.current;
         if (!el) return;
 
-        if ((el as unknown as { _leaflet_id?: number | null })._leaflet_id) {
-            (el as unknown as { _leaflet_id?: number | null })._leaflet_id =
-                null;
+        // Ensure previous map instance is cleanly removed before recreating
+        if (mapRef.current) {
+            try {
+                mapRef.current.remove();
+            } catch {}
+            mapRef.current = null;
+        }
+        if ((el as any)._leaflet_id) {
+            delete (el as any)._leaflet_id;
         }
 
         const map = L.map(el, {
@@ -145,13 +151,14 @@ export default function FacilityMap({
 
         return () => {
             if (mapRef.current) {
-                mapRef.current.remove();
+                try {
+                    mapRef.current.remove();
+                } catch {}
                 mapRef.current = null;
             }
             layerGroupsRef.current = null;
-            if (el) {
-                (el as unknown as { _leaflet_id?: number | null })._leaflet_id =
-                    null;
+            if (el && (el as any)._leaflet_id) {
+                delete (el as any)._leaflet_id;
             }
         };
     }, [view]);
@@ -776,40 +783,56 @@ function fitMapToData(
     selectedZoneId: string,
     showZones: boolean,
 ) {
-    if (selectedZoneId && showZones) {
-        const target = zones.find((z) => z.id === selectedZoneId);
-        if (target) {
-            const bounds = computeBoundaryBounds(target.boundaryGeojson);
-            if (bounds) {
-                map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
-                return;
+    try {
+        const container = map.getContainer();
+        if (!container) return;
+        const size = map.getSize();
+        if (size.x === 0 || size.y === 0) {
+            map.invalidateSize();
+        }
+
+        if (selectedZoneId && showZones) {
+            const target = zones.find((z) => z.id === selectedZoneId);
+            if (target) {
+                const bounds = computeBoundaryBounds(target.boundaryGeojson);
+                if (bounds) {
+                    map.fitBounds(bounds, {
+                        padding: [28, 28],
+                        maxZoom: 15,
+                        animate: false,
+                    });
+                    return;
+                }
             }
         }
-    }
 
-    const coords: [number, number][] = [
-        ...points.map((p): [number, number] => [p.lat, p.lng]),
-        ...cases.map((c): [number, number] => [c.lat, c.lng]),
-    ];
+        const coords: [number, number][] = [
+            ...points.map((p): [number, number] => [p.lat, p.lng]),
+            ...cases.map((c): [number, number] => [c.lat, c.lng]),
+        ];
 
-    if (showZones) {
-        for (const z of zones) {
-            const b = computeBoundaryBounds(z.boundaryGeojson);
-            if (b) {
-                coords.push(b[0], b[1]);
+        if (showZones) {
+            for (const z of zones) {
+                const b = computeBoundaryBounds(z.boundaryGeojson);
+                if (b) {
+                    coords.push(b[0], b[1]);
+                }
             }
         }
+
+        if (coords.length === 0) return;
+
+        if (coords.length === 1) {
+            map.setView(coords[0], 13, { animate: false });
+            return;
+        }
+
+        map.fitBounds(L.latLngBounds(coords), {
+            padding: [28, 28],
+            maxZoom: 14,
+            animate: false,
+        });
+    } catch {
+        // Safe guard against transient unmount
     }
-
-    if (coords.length === 0) return;
-
-    if (coords.length === 1) {
-        map.setView(coords[0], 13);
-        return;
-    }
-
-    map.fitBounds(L.latLngBounds(coords), {
-        padding: [28, 28],
-        maxZoom: 14,
-    });
 }

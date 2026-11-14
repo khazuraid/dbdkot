@@ -21,9 +21,11 @@ import {
     ChevronDown,
     Circle,
     Compass,
+    FileEdit,
     Loader2,
     MapPin,
     Phone,
+    Save,
     Search,
     Send,
     ShieldCheck,
@@ -38,6 +40,7 @@ import { Panel } from '@/components/shell/page';
 import { DateField } from '@/components/ui/date-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WilayahCascadingSelect } from '@/components/geo/wilayah-cascading-select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -319,7 +322,10 @@ export function ReportForm({
         toast.success('Koordinat diperbarui dari titik peta.');
     };
 
-    const onSubmit = (data: z.output<typeof createReportSchema>) => {
+    const executeSubmit = (
+        data: z.output<typeof createReportSchema>,
+        isDraft = false,
+    ) => {
         setFormError(null);
         start(async () => {
             const formData = new FormData();
@@ -332,14 +338,32 @@ export function ReportForm({
                     }
                 }
             }
+            if (isDraft) {
+                formData.set('isDraft', 'true');
+            }
 
             const result = await submitReport({}, formData);
 
             if (result.ok) {
-                toast.success('Laporan kasus berhasil dikirim', {
-                    description:
-                        'Notifikasi penugasan PE otomatis diteruskan ke Puskesmas wilayah.',
-                });
+                if (result.isDraft) {
+                    toast.success('Laporan berhasil disimpan sebagai draf', {
+                        description:
+                            'Laporan belum dikirim ke surveilans. Anda dapat memeriksa, mengedit, atau menghapusnya.',
+                    });
+                    if (result.id) {
+                        router.push(`/laporan/${result.id}`);
+                        return;
+                    }
+                } else {
+                    toast.success('Laporan kasus berhasil dikirim', {
+                        description:
+                            'Notifikasi penugasan PE otomatis diteruskan ke Puskesmas wilayah.',
+                    });
+                    if (result.id) {
+                        router.push(`/laporan/${result.id}`);
+                        return;
+                    }
+                }
                 router.push('/laporan');
                 return;
             }
@@ -358,6 +382,14 @@ export function ReportForm({
                 toast.error(result.error);
             }
         });
+    };
+
+    const onSubmit = (data: z.output<typeof createReportSchema>) => {
+        executeSubmit(data, false);
+    };
+
+    const onSaveDraft = () => {
+        handleSubmit((data) => executeSubmit(data, true), onInvalid)();
     };
 
     const onInvalid = (fieldErrors: Record<string, unknown>) => {
@@ -728,6 +760,25 @@ export function ReportForm({
                                         {errors.patientAddress.message}
                                     </p>
                                 )}
+                            </div>
+
+                            {/* Cascading Wilayah Selector (Kemendagri / Sumopod) */}
+                            <div className="rounded-lg border border-[var(--border)] bg-[var(--ground)]/40 p-3.5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                        <MapPin className="size-3.5 text-primary" />
+                                        Pilih Wilayah Domisili (Database Kemendagri)
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground">Otomatis mengisi form</span>
+                                </div>
+                                <WilayahCascadingSelect
+                                    onSelect={(sel) => {
+                                        if (sel.provinsi) setValue('provinsi', sel.provinsi, { shouldValidate: true });
+                                        if (sel.kota) setValue('kota', sel.kota, { shouldValidate: true });
+                                        if (sel.kecamatan) setValue('kecamatan', sel.kecamatan, { shouldValidate: true });
+                                        if (sel.kelurahan) setValue('kelurahan', sel.kelurahan, { shouldValidate: true });
+                                    }}
+                                />
                             </div>
 
                             {/* Wilayah Grid (2x2) */}
@@ -1208,18 +1259,28 @@ export function ReportForm({
                             </div>
                         </div>
 
-                        <div className="flex w-full sm:w-auto items-center gap-2.5">
+                        <div className="flex w-full sm:w-auto flex-wrap items-center gap-2.5">
                             <Button
                                 asChild
-                                variant="outline"
-                                className="h-10 flex-1 sm:flex-none px-4 text-[13px]"
+                                variant="ghost"
+                                className="h-10 px-3 text-[13px] text-muted-foreground"
                             >
-                                <Link href="/laporan">Batalkan & Kembali</Link>
+                                <Link href="/laporan">Batalkan</Link>
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onSaveDraft}
+                                disabled={submitting}
+                                className="h-10 px-4 text-[13px] font-medium gap-2 border-[var(--border)] hover:bg-[var(--raised)]"
+                            >
+                                <Save className="size-4 text-[var(--accent)]" />
+                                <span>Simpan Draf (Belum Dikirim)</span>
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={submitting}
-                                className="h-10 flex-1 sm:flex-none px-5 text-[13.5px] font-semibold gap-2 shadow-sm"
+                                className="h-10 px-5 text-[13.5px] font-semibold gap-2 shadow-sm bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90"
                             >
                                 {submitting ? (
                                     <>
@@ -1229,7 +1290,7 @@ export function ReportForm({
                                 ) : (
                                     <>
                                         <Send className="size-4" />
-                                        <span>Kirim laporan kasus</span>
+                                        <span>Kirim Laporan Kasus</span>
                                     </>
                                 )}
                             </Button>

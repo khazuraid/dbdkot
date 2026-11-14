@@ -166,23 +166,27 @@ export function MobileNav({
                             </Button>
                         </div>
 
-                        {institution && (
-                            <div className="flex items-center gap-2 border-b border-[var(--rule)] bg-[var(--raised)]/50 px-4 py-2.5">
-                                <Building2
-                                    className="size-3.5 shrink-0 text-[var(--accent)]"
-                                    strokeWidth={1.75}
-                                    aria-hidden
-                                />
-                                <div className="min-w-0">
-                                    <p className="truncate text-[12px] font-medium text-foreground">
-                                        {institution}
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground">
-                                        {ROLE_LABEL[role]}
-                                    </p>
-                                </div>
+                        <div className="flex items-center gap-2 border-b border-[var(--rule)] bg-[var(--raised)]/50 px-4 py-2.5">
+                            <Building2
+                                className="size-3.5 shrink-0 text-[var(--accent)]"
+                                strokeWidth={1.75}
+                                aria-hidden
+                            />
+                            <div className="min-w-0">
+                                <p className="truncate text-[12px] font-medium text-foreground">
+                                    {institution ??
+                                        (role === 'DINKES'
+                                            ? 'Dinas Kesehatan Kota Cirebon'
+                                            : role === 'ADMIN'
+                                              ? 'Pusat Administrator'
+                                              : 'Fasilitas Kesehatan')}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                    <span className="inline-block size-1.5 rounded-full bg-[var(--accent)]" />
+                                    {ROLE_LABEL[role] ?? role}
+                                </p>
                             </div>
-                        )}
+                        </div>
 
                         <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
                             {groups.map((group) => (

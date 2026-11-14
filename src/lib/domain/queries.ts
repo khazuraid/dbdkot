@@ -355,9 +355,12 @@ export async function listAuditLogs(
                 entityType: auditLogs.entityType,
                 entityId: auditLogs.entityId,
                 changes: auditLogs.changes,
+                ipAddress: auditLogs.ipAddress,
+                userAgent: auditLogs.userAgent,
                 createdAt: auditLogs.createdAt,
                 userName: users.name,
                 userEmail: users.email,
+                userRole: users.role,
             })
             .from(auditLogs)
             .leftJoin(users, eq(users.id, auditLogs.userId))

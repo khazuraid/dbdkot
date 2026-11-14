@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock, FileDown } from 'lucide-react';
 import { requireActor } from '@/lib/session';
 import { listReportsPE } from '@/lib/domain/queries';
 import { formatDate } from '@/lib/format';
@@ -9,6 +9,7 @@ import {
     PageHeader,
     Panel,
 } from '@/components/shell/page';
+import { Stat, StatRow } from '@/components/shell/stat';
 import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { StatusText } from '@/components/shell/status-text';
@@ -43,6 +44,10 @@ export default async function PePage({
         readPage(sp.page),
     );
 
+    const verifiedCount = rows.filter((r) => r.status === 'VERIFIED').length;
+    const pendingCount = rows.filter((r) => r.status === 'SUBMITTED').length;
+    const rejectedCount = rows.filter((r) => r.status === 'REJECTED').length;
+
     return (
         <PageBody>
             <PageHeader
@@ -51,6 +56,37 @@ export default async function PePage({
             />
 
             <PageContent>
+                <StatRow className="grid-cols-2 lg:grid-cols-4">
+                    <Stat
+                        label="Total Laporan PE"
+                        value={total}
+                        signal="neutral"
+                        hint="Data tersimpan di sistem"
+                        icon={ClipboardCheck}
+                    />
+                    <Stat
+                        label="Terverifikasi Dinkes"
+                        value={verifiedCount}
+                        signal="good"
+                        hint="Investigasi tuntas"
+                        icon={CheckCircle2}
+                    />
+                    <Stat
+                        label="Menunggu Verifikasi"
+                        value={pendingCount}
+                        signal={pendingCount > 0 ? 'warn' : 'good'}
+                        hint={pendingCount > 0 ? 'Perlu tindakan verifikator' : 'Nol antrian verifikasi'}
+                        icon={Clock}
+                    />
+                    <Stat
+                        label="Perlu Revisi / Ditolak"
+                        value={rejectedCount}
+                        signal={rejectedCount > 0 ? 'bad' : 'neutral'}
+                        hint={rejectedCount > 0 ? 'Perbaiki temuan lapangan' : 'Nol laporan ditolak'}
+                        icon={AlertTriangle}
+                    />
+                </StatRow>
+
                 <Panel title={`${total} laporan PE`}>
                     <DataTable<PeRow>
                         rows={rows}

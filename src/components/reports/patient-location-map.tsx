@@ -56,10 +56,15 @@ export default function PatientLocationMap({
         const el = containerRef.current;
         if (!el) return;
 
-        // Clean up any stale Leaflet ID on the DOM container to prevent
-        // "Error: Map container is being reused by another instance"
-        if ((el as unknown as { _leaflet_id?: number | null })._leaflet_id) {
-            (el as unknown as { _leaflet_id?: number | null })._leaflet_id = null;
+        // Ensure previous map instance is cleanly removed before recreating
+        if (mapRef.current) {
+            try {
+                mapRef.current.remove();
+            } catch {}
+            mapRef.current = null;
+        }
+        if ((el as any)._leaflet_id) {
+            delete (el as any)._leaflet_id;
         }
 
         const init = initialCoordsRef.current;
@@ -95,11 +100,13 @@ export default function PatientLocationMap({
 
         return () => {
             if (mapRef.current) {
-                mapRef.current.remove();
+                try {
+                    mapRef.current.remove();
+                } catch {}
                 mapRef.current = null;
             }
-            if (el) {
-                (el as unknown as { _leaflet_id?: number | null })._leaflet_id = null;
+            if (el && (el as any)._leaflet_id) {
+                delete (el as any)._leaflet_id;
             }
         };
     }, []); // Run once on mount

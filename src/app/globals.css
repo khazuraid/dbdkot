@@ -228,11 +228,11 @@
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
         overflow-wrap: anywhere;
+        min-height: 100dvh;
     }
 
     @media (min-width: 768px) {
-        html,
-        body {
+        html, body {
             height: 100%;
             overflow: hidden;
         }

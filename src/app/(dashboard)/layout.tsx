@@ -19,7 +19,12 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const session = await auth.api.getSession({ headers: await headers() });
+    let session;
+    try {
+        session = await auth.api.getSession({ headers: await headers() });
+    } catch {
+        redirect('/masuk');
+    }
 
     if (!session?.user) {
         redirect('/masuk');
@@ -51,7 +56,7 @@ export default async function DashboardLayout({
     const email = user.email ?? '';
 
     return (
-        <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:h-dvh md:max-h-dvh md:overflow-hidden md:flex-row md:gap-3 md:p-3">
+        <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:fixed md:inset-0 md:h-dvh md:max-h-dvh md:overflow-hidden md:flex-row md:gap-3 md:p-3">
             <a href="#main-content" className="skip-link">
                 Lewati ke konten utama
             </a>
@@ -83,7 +88,7 @@ export default async function DashboardLayout({
                 <main
                     id="main-content"
                     tabIndex={-1}
-                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto outline-none pb-20 md:pb-0"
+                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none pb-20 md:pb-0"
                 >
                     {children}
                 </main>

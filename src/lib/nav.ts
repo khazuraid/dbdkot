@@ -22,19 +22,21 @@ export const NAV: Record<Role, NavGroup[]> = {
             items: [{ href: '/dasbor', label: 'Dasbor' }],
         },
         {
-            label: 'Laporan',
+            label: 'Pelaporan Kasus',
             items: [
-                { href: '/laporan', label: 'Semua laporan' },
-                { href: '/laporan/baru', label: 'Lapor kasus' },
-                { href: '/laporan/perlu-action', label: 'Perlu action' },
-                { href: '/laporan/analitik', label: 'Analitik' },
+                { href: '/laporan', label: 'Semua Laporan' },
+                { href: '/laporan/baru', label: 'Lapor Kasus Baru' },
+                { href: '/laporan/perlu-action', label: 'Perlu Kelengkapan' },
+                { href: '/laporan/analitik', label: 'Peta & Tren Kasus' },
+                { href: '/laporan/rekap', label: 'Rekap Laporan RS' },
             ],
         },
         {
-            label: 'Akun',
+            label: 'Akun & Komunikasi',
             items: [
                 { href: '/notifikasi', label: 'Notifikasi' },
                 { href: '/pesan', label: 'Pesan' },
+                { href: '/pengaturan', label: 'Pengaturan' },
             ],
         },
     ],
@@ -46,6 +48,8 @@ export const NAV: Record<Role, NavGroup[]> = {
                 { href: '/laporan', label: 'Daftar Laporan' },
                 { href: '/laporan/perlu-action', label: 'Perlu Tindakan' },
                 { href: '/laporan/baru', label: 'Lapor Poli' },
+                { href: '/laporan/analitik', label: 'Peta & Klaster' },
+                { href: '/laporan/rekap', label: 'Rekap Laporan' },
             ],
         },
         {
@@ -59,44 +63,58 @@ export const NAV: Record<Role, NavGroup[]> = {
         {
             label: 'Pengendalian & Logistik',
             items: [
-                { href: '/tindak-lanjut', label: 'Tindak Lanjut' },
-                { href: '/logistik', label: 'Logistik & Aset' },
+                { href: '/tindak-lanjut', label: 'Tindak Lanjut & Fogging' },
+                { href: '/logistik', label: 'Logistik Vektor' },
+                { href: '/aset', label: 'Aset & Alat' },
             ],
         },
         {
-            label: 'Akun',
+            label: 'Akun & Komunikasi',
             items: [
                 { href: '/notifikasi', label: 'Notifikasi' },
                 { href: '/pesan', label: 'Pesan' },
+                { href: '/pengaturan', label: 'Pengaturan' },
             ],
         },
     ],
     DINKES: [
         {
             label: 'Ringkasan',
-            items: [{ href: '/dasbor', label: 'Dasbor' }],
-        },
-        {
-            label: 'Pengawasan',
             items: [
-                { href: '/laporan', label: 'Semua laporan' },
-                { href: '/laporan/perlu-action', label: 'Perlu action' },
-                { href: '/laporan/lintas-wilayah', label: 'Lintas wilayah' },
-                { href: '/laporan/analitik', label: 'Analitik' },
+                { href: '/dasbor', label: 'Dasbor' },
             ],
         },
         {
-            label: 'Penyelidikan',
+            label: 'Pengawasan Surveilans',
             items: [
-                { href: '/pe', label: 'Laporan PE' },
+                { href: '/laporan', label: 'Semua Laporan' },
+                { href: '/laporan/perlu-action', label: 'Perlu Verifikasi' },
+                { href: '/laporan/lintas-wilayah', label: 'Lintas Wilayah' },
+                { href: '/laporan/analitik', label: 'Peta & Klaster Kota' },
+                { href: '/laporan/rekap', label: 'Rekap Laporan Kemenkes' },
+            ],
+        },
+        {
+            label: 'Penyelidikan & Vektor',
+            items: [
+                { href: '/pe', label: 'Monitoring PE' },
                 { href: '/pe/verifikasi', label: 'Verifikasi PE' },
-                { href: '/pe/analitik', label: 'Analitik PE' },
-                { href: '/tindak-lanjut', label: 'Tindak lanjut' },
-                { href: '/logistik', label: 'Logistik vektor' },
+                { href: '/pe/analitik', label: 'Analitik Entomologi' },
+                { href: '/tindak-lanjut', label: 'Tindak Lanjut & Fogging' },
+                { href: '/logistik', label: 'Logistik Vektor' },
+                { href: '/aset', label: 'Aset & Alat' },
             ],
         },
         {
-            label: 'Akun',
+            label: 'Master Wilayah & Faskes',
+            items: [
+                { href: '/admin/institusi', label: 'Institusi (RS & Puskesmas)' },
+                { href: '/admin/kelurahan', label: 'Kelurahan & Zonasi' },
+                { href: '/admin/koreksi-wilayah', label: 'Koreksi Wilayah' },
+            ],
+        },
+        {
+            label: 'Akun & Komunikasi',
             items: [
                 { href: '/notifikasi', label: 'Notifikasi' },
                 { href: '/pesan', label: 'Pesan' },
@@ -107,30 +125,37 @@ export const NAV: Record<Role, NavGroup[]> = {
     ADMIN: [
         {
             label: 'Ringkasan',
-            items: [{ href: '/dasbor', label: 'Dasbor' }],
+            items: [
+                { href: '/dasbor', label: 'Dasbor' },
+                { href: '/admin', label: 'Pusat Admin' },
+            ],
         },
         {
-            label: 'Pengawasan',
+            label: 'Pengawasan Sistem',
             items: [
-                { href: '/laporan', label: 'Semua laporan' },
+                { href: '/laporan', label: 'Semua Laporan' },
+                { href: '/laporan/rekap', label: 'Rekap Laporan' },
                 { href: '/pe', label: 'Laporan PE' },
+                { href: '/pe/verifikasi', label: 'Verifikasi PE' },
+                { href: '/tindak-lanjut', label: 'Tindak Lanjut' },
             ],
         },
         {
-            label: 'Master data',
+            label: 'Master Data & Keamanan',
             items: [
-                { href: '/admin/pengguna', label: 'Pengguna' },
-                { href: '/admin/institusi', label: 'Institusi' },
-                { href: '/admin/kelurahan', label: 'Kelurahan' },
-                { href: '/admin/koreksi-wilayah', label: 'Koreksi wilayah' },
+                { href: '/admin/pengguna', label: 'Pengguna & Hak Akses' },
+                { href: '/admin/institusi', label: 'Institusi Faskes' },
+                { href: '/admin/kelurahan', label: 'Kelurahan & Batas' },
+                { href: '/admin/koreksi-wilayah', label: 'Koreksi Wilayah' },
+                { href: '/admin/audit-log', label: 'Audit Log Keamanan' },
             ],
         },
         {
-            label: 'Sistem',
+            label: 'Logistik & Sistem',
             items: [
-                { href: '/admin/audit-log', label: 'Audit log' },
-                { href: '/aset', label: 'Aset' },
-                { href: '/pengaturan', label: 'Pengaturan' },
+                { href: '/logistik', label: 'Logistik' },
+                { href: '/aset', label: 'Aset & Alat' },
+                { href: '/pengaturan', label: 'Pengaturan & API Wilayah' },
             ],
         },
     ],

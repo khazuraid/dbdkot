@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireActor } from '@/lib/session';
+import { requireActor, requireRole } from '@/lib/session';
 import { idSchema, kelurahanSchema } from '@/lib/domain/form-contracts';
 import {
     boundaryGeoJsonSchema,
@@ -13,6 +13,10 @@ import {
     updateKelurahan,
     updateKelurahanBoundary,
 } from '@/lib/domain/master';
+import {
+    syncAllKelurahanKotaCirebon,
+    type SumopodSyncResult,
+} from '@/lib/services/sumopod';
 
 export type FormState = {
     ok: boolean;
@@ -110,4 +114,15 @@ export async function deleteKelurahanAction(id: string): Promise<FormState> {
 
     revalidatePath('/admin/kelurahan');
     return { ok: true };
+}
+
+export async function syncKelurahanFromSumopodAction(): Promise<SumopodSyncResult> {
+    await requireRole('ADMIN');
+    const res = await syncAllKelurahanKotaCirebon();
+    if (res.ok) {
+        revalidatePath('/admin/kelurahan');
+        revalidatePath('/admin/institusi');
+        revalidatePath('/laporan/analitik');
+    }
+    return res;
 }

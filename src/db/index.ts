@@ -22,6 +22,9 @@ export function getDb() {
 
         globalForDb.sql ??= postgres(connectionString, {
             max: process.env.NODE_ENV === 'production' ? 10 : 1,
+            idle_timeout: 20,
+            connect_timeout: 10,
+            max_lifetime: 60 * 30,
             prepare: false,
         });
 

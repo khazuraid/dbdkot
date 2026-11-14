@@ -37,6 +37,8 @@ export function DataTable<T extends { id: string }>({
     caption,
     minWidth = 720,
     rowClassName,
+    maxHeight,
+    className,
 }: {
     rows: T[];
     columns: Column<T>[];
@@ -44,36 +46,45 @@ export function DataTable<T extends { id: string }>({
     caption?: string;
     minWidth?: number;
     rowClassName?: (row: T) => string | undefined;
+    maxHeight?: string | number;
+    className?: string;
 }) {
     if (rows.length === 0) return <Empty>{empty}</Empty>;
 
     return (
-        <div className="w-full overflow-x-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-xs">
-            <Table
-                className="ledger caption-bottom"
+        <div
+            className={cn(
+                'relative w-full overflow-x-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-xs',
+                maxHeight && 'overflow-y-auto',
+                className,
+            )}
+            style={maxHeight ? { maxHeight } : undefined}
+        >
+            <table
+                className="ledger w-full caption-bottom text-sm"
                 style={{ minWidth: `${minWidth}px` }}
             >
                 {caption && <caption className="sr-only">{caption}</caption>}
-                <TableHeader>
-                    <TableRow className="border-b border-[var(--border)] bg-[var(--raised)]/60 hover:bg-[var(--raised)]/60">
+                <thead className="sticky top-0 z-20 bg-[var(--surface)] shadow-[0_1px_0_0_var(--border)]">
+                    <tr className="border-b border-[var(--border)] bg-[var(--raised)]/95 hover:bg-[var(--raised)]/95 backdrop-blur-xs">
                         {columns.map((c) => (
-                            <TableHead
+                            <th
                                 key={c.key}
                                 scope="col"
                                 className={cn(
-                                    'h-9 font-semibold text-muted-foreground',
+                                    'h-10 px-3.5 py-2 text-left text-[11px] font-bold tracking-wider text-muted-foreground uppercase bg-inherit select-none',
                                     c.align === 'right' && 'text-right',
                                     c.className,
                                 )}
                             >
                                 {c.header}
-                            </TableHead>
+                            </th>
                         ))}
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--rule)]">
                     {rows.map((row) => (
-                        <TableRow
+                        <tr
                             key={row.id}
                             className={cn(
                                 'border-b border-[var(--rule)] transition-colors hover:bg-[var(--raised)]/40',
@@ -81,21 +92,21 @@ export function DataTable<T extends { id: string }>({
                             )}
                         >
                             {columns.map((c) => (
-                                <TableCell
+                                <td
                                     key={c.key}
                                     className={cn(
-                                        'py-2.5',
-                                        c.align === 'right' && 'num',
+                                        'px-3.5 py-2.5 align-middle text-sm',
+                                        c.align === 'right' && 'text-right num',
                                         c.className,
                                     )}
                                 >
                                     {c.cell(row)}
-                                </TableCell>
+                                </td>
                             ))}
-                        </TableRow>
+                        </tr>
                     ))}
-                </TableBody>
-            </Table>
+                </tbody>
+            </table>
         </div>
     );
 }

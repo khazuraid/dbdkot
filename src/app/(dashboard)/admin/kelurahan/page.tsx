@@ -28,6 +28,7 @@ import {
     type TableColumn,
 } from '@/components/admin/master-table-view';
 import { KelurahanZonePanel } from '@/components/admin/kelurahan-zone-panel';
+import { SyncSumopodButton } from './sync-sumopod-button';
 import { Button } from '@/components/ui/button';
 import {
     InputGroup,
@@ -54,7 +55,8 @@ export default async function KelurahanPage({
     }>;
 }) {
     const sp = await searchParams;
-    await requireRole('ADMIN', 'DINKES');
+    const actor = await requireRole('ADMIN', 'DINKES');
+    const isAdmin = actor.role === 'ADMIN';
     const q = sp.q?.trim() ?? '';
     const [{ rows, page, perPage, total, summary }, zoneOptions] =
         await Promise.all([
@@ -205,6 +207,7 @@ export default async function KelurahanPage({
                     title={`${formatNumber(total)} kelurahan${q ? ` · “${q}”` : ''}`}
                     aside={
                         <div className="flex flex-wrap items-center gap-2">
+                            {isAdmin && <SyncSumopodButton />}
                             {summary.uncovered > 0 && (
                                 <Button asChild variant="outline" size="sm">
                                     <Link href="/admin/institusi">

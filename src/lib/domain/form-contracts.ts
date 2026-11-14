@@ -121,6 +121,10 @@ export const createReportSchema = z.object({
     ),
     sourceType: z.enum(['RS', 'PUSKESMAS_POLI']).optional(),
     diagnosis: z.string().trim().max(500).optional(),
+    isDraft: z.preprocess(
+        (v) => v === true || v === 'true' || v === '1',
+        z.boolean().optional(),
+    ),
 });
 
 export type CreateReportInput = z.infer<typeof createReportSchema>;
@@ -158,6 +162,8 @@ export const createPeSchema = z.object({
     respondentAge: optionalInt(0, 150, 'Umur responden'),
     respondentAddress: z.string().trim().max(300).optional(),
     respondentJob: z.string().trim().max(120).optional(),
+    rt: z.string().trim().max(10).optional(),
+    rw: z.string().trim().max(10).optional(),
     patientJob: z.string().trim().max(120).optional(),
     mainComplaint: z.string().trim().max(300).optional(),
     symptomOnsetDate: optionalDate,

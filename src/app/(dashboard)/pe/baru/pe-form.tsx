@@ -142,6 +142,8 @@ export function PeForm({
             reportRSId: initialCandidate?.id ?? '',
             peDate: new Date(),
             officerName: defaultOfficerName,
+            rt: '',
+            rw: '',
             respondentAddress: initialCandidate?.patientAddress ?? '',
             symptomOnsetDate: toIsoDate(initialCandidate?.symptomOnsetDate),
             clinicalSymptoms: initialCandidate?.diagnosis
@@ -200,6 +202,13 @@ export function PeForm({
         setValue('labHematocrit', activeReport.hematocrit ?? undefined);
         setValue('symptomOnsetDate', toIsoDate(activeReport.symptomOnsetDate));
         setValue('respondentAddress', activeReport.patientAddress ?? '');
+
+        // Auto pre-populate RT/RW from address if present
+        const addr = activeReport.patientAddress ?? '';
+        const rtMatch = addr.match(/\bRT[\s.:]*(\d{1,3})\b/i);
+        const rwMatch = addr.match(/\bRW[\s.:]*(\d{1,3})\b/i);
+        if (rtMatch) setValue('rt', String(parseInt(rtMatch[1], 10)).padStart(2, '0'));
+        if (rwMatch) setValue('rw', String(parseInt(rwMatch[1], 10)).padStart(2, '0'));
     }, [activeReport, setValue]);
 
     const surveys = useMemo(
@@ -284,6 +293,8 @@ export function PeForm({
                 fd.set('respondentAge', String(data.respondentAge));
             if (data.respondentAddress)
                 fd.set('respondentAddress', data.respondentAddress);
+            if (data.rt) fd.set('rt', data.rt);
+            if (data.rw) fd.set('rw', data.rw);
             if (data.respondentJob) fd.set('respondentJob', data.respondentJob);
             if (data.patientJob) fd.set('patientJob', data.patientJob);
             if (data.mainComplaint) fd.set('mainComplaint', data.mainComplaint);
@@ -680,6 +691,33 @@ export function PeForm({
                                     placeholder="Alamat lengkap KK / responden"
                                     {...register('respondentAddress')}
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="rw">RW (Fokus Kasus / Investigasi PE)</Label>
+                                    <Input
+                                        id="rw"
+                                        placeholder="Contoh: 05"
+                                        {...register('rw')}
+                                        className="font-mono text-xs"
+                                    />
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Nomor RW untuk sinkronisasi rekap Puskesmas
+                                    </span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="rt">RT (Fokus Kasus / Investigasi PE)</Label>
+                                    <Input
+                                        id="rt"
+                                        placeholder="Contoh: 02"
+                                        {...register('rt')}
+                                        className="font-mono text-xs"
+                                    />
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Nomor RT untuk sinkronisasi rekap Puskesmas
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

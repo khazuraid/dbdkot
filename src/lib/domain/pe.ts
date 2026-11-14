@@ -233,7 +233,11 @@ export async function createPe(
                     breteauIndex: String(metrics.bi),
                     transmissionRisk: metrics.transmissionRisk,
                     foggingRecommended: metrics.foggingRecommended,
+                    rt: input.rt ?? null,
+                    rw: input.rw ?? null,
                     formData: {
+                        rt: input.rt ?? null,
+                        rw: input.rw ?? null,
                         clinicalSymptoms: input.clinicalSymptoms ?? [],
                         labRdtNs1: input.labRdtNs1 ?? 'TIDAK_DIPERIKSA',
                         labIgm: input.labIgm ?? 'TIDAK_DIPERIKSA',
@@ -286,6 +290,8 @@ export async function createPe(
                 .update(reportsRS)
                 .set({
                     status: 'PE_COMPLETED',
+                    ...(input.rt ? { rt: input.rt } : {}),
+                    ...(input.rw ? { rw: input.rw } : {}),
                     updatedById: actor.userId,
                     updatedAt: new Date(),
                 })

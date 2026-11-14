@@ -148,7 +148,7 @@ export function Sidebar({ role, name, email, institution }: Props) {
                 </button>
             </div>
 
-            {institution && !collapsed && (
+            {!collapsed && (
                 <div className="border-b border-[var(--rule)] bg-[var(--raised)]/45 px-3.5 py-2.5">
                     <div className="flex items-center gap-2">
                         <Building2
@@ -158,10 +158,16 @@ export function Sidebar({ role, name, email, institution }: Props) {
                         />
                         <div className="min-w-0">
                             <p className="truncate text-[12px] leading-tight font-medium text-foreground">
-                                {institution}
+                                {institution ??
+                                    (role === 'DINKES'
+                                        ? 'Dinas Kesehatan Kota Cirebon'
+                                        : role === 'ADMIN'
+                                          ? 'Pusat Administrator'
+                                          : 'Fasilitas Kesehatan')}
                             </p>
-                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                {ROLE_LABEL[role]}
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                <span className="inline-block size-1.5 rounded-full bg-[var(--accent)]" />
+                                {ROLE_LABEL[role] ?? role}
                             </p>
                         </div>
                     </div>
@@ -194,7 +200,7 @@ export function Sidebar({ role, name, email, institution }: Props) {
                 </button>
             </div>
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-2.5 py-3.5">
+            <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-2.5 py-3.5">
                 {groups.map((group) => (
                     <div key={group.label}>
                         {!collapsed && (

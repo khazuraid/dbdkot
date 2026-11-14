@@ -39,6 +39,7 @@ import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
 import { StatusStepper } from '@/components/reports/status-stepper';
 import { SlaCountdown } from '@/components/reports/sla-countdown';
 import { PatientMapPanel } from '@/components/reports/patient-map-panel';
+import { DraftActionToolbar } from './draft-actions';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -72,6 +73,10 @@ export default async function LaporanDetailPage({
     const canClose =
         (actor.role === 'DINKES' || actor.role === 'PUSKESMAS') &&
         (report.status === 'VERIFIED' || report.status === 'SIKLUS_2_DONE');
+
+    const isDraft = report.status === 'DRAFT';
+    const canManageDraft =
+        actor.role === 'ADMIN' || actor.institutionId === report.institutionId;
 
     return (
         <PageBody>
@@ -108,6 +113,13 @@ export default async function LaporanDetailPage({
                 }
                 aside={
                     <div className="flex items-center gap-2">
+                        {isDraft && (
+                            <DraftActionToolbar
+                                reportId={id}
+                                reportNumber={report.reportNumber}
+                                canManage={canManageDraft}
+                            />
+                        )}
                         <Button asChild variant="outline" size="sm">
                             <Link href="/laporan" className="inline-flex items-center gap-1.5">
                                 <ArrowLeft className="size-3.5" aria-hidden />
@@ -119,6 +131,140 @@ export default async function LaporanDetailPage({
             />
 
             <PageContent className="space-y-6">
+                {/* Draft Alert Banner */}
+                {isDraft && (
+                    <div className="rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-500/10 p-4 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                    <p className="text-[13.5px] font-semibold text-foreground">
+                                        Laporan Berstatus Draf (Belum Dikirim ke Surveilans)
+                                    </p>
+                                    <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                                        Berkas kasus ini disimpan sebagai draf lokal faskes. Laporan belum didisposisi ke Puskesmas wilayah dan belum memicu SLA investigasi lapangan (24/72 jam). Anda dapat memeriksa data, mengedit rincian, menghapus draf ini, atau langsung mengirimkannya.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="shrink-0 pt-1 sm:pt-0">
+                                <DraftActionToolbar
+                                    reportId={id}
+                                    reportNumber={report.reportNumber}
+                                    canManage={canManageDraft}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Clinical KPI Summary Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+                    {/* Trombosit */}
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                            <span>Trombosit</span>
+                            <Activity className="size-3 text-[var(--accent)]" />
+                        </span>
+                        <div className="flex items-baseline gap-1.5 pt-0.5">
+                            <span className={`text-base font-bold font-mono ${
+                                (report.plateletCount ?? 999999) < 50000
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : (report.plateletCount ?? 999999) < 100000
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-foreground'
+                            }`}>
+                                {report.plateletCount ? formatNumber(report.plateletCount) : '—'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">sel/µL</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                            {report.plateletCount
+                                ? report.plateletCount < 50000
+                                    ? 'Trombositopenia Berat (Kritis)'
+                                    : report.plateletCount < 100000
+                                      ? 'Trombositopenia Sedang'
+                                      : 'Trombosit Cukup'
+                                : 'Tidak ada data lab'}
+                        </p>
+                    </div>
+
+                    {/* Hematokrit */}
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Hematokrit (Ht)
+                        </span>
+                        <div className="flex items-baseline gap-1 pt-0.5">
+                            <span className="text-base font-bold font-mono text-foreground">
+                                {report.hematocrit ? `${report.hematocrit}%` : '—'}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                            {report.hematocrit && Number(report.hematocrit) >= 45
+                                ? 'Hemokonsentrasi Tinggi'
+                                : 'Dalam batas fisiologis'}
+                        </p>
+                    </div>
+
+                    {/* Serologi NS1 / Rapid */}
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            NS1 Rapid Test
+                        </span>
+                        <div className="pt-0.5">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                report.dengueBlot === 'POSITIF'
+                                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                                    : report.dengueBlot === 'NEGATIF'
+                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                                      : 'bg-[var(--raised)] text-muted-foreground border border-[var(--border)]'
+                            }`}>
+                                {report.dengueBlot ?? 'TIDAK DIPERIKSA'}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate">Antigen Dengue Akut</p>
+                    </div>
+
+                    {/* Serologi IgM / IgG */}
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            IgM / IgG Dengue
+                        </span>
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                            <span className="text-[11px] font-medium font-mono text-foreground">
+                                IgM: <span className={report.igm === 'POSITIF' ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-muted-foreground'}>{report.igm ?? '-'}</span>
+                            </span>
+                            <span>·</span>
+                            <span className="text-[11px] font-medium font-mono text-foreground">
+                                IgG: <span className={report.igg === 'POSITIF' ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>{report.igg ?? '-'}</span>
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate">Antibodi Fase Lanjut</p>
+                    </div>
+
+                    {/* Usia & Kategori Pasien */}
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1 col-span-2 sm:col-span-4 lg:col-span-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Kategori Pasien
+                        </span>
+                        <div className="pt-0.5 flex items-center gap-1.5">
+                            <span className="text-base font-bold font-mono text-foreground">
+                                {report.patient.age} Th
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                ({report.patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                            {report.patient.age < 5
+                                ? 'Balita (Kelompok Rentan)'
+                                : report.patient.age < 15
+                                  ? 'Anak (Kelompok Rentan)'
+                                  : report.patient.age >= 60
+                                    ? 'Lansia (Kelompok Rentan)'
+                                    : 'Dewasa Produktif'}
+                        </p>
+                    </div>
+                </div>
                 {/* Decision Action Bar if pending actor action */}
                 {(canReview || canStartPe || canVerify || canClose) && (
                     <div className="rounded-[var(--radius-card)] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 shadow-xs">

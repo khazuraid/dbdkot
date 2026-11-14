@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireActor } from '@/lib/session';
+import { requireRole } from '@/lib/session';
 import { listPeTasks } from '@/lib/domain/queries';
 import { formatDate } from '@/lib/format';
 import {
@@ -37,7 +37,7 @@ export default async function PeTugasPage({
     searchParams: Promise<{ page?: string }>;
 }) {
     const sp = await searchParams;
-    const actor = await requireActor();
+    const actor = await requireRole('PUSKESMAS', 'DINKES', 'ADMIN');
     const { rows, page, perPage, total } = await listPeTasks(
         actor,
         readPage(sp.page),

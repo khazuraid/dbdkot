@@ -42,7 +42,7 @@ export default async function AsetPage({
     }>;
 }) {
     const sp = await searchParams;
-    const actor = await requireRole('ADMIN', 'PUSKESMAS');
+    const actor = await requireRole('ADMIN', 'DINKES', 'PUSKESMAS');
     const q = sp.q?.trim() ?? '';
     const [{ rows, page, perPage, total }, allInstitutions] = await Promise.all(
         [

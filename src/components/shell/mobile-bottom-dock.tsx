@@ -54,8 +54,8 @@ const DOCK_BY_ROLE: Record<Role, DockItem[]> = {
         { href: '/dasbor', label: 'Dasbor', icon: LayoutDashboard },
         { href: '/laporan', label: 'Kasus', icon: FileText },
         {
-            href: '/admin/pengguna',
-            label: 'Kelola',
+            href: '/admin',
+            label: 'Admin',
             icon: ShieldCheck,
             primary: true,
         },

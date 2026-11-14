@@ -13,7 +13,7 @@ export const instant = false;
 export default async function PengaturanPage() {
     const actor = await requireActor();
     const isAdmin = actor.role === 'ADMIN';
-    const canManageSystem = actor.role === 'ADMIN' || actor.role === 'DINKES';
+    const canManageSystem = actor.role === 'ADMIN';
 
     const db = getDb();
 

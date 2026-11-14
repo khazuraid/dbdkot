@@ -3,16 +3,25 @@ import { getDb } from '@/db';
 import {
     foggingCycles,
     institutions,
+    kelurahan,
     reportsPE,
     reportsRS,
     waDispatches,
 } from '@/db/schema';
-import { decryptPii } from '@/lib/crypto';
+import { decryptPii, encryptPii, hashPii } from '@/lib/crypto';
 import { audit } from '@/lib/audit';
-import { enqueuePeSla, enqueueWhatsAppDispatch } from '@/lib/queue';
+import {
+    enqueueAssign,
+    enqueueClusterDetector,
+    enqueuePeSla,
+    enqueueSla,
+    enqueueWhatsAppDispatch,
+} from '@/lib/queue';
 import { insertNotifications } from './notify';
+import { assignReportByKelurahan } from './assignment';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { ReportStatus } from './reports';
+import type { CreateReportInput } from './form-contracts';
 
 export type ReportDetail = {
     id: string;
@@ -567,4 +576,308 @@ export async function disposeCrossBorder(
     });
 
     return { ok: true, status: updated.status };
+}
+
+export async function deleteDraftReport(
+    actor: Actor,
+    id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const db = getDb();
+    const [row] = await db
+        .select({
+            id: reportsRS.id,
+            reportNumber: reportsRS.reportNumber,
+            status: reportsRS.status,
+            institutionId: reportsRS.institutionId,
+        })
+        .from(reportsRS)
+        .where(eq(reportsRS.id, id))
+        .limit(1);
+
+    if (!row) {
+        return { ok: false, error: 'Laporan tidak ditemukan.' };
+    }
+
+    if (row.status !== 'DRAFT') {
+        return {
+            ok: false,
+            error: 'Hanya laporan dengan status Draf (belum dikirim) yang dapat dihapus.',
+        };
+    }
+
+    const isOwner =
+        actor.role === 'ADMIN' ||
+        (actor.institutionId && actor.institutionId === row.institutionId);
+
+    if (!isOwner) {
+        return {
+            ok: false,
+            error: 'Anda tidak memiliki hak untuk menghapus draf faskes lain.',
+        };
+    }
+
+    await db.delete(reportsRS).where(eq(reportsRS.id, id));
+
+    await audit({
+        actor,
+        action: 'DELETE',
+        entityType: 'REPORT_RS',
+        entityId: id,
+        changes: {
+            reportNumber: { from: row.reportNumber, to: null },
+            status: { from: 'DRAFT', to: null },
+        },
+    });
+
+    return { ok: true };
+}
+
+export async function submitDraftReport(
+    actor: Actor,
+    id: string,
+): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
+    const db = getDb();
+    const [row] = await db
+        .select()
+        .from(reportsRS)
+        .where(eq(reportsRS.id, id))
+        .limit(1);
+
+    if (!row) {
+        return { ok: false, error: 'Laporan tidak ditemukan.' };
+    }
+
+    if (row.status !== 'DRAFT') {
+        return {
+            ok: false,
+            error: 'Laporan ini sudah dikirim sebelumnya.',
+        };
+    }
+
+    const isOwner =
+        actor.role === 'ADMIN' ||
+        (actor.institutionId && actor.institutionId === row.institutionId);
+
+    if (!isOwner) {
+        return {
+            ok: false,
+            error: 'Anda tidak memiliki hak untuk mengirim draf faskes lain.',
+        };
+    }
+
+    const [{ localMatches }] = await db
+        .select({ localMatches: sql<number>`count(*)::int` })
+        .from(kelurahan)
+        .where(
+            and(
+                sql`lower(${kelurahan.name}) = lower(${row.kelurahan ?? ''})`,
+                sql`lower(${kelurahan.kota}) = lower(${row.kota ?? ''})`,
+            ),
+        );
+
+    const [{ totalKelurahan }] = await db
+        .select({ totalKelurahan: sql<number>`count(*)::int` })
+        .from(kelurahan);
+
+    const isCrossBorder = totalKelurahan > 0 && localMatches === 0;
+    const isPuskesmasPoli =
+        actor.role === 'PUSKESMAS' || row.sourceType === 'PUSKESMAS_POLI';
+
+    const targetStatus = isCrossBorder
+        ? ('CROSS_BORDER_PENDING' as const)
+        : isPuskesmasPoli
+          ? ('ASSIGNED_ACCEPTED' as const)
+          : ('SUBMITTED' as const);
+
+    const now = new Date();
+    await db
+        .update(reportsRS)
+        .set({
+            status: targetStatus,
+            updatedById: actor.userId,
+            updatedAt: now,
+        })
+        .where(eq(reportsRS.id, id));
+
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'REPORT_RS',
+        entityId: id,
+        changes: {
+            status: { from: 'DRAFT', to: targetStatus },
+        },
+    });
+
+    if (isCrossBorder) {
+        await insertNotifications(
+            { kind: 'ROLE', role: 'DINKES' },
+            {
+                title: 'Kasus luar wilayah terdeteksi',
+                message: `Laporan ${row.reportNumber} berdomisili di ${row.kota} dan menunggu disposisi Dinkes.`,
+                type: 'CROSS_BORDER',
+                entityType: 'REPORT_RS',
+                entityId: id,
+            },
+        );
+    } else if (!isPuskesmasPoli) {
+        try {
+            const assignRes = await assignReportByKelurahan(id);
+            if (assignRes.assigned) {
+                await insertNotifications(
+                    {
+                        kind: 'INSTITUTION',
+                        institutionId: assignRes.puskesmasId,
+                    },
+                    {
+                        title: 'Laporan kasus baru masuk',
+                        message: `Laporan ${row.reportNumber} (${row.caseType}) di Kel. ${row.kelurahan} menunggu verifikasi Puskesmas (SLA 24 jam).`,
+                        type: 'ASSIGNMENT',
+                        entityType: 'REPORT_RS',
+                        entityId: id,
+                    },
+                );
+            }
+        } catch (err) {
+            console.error('[laporan] auto-assign inline error:', err);
+        }
+
+        try {
+            await insertNotifications(
+                { kind: 'ROLE', role: 'DINKES' },
+                {
+                    title: 'Laporan kasus DBD baru',
+                    message: `Laporan ${row.reportNumber} (${row.caseType}) diterima dari faskes di Kel. ${row.kelurahan}, Kec. ${row.kecamatan}.`,
+                    type: 'STATUS_CHANGE',
+                    entityType: 'REPORT_RS',
+                    entityId: id,
+                },
+            );
+        } catch (err) {
+            console.error('[laporan] dinkes notification error:', err);
+        }
+    } else {
+        try {
+            await insertNotifications(
+                { kind: 'ROLE', role: 'DINKES' },
+                {
+                    title: 'Laporan kasus DBD baru (Puskesmas Poli)',
+                    message: `Laporan ${row.reportNumber} (${row.caseType}) dibuat langsung oleh Puskesmas di Kel. ${row.kelurahan}.`,
+                    type: 'STATUS_CHANGE',
+                    entityType: 'REPORT_RS',
+                    entityId: id,
+                },
+            );
+        } catch (err) {
+            console.error('[laporan] poli dinkes notification error:', err);
+        }
+    }
+
+    try {
+        if (!isCrossBorder && !isPuskesmasPoli) {
+            await enqueueAssign(id);
+            await enqueueSla(id);
+        }
+        if (row.latitude !== null && row.longitude !== null) {
+            await enqueueClusterDetector(id);
+        }
+        if (isCrossBorder) {
+            await enqueueWhatsAppDispatch({
+                recipientPhone: process.env.DINKES_ALERT_PHONE ?? '',
+                recipientRole: 'DINKES',
+                reportRSId: id,
+                eventKind: 'CROSS_BORDER',
+                message: `[WALI-EPI] Kasus luar wilayah ${row.reportNumber} (${row.kelurahan}, ${row.kota}) menunggu disposisi Dinkes di /laporan/lintas-wilayah.`,
+            });
+        }
+    } catch (error) {
+        console.error('[laporan] gagal enqueue ke Redis', { reportId: id, error });
+    }
+
+    return { ok: true, status: targetStatus };
+}
+
+export async function updateDraftReport(
+    actor: Actor,
+    id: string,
+    input: Partial<CreateReportInput>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const db = getDb();
+    const [row] = await db
+        .select()
+        .from(reportsRS)
+        .where(eq(reportsRS.id, id))
+        .limit(1);
+
+    if (!row) {
+        return { ok: false, error: 'Laporan tidak ditemukan.' };
+    }
+
+    if (row.status !== 'DRAFT' && actor.role !== 'ADMIN') {
+        return {
+            ok: false,
+            error: 'Hanya laporan berstatus draf yang dapat diubah.',
+        };
+    }
+
+    const isOwner =
+        actor.role === 'ADMIN' ||
+        (actor.institutionId && actor.institutionId === row.institutionId);
+
+    if (!isOwner) {
+        return {
+            ok: false,
+            error: 'Anda tidak memiliki hak untuk mengubah draf faskes lain.',
+        };
+    }
+
+    const updates: Record<string, unknown> = {
+        updatedById: actor.userId,
+        updatedAt: new Date(),
+    };
+
+    if (input.patientName) updates.patientNameEncrypted = encryptPii(input.patientName);
+    if (input.patientNik) {
+        updates.patientNikEncrypted = encryptPii(input.patientNik);
+        updates.patientNikHash = hashPii(input.patientNik);
+    }
+    if (input.patientAddress) updates.patientAddressEncrypted = encryptPii(input.patientAddress);
+    if (input.phoneNumber !== undefined) {
+        updates.phoneNumberEncrypted = input.phoneNumber ? encryptPii(input.phoneNumber) : null;
+    }
+    if (input.patientAge !== undefined) updates.patientAge = input.patientAge;
+    if (input.patientGender) updates.patientGender = input.patientGender;
+    if (input.caseType) updates.caseType = input.caseType;
+    if (input.kelurahan) updates.kelurahan = input.kelurahan;
+    if (input.kecamatan) updates.kecamatan = input.kecamatan;
+    if (input.kota) updates.kota = input.kota;
+    if (input.provinsi) updates.provinsi = input.provinsi;
+    if (input.latitude !== undefined) updates.latitude = input.latitude;
+    if (input.longitude !== undefined) updates.longitude = input.longitude;
+    if (input.admissionDate) updates.admissionDate = input.admissionDate;
+    if (input.symptomOnsetDate !== undefined) updates.symptomOnsetDate = input.symptomOnsetDate ?? null;
+    if (input.diagnosisDate !== undefined) updates.diagnosisDate = input.diagnosisDate ?? null;
+    if (input.plateletCount !== undefined) updates.plateletCount = input.plateletCount ?? null;
+    if (input.hematocrit !== undefined) {
+        updates.hematocrit = input.hematocrit !== null && input.hematocrit !== undefined ? String(input.hematocrit) : null;
+    }
+    if (input.ns1Result !== undefined) updates.dengueBlot = input.ns1Result ?? null;
+    if (input.igmResult !== undefined) updates.igm = input.igmResult ?? null;
+    if (input.iggResult !== undefined) updates.igg = input.iggResult ?? null;
+    if (input.diagnosis !== undefined) updates.diagnosis = input.diagnosis ?? null;
+
+    await db.update(reportsRS).set(updates).where(eq(reportsRS.id, id));
+
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'REPORT_RS',
+        entityId: id,
+        changes: {
+            reportNumber: { from: row.reportNumber, to: row.reportNumber },
+            updatedFields: { from: null, to: Object.keys(updates) },
+        },
+    });
+
+    return { ok: true };
 }
