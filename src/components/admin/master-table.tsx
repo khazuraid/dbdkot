@@ -71,6 +71,8 @@ type Value =
 export type FieldSpec = {
     /** A disabled control that still submits, for a locked identity field. */
     disabled?: boolean;
+    readOnly?: boolean;
+    defaultValue?: Value;
     name: string;
     label: string;
     kind:
@@ -91,6 +93,8 @@ export type FieldSpec = {
         hint?: string;
         disabled?: boolean;
         disabledReason?: string;
+        kota?: string;
+        provinsi?: string;
     }[];
     /** Step for `number` inputs (e.g. `"any"` for coordinates). */
     step?: string;
@@ -255,7 +259,9 @@ function initialValuesFor<T extends Row>(
 ): Record<string, Value> {
     const init: Record<string, Value> = {};
     for (const f of fields) {
-        const raw = editing?.[f.name];
+        const raw = editing?.[f.name] !== undefined && editing?.[f.name] !== null
+            ? editing?.[f.name]
+            : f.defaultValue;
         if (f.kind === 'checkbox') {
             init[f.name] = raw !== false;
         } else if (f.kind === 'list') {
@@ -379,10 +385,25 @@ function MasterFormDialog<T extends Row>({
                                     value={value}
                                     allValues={values}
                                     onChange={(next) =>
-                                        setValues((prev) => ({
-                                            ...prev,
-                                            [field.name]: next,
-                                        }))
+                                        setValues((prev) => {
+                                            const updated = {
+                                                ...prev,
+                                                [field.name]: next,
+                                            };
+                                            if (
+                                                field.name === 'kelurahanList' &&
+                                                Array.isArray(next) &&
+                                                next.length > 0
+                                            ) {
+                                                const firstVal = String(next[0]).toLowerCase();
+                                                const opt = field.options?.find(
+                                                    (o) => o.value.toLowerCase() === firstVal,
+                                                );
+                                                if (opt?.kota) updated.city = opt.kota;
+                                                if (opt?.provinsi) updated.province = opt.provinsi;
+                                            }
+                                            return updated;
+                                        })
                                     }
                                 />
                             </ModalField>
@@ -577,10 +598,12 @@ function FieldControl({
             step={field.step ?? (field.kind === 'number' ? 'any' : undefined)}
             name={field.name}
             value={strValue}
-            onChange={(e) => onChange(e.target.value)}
+            readOnly={field.readOnly}
+            disabled={field.disabled}
+            onChange={(e) => !field.readOnly && onChange(e.target.value)}
             placeholder={field.placeholder}
             required={field.required}
-            disabled={field.disabled}
+            className={cn(field.readOnly && 'bg-[var(--raised)]/60 text-muted-foreground cursor-default select-none')}
         />
     );
 }

@@ -360,13 +360,17 @@ export default async function InstitusiPage({
                                 name: 'city',
                                 label: 'Kota',
                                 kind: 'text',
-                                placeholder: 'Depok',
+                                defaultValue: 'Kota Cirebon',
+                                readOnly: true,
+                                hint: 'Otomatis terisi sesuai wilayah kerja institusi',
                             },
                             {
                                 name: 'province',
                                 label: 'Provinsi',
                                 kind: 'text',
-                                placeholder: 'Jawa Barat',
+                                defaultValue: 'Jawa Barat',
+                                readOnly: true,
+                                hint: 'Otomatis terisi sesuai wilayah operasional',
                             },
                             {
                                 name: 'address',
@@ -391,6 +395,8 @@ export default async function InstitusiPage({
                                     disabledReason: k.isClaimed
                                         ? `Sudah di wilayah kerja ${k.coveredBy}`
                                         : undefined,
+                                    kota: k.kota,
+                                    provinsi: k.provinsi,
                                 })),
                                 hint: 'Pilih dari kelurahan terdaftar. Kelurahan yang sudah menjadi wilayah kerja puskesmas lain tidak dapat dipilih kembali.',
                                 placeholder: 'Cari kelurahan atau kecamatan…',
