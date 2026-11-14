@@ -3,6 +3,7 @@ import {
     count,
     eq,
     ilike,
+    ne,
     or,
     sql,
     type SQL,
@@ -182,13 +183,14 @@ export async function institutionChoices() {
 
 function institutionValues(input: InstitutionInput) {
     return {
-        name: input.name,
+        name: input.name.trim(),
         type: input.type,
         address: input.address ?? null,
         province: input.province ?? null,
         city: input.city ?? null,
         subDistrict: input.subDistrict ?? null,
-        phoneNumber: input.phoneNumber ?? null,
+        phoneNumber: null,
+        phone: null,
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
         kelurahanList:
@@ -225,8 +227,75 @@ export async function createInstitution(
         };
     }
 
+    const db = getDb();
+    const cleanName = input.name.trim();
+
     try {
-        const [row] = await getDb()
+        // 1. Cegah duplikasi nama institusi
+        const [existingByName] = await db
+            .select({ id: institutions.id, name: institutions.name })
+            .from(institutions)
+            .where(
+                and(
+                    ilike(institutions.name, cleanName),
+                    eq(institutions.isActive, true),
+                ),
+            )
+            .limit(1);
+
+        if (existingByName) {
+            return {
+                ok: false,
+                error: 'CONFLICT',
+                message: `Institusi dengan nama "${cleanName}" sudah terdaftar.`,
+            };
+        }
+
+        // 2. Cegah duplikasi wilayah kerja kelurahan
+        if (
+            input.type === 'PUSKESMAS' &&
+            input.kelurahanList &&
+            input.kelurahanList.length > 0
+        ) {
+            const puskesmasRows = await db
+                .select({
+                    id: institutions.id,
+                    name: institutions.name,
+                    kelurahanList: institutions.kelurahanList,
+                })
+                .from(institutions)
+                .where(
+                    and(
+                        eq(institutions.type, 'PUSKESMAS'),
+                        eq(institutions.isActive, true),
+                    ),
+                );
+
+            const conflicts: string[] = [];
+            for (const reqKel of input.kelurahanList) {
+                const normReq = reqKel.trim().toLowerCase();
+                if (!normReq) continue;
+                for (const p of puskesmasRows) {
+                    const isClaimed = (p.kelurahanList ?? []).some(
+                        (k) => k.trim().toLowerCase() === normReq,
+                    );
+                    if (isClaimed) {
+                        conflicts.push(`"${reqKel}" (milik ${p.name})`);
+                        break;
+                    }
+                }
+            }
+
+            if (conflicts.length > 0) {
+                return {
+                    ok: false,
+                    error: 'CONFLICT',
+                    message: `Wilayah kerja gagal ditambahkan: kelurahan ${conflicts.join(', ')} sudah terdaftar di puskesmas lain.`,
+                };
+            }
+        }
+
+        const [row] = await db
             .insert(institutions)
             .values(institutionValues(input))
             .returning({ id: institutions.id });
@@ -276,6 +345,75 @@ export async function updateInstitution(
             error: 'NOT_FOUND',
             message: 'Institusi tidak ditemukan.',
         };
+    }
+
+    // 1. Cek duplikasi nama jika nama diubah
+    if (input.name) {
+        const cleanName = input.name.trim();
+        const [existingByName] = await db
+            .select({ id: institutions.id })
+            .from(institutions)
+            .where(
+                and(
+                    ilike(institutions.name, cleanName),
+                    ne(institutions.id, id),
+                    eq(institutions.isActive, true),
+                ),
+            )
+            .limit(1);
+
+        if (existingByName) {
+            return {
+                ok: false,
+                error: 'CONFLICT',
+                message: `Institusi dengan nama "${cleanName}" sudah terdaftar.`,
+            };
+        }
+    }
+
+    // 2. Cegah duplikasi wilayah kerja kelurahan dengan puskesmas lain
+    if (
+        input.type === 'PUSKESMAS' &&
+        input.kelurahanList &&
+        input.kelurahanList.length > 0
+    ) {
+        const puskesmasRows = await db
+            .select({
+                id: institutions.id,
+                name: institutions.name,
+                kelurahanList: institutions.kelurahanList,
+            })
+            .from(institutions)
+            .where(
+                and(
+                    eq(institutions.type, 'PUSKESMAS'),
+                    ne(institutions.id, id),
+                    eq(institutions.isActive, true),
+                ),
+            );
+
+        const conflicts: string[] = [];
+        for (const reqKel of input.kelurahanList) {
+            const normReq = reqKel.trim().toLowerCase();
+            if (!normReq) continue;
+            for (const p of puskesmasRows) {
+                const isClaimed = (p.kelurahanList ?? []).some(
+                    (k) => k.trim().toLowerCase() === normReq,
+                );
+                if (isClaimed) {
+                    conflicts.push(`"${reqKel}" (milik ${p.name})`);
+                    break;
+                }
+            }
+        }
+
+        if (conflicts.length > 0) {
+            return {
+                ok: false,
+                error: 'CONFLICT',
+                message: `Wilayah kerja gagal diperbarui: kelurahan ${conflicts.join(', ')} sudah terdaftar di puskesmas lain.`,
+            };
+        }
     }
 
     // Only the columns this submit actually carries are written. `toValues` on
@@ -383,6 +521,60 @@ export async function listKelurahanOptions() {
         })
         .from(kelurahan)
         .orderBy(kelurahan.name, kelurahan.kecamatan);
+}
+
+export async function listKelurahanOptionsWithCoverage(
+    currentInstitutionId?: string | null,
+) {
+    const db = getDb();
+    const [kelList, puskesmasRows] = await Promise.all([
+        db
+            .select({
+                name: kelurahan.name,
+                kecamatan: kelurahan.kecamatan,
+                kota: kelurahan.kota,
+                provinsi: kelurahan.provinsi,
+            })
+            .from(kelurahan)
+            .orderBy(kelurahan.name, kelurahan.kecamatan),
+        db
+            .select({
+                id: institutions.id,
+                name: institutions.name,
+                kelurahanList: institutions.kelurahanList,
+            })
+            .from(institutions)
+            .where(
+                and(
+                    eq(institutions.type, 'PUSKESMAS'),
+                    eq(institutions.isActive, true),
+                ),
+            ),
+    ]);
+
+    const kelurahanCoverage = new Map<string, string>();
+    for (const p of puskesmasRows) {
+        if (currentInstitutionId && p.id === currentInstitutionId) continue;
+        for (const k of p.kelurahanList ?? []) {
+            const norm = k.trim().toLowerCase();
+            if (norm && !kelurahanCoverage.has(norm)) {
+                kelurahanCoverage.set(norm, p.name);
+            }
+        }
+    }
+
+    return kelList.map((k) => {
+        const owner = kelurahanCoverage.get(k.name.trim().toLowerCase());
+        const isClaimed = Boolean(owner);
+        return {
+            name: k.name,
+            kecamatan: k.kecamatan,
+            kota: k.kota,
+            provinsi: k.provinsi,
+            isClaimed,
+            coveredBy: owner ?? null,
+        };
+    });
 }
 
 export async function listKelurahanPaged(q: ListQuery = {}) {

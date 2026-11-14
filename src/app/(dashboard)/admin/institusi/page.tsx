@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { requireRole } from '@/lib/session';
 import {
     listInstitutionsPaged,
-    listKelurahanOptions,
+    listKelurahanOptionsWithCoverage,
     type InstitutionTypeFilter,
 } from '@/lib/domain/master';
 import { formatNumber } from '@/lib/format';
@@ -96,7 +96,7 @@ export default async function InstitusiPage({
                 type,
                 page: readPage(sp.page),
             }),
-            listKelurahanOptions(),
+            listKelurahanOptionsWithCoverage(sp.ubah ?? null),
         ]);
 
     const buildQuery = (overrides: { page?: number; type?: string; q?: string }) => {
@@ -119,11 +119,9 @@ export default async function InstitusiPage({
             cell: (i) => (
                 <div className="min-w-0">
                     <p className="font-medium text-foreground">{i.name}</p>
-                    {(i.phoneNumber || i.address) && (
+                    {i.address && (
                         <p className="mt-0.5 max-w-[260px] truncate text-[12px] text-muted-foreground">
-                            {[i.phoneNumber, i.address]
-                                .filter(Boolean)
-                                .join(' · ')}
+                            {i.address}
                         </p>
                     )}
                 </div>
@@ -377,12 +375,6 @@ export default async function InstitusiPage({
                                 wide: true,
                             },
                             {
-                                name: 'phoneNumber',
-                                label: 'Telepon',
-                                kind: 'text',
-                                wide: true,
-                            },
-                            {
                                 name: 'kelurahanList',
                                 label: 'Wilayah kerja',
                                 kind: 'list',
@@ -395,8 +387,12 @@ export default async function InstitusiPage({
                                     value: k.name,
                                     label: k.name,
                                     hint: `${k.kecamatan}, ${k.kota}`,
+                                    disabled: k.isClaimed,
+                                    disabledReason: k.isClaimed
+                                        ? `Sudah di wilayah kerja ${k.coveredBy}`
+                                        : undefined,
                                 })),
-                                hint: 'Pilih dari kelurahan terdaftar. Hanya puskesmas yang memakai wilayah kerja untuk penugasan laporan.',
+                                hint: 'Pilih dari kelurahan terdaftar. Kelurahan yang sudah menjadi wilayah kerja puskesmas lain tidak dapat dipilih kembali.',
                                 placeholder: 'Cari kelurahan atau kecamatan…',
                             },
                             {

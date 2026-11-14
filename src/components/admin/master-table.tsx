@@ -85,7 +85,13 @@ export type FieldSpec = {
     hint?: string;
     placeholder?: string;
     /** For `select` and selectable `list`. */
-    options?: { value: string; label: string; hint?: string }[];
+    options?: {
+        value: string;
+        label: string;
+        hint?: string;
+        disabled?: boolean;
+        disabledReason?: string;
+    }[];
     /** Step for `number` inputs (e.g. `"any"` for coordinates). */
     step?: string;
     /** Full row span in the two-column grid, for a textarea or a long list. */
@@ -524,7 +530,11 @@ function FieldControl({
                 </SelectTrigger>
                 <SelectContent>
                     {field.options?.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
+                        <SelectItem
+                            key={option.value}
+                            value={option.value}
+                            disabled={option.disabled}
+                        >
                             {option.label}
                         </SelectItem>
                     ))}
@@ -696,38 +706,49 @@ function ListField({
                                     const checked = selectedKeys.has(
                                         opt.value.toLowerCase(),
                                     );
+                                    const isDisabled = Boolean(opt.disabled && !checked);
                                     return (
                                         <li key={`${opt.value}-${opt.hint ?? ''}`}>
                                             <button
                                                 type="button"
+                                                disabled={isDisabled}
                                                 onClick={() =>
-                                                    toggle(opt.value)
+                                                    !isDisabled && toggle(opt.value)
                                                 }
                                                 aria-pressed={checked}
+                                                aria-disabled={isDisabled}
                                                 className={cn(
                                                     'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] transition-colors',
-                                                    checked
-                                                        ? 'bg-[var(--accent-soft)]/65 text-foreground'
-                                                        : 'hover:bg-[var(--raised)]/60',
+                                                    isDisabled
+                                                        ? 'cursor-not-allowed opacity-60 bg-[var(--raised)]/30 select-none'
+                                                        : checked
+                                                          ? 'bg-[var(--accent-soft)]/65 text-foreground'
+                                                          : 'hover:bg-[var(--raised)]/60',
                                                 )}
                                             >
-                                                <span className="min-w-0">
-                                                    <span className="block truncate font-medium">
+                                                <span className="min-w-0 flex-1">
+                                                    <span className={cn('block truncate font-medium', isDisabled && 'text-muted-foreground')}>
                                                         {opt.label}
                                                     </span>
-                                                    {opt.hint && (
+                                                    {opt.disabledReason ? (
+                                                        <span className="block truncate text-[11px] font-medium text-[var(--warning)]">
+                                                            {opt.disabledReason}
+                                                        </span>
+                                                    ) : opt.hint ? (
                                                         <span className="block truncate text-[11.5px] text-muted-foreground">
                                                             {opt.hint}
                                                         </span>
-                                                    )}
+                                                    ) : null}
                                                 </span>
                                                 <span
                                                     aria-hidden
                                                     className={cn(
                                                         'grid size-4 shrink-0 place-items-center rounded-[4px] border transition-colors',
-                                                        checked
-                                                            ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]'
-                                                            : 'border-[var(--border)] bg-[var(--surface)]',
+                                                        isDisabled
+                                                            ? 'border-[var(--border)] bg-[var(--raised)] text-transparent'
+                                                            : checked
+                                                              ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]'
+                                                              : 'border-[var(--border)] bg-[var(--surface)]',
                                                     )}
                                                 >
                                                     {checked && (
