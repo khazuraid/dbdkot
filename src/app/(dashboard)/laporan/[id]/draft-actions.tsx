@@ -23,10 +23,12 @@ export function DraftActionToolbar({
     reportId,
     reportNumber,
     canManage,
+    isDraft = true,
 }: {
     reportId: string;
     reportNumber: string;
     canManage: boolean;
+    isDraft?: boolean;
 }) {
     const router = useRouter();
     const [isDeleting, startDeleteTransition] = useTransition();
@@ -40,11 +42,15 @@ export function DraftActionToolbar({
         startDeleteTransition(async () => {
             const res = await deleteDraftReportAction(reportId);
             if (res.ok) {
-                toast.success(`Draf laporan ${reportNumber} berhasil dihapus`);
+                toast.success(
+                    isDraft
+                        ? `Draf laporan ${reportNumber} berhasil dihapus`
+                        : `Laporan ${reportNumber} berhasil dihapus dari sistem`,
+                );
                 setDeleteOpen(false);
                 router.push('/laporan');
             } else {
-                toast.error(res.error || 'Gagal menghapus draf laporan');
+                toast.error(res.error || 'Gagal menghapus laporan');
             }
         });
     };
@@ -64,7 +70,7 @@ export function DraftActionToolbar({
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            {/* Edit Draft */}
+            {/* Edit Report */}
             <Button
                 asChild
                 variant="outline"
@@ -73,11 +79,11 @@ export function DraftActionToolbar({
             >
                 <Link href={`/laporan/${reportId}/edit`}>
                     <Edit3 className="size-3.5 text-foreground" />
-                    <span>Edit Draf</span>
+                    <span>{isDraft ? 'Edit Draf' : 'Edit Laporan'}</span>
                 </Link>
             </Button>
 
-            {/* Delete Draft Modal */}
+            {/* Delete Modal */}
             <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <AlertDialogTrigger asChild>
                     <Button
@@ -87,15 +93,28 @@ export function DraftActionToolbar({
                         className="h-8 text-xs font-medium gap-1.5 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800/40 hover:bg-rose-50 dark:hover:bg-rose-950/20"
                     >
                         <Trash2 className="size-3.5" />
-                        <span>Hapus Draf</span>
+                        <span>{isDraft ? 'Hapus Draf' : 'Hapus Laporan'}</span>
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Hapus Draf Laporan Kasus?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {isDraft
+                                ? 'Hapus Draf Laporan Kasus?'
+                                : 'Hapus Laporan Kasus Terkirim?'}
+                        </AlertDialogTitle>
                         <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                            Apakah Anda yakin ingin menghapus draf laporan <strong>{reportNumber}</strong>?
-                            Laporan ini belum dikirim ke surveilans dan data yang dihapus tidak dapat dipulihkan kembali.
+                            {isDraft ? (
+                                <>
+                                    Apakah Anda yakin ingin menghapus draf laporan <strong>{reportNumber}</strong>?
+                                    Laporan ini belum dikirim ke surveilans dan data yang dihapus tidak dapat dipulihkan kembali.
+                                </>
+                            ) : (
+                                <>
+                                    Apakah Anda yakin ingin menghapus laporan <strong>{reportNumber}</strong>?
+                                    Tindakan ini akan menghapus laporan dari antrian surveilans beserta berkas lampiran terkait secara permanen.
+                                </>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -116,7 +135,7 @@ export function DraftActionToolbar({
                             ) : (
                                 <>
                                     <Trash2 className="size-3.5" />
-                                    <span>Ya, Hapus Draf</span>
+                                    <span>{isDraft ? 'Ya, Hapus Draf' : 'Ya, Hapus Laporan'}</span>
                                 </>
                             )}
                         </AlertDialogAction>
@@ -124,50 +143,54 @@ export function DraftActionToolbar({
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Submit Draft Modal */}
-            <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
-                <AlertDialogTrigger asChild>
-                    <Button
-                        size="sm"
-                        disabled={isDeleting || isSubmitting}
-                        className="h-8 text-xs font-semibold gap-1.5 bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 shadow-xs"
-                    >
-                        <Send className="size-3.5" />
-                        <span>Kirim Sekarang</span>
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Kirim Laporan Kasus ke Surveilans?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                            Setelah dikirim, laporan <strong>{reportNumber}</strong> akan langsung masuk ke antrian penugasan Penyelidikan Epidemiologi (PE 100 meter) di Puskesmas wilayah terkait dan statusnya tidak lagi berstatus draf.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isSubmitting}>Nanti Saja</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleSubmitNow();
-                            }}
-                            disabled={isSubmitting}
-                            className="bg-[var(--accent)] hover:opacity-90 text-[var(--accent-ink)] gap-1.5 font-semibold"
+            {/* Submit Draft Modal (Only if draft) */}
+            {isDraft && (
+                <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            size="sm"
+                            disabled={isDeleting || isSubmitting}
+                            className="h-8 text-xs font-semibold gap-1.5 bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 shadow-xs"
                         >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                    <span>Mengirimkan…</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Send className="size-3.5" />
-                                    <span>Kirim Laporan Sekarang</span>
-                                </>
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            <Send className="size-3.5" />
+                            <span>Kirim Sekarang</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Kirim Laporan ke Surveilans?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                                Laporan <strong>{reportNumber}</strong> akan langsung dikirimkan ke tim surveilans Puskesmas wilayah dan Dinas Kesehatan.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isSubmitting}>Batal</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleSubmitNow();
+                                }}
+                                disabled={isSubmitting}
+                                className="bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 font-semibold gap-1.5"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                        <span>Mengirim…</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="size-3.5" />
+                                        <span>Ya, Kirim Laporan</span>
+                                    </>
+                                )}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 }
+
+export const ReportActionToolbar = DraftActionToolbar;

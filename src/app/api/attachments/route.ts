@@ -95,13 +95,19 @@ async function serve(request: Request) {
         changes: { reportRSId: { from: null, to: row.reportRSId } },
     });
 
+    const isInline = new URL(request.url).searchParams.get('inline') === 'true';
+    const isImage = row.fileType.startsWith('image/');
+    const isPdf = row.fileType === 'application/pdf';
+
     return new Response(bytes as BodyInit, {
         headers: {
             'Content-Type': row.fileType,
-            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
+            'Content-Disposition': `${isInline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
             'X-Content-Type-Options': 'nosniff',
-            'Content-Security-Policy': "default-src 'none'; sandbox",
-            'Cache-Control': 'private, no-store',
+            'Content-Security-Policy': isInline && (isImage || isPdf)
+                ? "default-src 'self'; img-src 'self' data: blob:; style-src 'unsafe-inline'; object-src 'self'"
+                : "default-src 'none'; sandbox",
+            'Cache-Control': isInline ? 'private, max-age=3600' : 'private, no-store',
         },
     });
 }
