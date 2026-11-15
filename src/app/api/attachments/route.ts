@@ -3,7 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { requireActor, scopeToInstitution } from '@/lib/session';
 import { getReport } from '@/lib/domain/report-detail';
-import { listAttachments } from '@/lib/domain/attachments';
+import { listAttachments, listPeAttachments } from '@/lib/domain/attachments';
+import { peDetail } from '@/lib/domain/pe';
 import { getDb } from '@/db';
 import { attachments } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -45,6 +46,7 @@ async function serve(request: Request) {
             fileName: attachments.fileName,
             fileType: attachments.fileType,
             reportRSId: attachments.reportRSId,
+            reportPEId: attachments.reportPEId,
         })
         .from(attachments)
         .where(eq(attachments.id, id))
@@ -58,17 +60,17 @@ async function serve(request: Request) {
     }
 
     if (actor.role !== 'ADMIN') {
-        if (!row.reportRSId) {
-            return NextResponse.json(
-                { error: 'Berkas tidak ditemukan.' },
-                { status: 404 },
-            );
+        let authorized = false;
+        if (row.reportRSId) {
+            const report = await getReport(actor, row.reportRSId);
+            if (report) authorized = true;
+        }
+        if (!authorized && row.reportPEId) {
+            const pe = await peDetail(actor, row.reportPEId);
+            if (pe) authorized = true;
         }
 
-        // Same tenant check as the list: a report the caller is not party to is a
-        // 404, so ids cannot be probed.
-        const report = await getReport(actor, row.reportRSId);
-        if (!report) {
+        if (!authorized) {
             return NextResponse.json(
                 { error: 'Berkas tidak ditemukan.' },
                 { status: 404 },
@@ -92,7 +94,10 @@ async function serve(request: Request) {
         action: 'READ_PII',
         entityType: 'ATTACHMENT',
         entityId: id,
-        changes: { reportRSId: { from: null, to: row.reportRSId } },
+        changes: {
+            reportRSId: { from: null, to: row.reportRSId },
+            reportPEId: { from: null, to: row.reportPEId },
+        },
     });
 
     const isInline = new URL(request.url).searchParams.get('inline') === 'true';
@@ -104,8 +109,9 @@ async function serve(request: Request) {
             'Content-Type': row.fileType,
             'Content-Disposition': `${isInline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
             'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'SAMEORIGIN',
             'Content-Security-Policy': isInline && (isImage || isPdf)
-                ? "default-src 'self'; img-src 'self' data: blob:; style-src 'unsafe-inline'; object-src 'self'"
+                ? "default-src 'self'; img-src 'self' data: blob:; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'"
                 : "default-src 'none'; sandbox",
             'Cache-Control': isInline ? 'private, max-age=3600' : 'private, no-store',
         },
@@ -113,9 +119,7 @@ async function serve(request: Request) {
 }
 
 /**
- * Attachments for one report. Reads are scoped by `listAttachments`, which
- * reuses getReport's tenant check; a report the caller is not party to returns
- * 404 rather than an empty list, so ids cannot be probed.
+ * Attachments for one report or PE report. Reads are scoped by tenant check.
  */
 export async function GET(request: Request) {
     if (new URL(request.url).searchParams.has('id')) return serve(request);
@@ -123,10 +127,22 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     scopeToInstitution(actor);
 
+    const reportPEId = new URL(request.url).searchParams.get('reportPEId');
+    if (reportPEId) {
+        const rows = await listPeAttachments(actor, reportPEId);
+        if (!rows) {
+            return NextResponse.json(
+                { error: 'Laporan PE tidak ditemukan.' },
+                { status: 404 },
+            );
+        }
+        return NextResponse.json({ rows });
+    }
+
     const reportRSId = new URL(request.url).searchParams.get('reportRSId');
     if (!reportRSId) {
         return NextResponse.json(
-            { error: 'reportRSId wajib diisi.' },
+            { error: 'reportRSId atau reportPEId wajib diisi.' },
             { status: 400 },
         );
     }
@@ -142,21 +158,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ rows });
 }
 
-/**
- * Attachment upload. The path is never derived from client input — only the
- * basename is kept and the storage path comes from buildStoragePath() (C7).
- *
- * The type and extension must agree: a `.png` declared as image/png is fine,
- * a `.html` declared as image/png is refused, which is the stored-XSS route
- * the legacy app left open.
- */
 export async function POST(request: Request) {
     const actor = await requireActor();
     scopeToInstitution(actor);
 
     const form = await request.formData();
     const file = form.get('file');
-    const reportRSId = String(form.get('reportRSId') ?? '');
+    const reportRSId = form.get('reportRSId') ? String(form.get('reportRSId')) : null;
+    const reportPEId = form.get('reportPEId') ? String(form.get('reportPEId')) : null;
 
     if (!(file instanceof File)) {
         return NextResponse.json(
@@ -165,13 +174,31 @@ export async function POST(request: Request) {
         );
     }
 
-    // Authorisation before parsing: the caller must be party to this report.
-    const report = await getReport(actor, reportRSId);
-    if (!report) {
+    if (!reportRSId && !reportPEId) {
         return NextResponse.json(
-            { error: 'Laporan tidak ditemukan.' },
-            { status: 404 },
+            { error: 'reportRSId atau reportPEId wajib diisi.' },
+            { status: 400 },
         );
+    }
+
+    let targetReportRSId = reportRSId;
+    if (reportPEId) {
+        const pe = await peDetail(actor, reportPEId);
+        if (!pe) {
+            return NextResponse.json(
+                { error: 'Laporan PE tidak ditemukan.' },
+                { status: 404 },
+            );
+        }
+        if (!targetReportRSId) targetReportRSId = pe.reportRSId;
+    } else if (reportRSId) {
+        const report = await getReport(actor, reportRSId);
+        if (!report) {
+            return NextResponse.json(
+                { error: 'Laporan tidak ditemukan.' },
+                { status: 404 },
+            );
+        }
     }
 
     const parsed = attachmentUploadSchema.safeParse({
@@ -200,17 +227,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: magic.error }, { status: 415 });
     }
 
-    const storagePath = buildStoragePath(report.id, file.name);
+    const folderPrefix = reportPEId ? `pe_${reportPEId}` : targetReportRSId!;
+    const storagePath = buildStoragePath(folderPrefix, file.name);
     const absolute = join(UPLOAD_ROOT, storagePath);
 
     await mkdir(dirname(absolute), { recursive: true });
     try {
-        // `wx`: the generated path is derived from the name, so a second
-        // upload with the same name would otherwise replace the first file
-        // while its row keeps the old type and size.
-        await writeFile(absolute, rawBytes, {
-            flag: 'wx',
-        });
+        await writeFile(absolute, rawBytes, { flag: 'wx' });
     } catch (error) {
         if ((error as { code?: string }).code === 'EEXIST') {
             return NextResponse.json(
@@ -224,7 +247,8 @@ export async function POST(request: Request) {
     const [row] = await getDb()
         .insert(attachments)
         .values({
-            reportRSId: report.id,
+            reportRSId: targetReportRSId,
+            reportPEId: reportPEId,
             fileName: file.name,
             filePath: storagePath,
             fileType: magic.mime,
@@ -238,7 +262,10 @@ export async function POST(request: Request) {
         action: 'UPDATE',
         entityType: 'ATTACHMENT',
         entityId: row.id,
-        changes: { reportRSId: { from: null, to: report.id } },
+        changes: {
+            reportRSId: { from: null, to: targetReportRSId },
+            reportPEId: { from: null, to: reportPEId },
+        },
     });
 
     return NextResponse.json({ id: row.id, fileName: file.name });

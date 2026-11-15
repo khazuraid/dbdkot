@@ -7,6 +7,7 @@ import { assertInsideUploadRoot } from '@/lib/attachments';
 import { audit } from '@/lib/audit';
 import type { Actor } from '@/lib/session';
 import { getReport } from './report-detail';
+import { peDetail } from './pe';
 
 export type AttachmentRow = {
     id: string;
@@ -49,6 +50,39 @@ export async function listAttachments(
     // The href addresses the row, not the storage path: the handler owns the
     // lookup and re-checks the report, so the URL a caller sees reveals
     // nothing about the upload layout.
+    return rows.map((row) => ({
+        id: row.id,
+        fileName: row.fileName,
+        fileType: row.fileType,
+        fileSize: row.fileSize,
+        createdAt: row.createdAt,
+        href: `/api/attachments?id=${row.id}`,
+    }));
+}
+
+/**
+ * Attachments for one PE report (field photos and official documents).
+ */
+export async function listPeAttachments(
+    actor: Actor,
+    reportPEId: string,
+): Promise<AttachmentRow[] | null> {
+    const detail = await peDetail(actor, reportPEId);
+    if (!detail) return null;
+
+    const rows = await getDb()
+        .select({
+            id: attachments.id,
+            fileName: attachments.fileName,
+            fileType: attachments.fileType,
+            fileSize: attachments.fileSize,
+            filePath: attachments.filePath,
+            createdAt: attachments.createdAt,
+        })
+        .from(attachments)
+        .where(eq(attachments.reportPEId, reportPEId))
+        .orderBy(desc(attachments.createdAt));
+
     return rows.map((row) => ({
         id: row.id,
         fileName: row.fileName,

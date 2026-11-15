@@ -269,6 +269,52 @@ export async function listPeTasks(
     };
 }
 
+export async function listPendingVerifications(
+    page?: number,
+    perPage = PER_PAGE,
+) {
+    const db = getDb();
+    const { current, size, offset } = pageSlice(page, perPage);
+
+    const [rows, [totals]] = await Promise.all([
+        db
+            .select({
+                id: reportsRS.id,
+                reportNumber: reportsRS.reportNumber,
+                caseType: reportsRS.caseType,
+                kelurahan: reportsRS.kelurahan,
+                sourceType: reportsRS.sourceType,
+                createdAt: reportsRS.createdAt,
+                peId: reportsPE.id,
+                peDate: reportsPE.peDate,
+                officerName: reportsPE.officerName,
+                abj: reportsPE.abj,
+                houseIndex: reportsPE.houseIndex,
+                containerIndex: reportsPE.containerIndex,
+                transmissionRisk: reportsPE.transmissionRisk,
+                foggingRecommended: reportsPE.foggingRecommended,
+                conclusion: reportsPE.conclusion,
+            })
+            .from(reportsRS)
+            .leftJoin(reportsPE, eq(reportsPE.reportRSId, reportsRS.id))
+            .where(eq(reportsRS.status, 'PE_COMPLETED'))
+            .orderBy(desc(reportsRS.createdAt))
+            .limit(size)
+            .offset(offset),
+        db
+            .select({ n: count() })
+            .from(reportsRS)
+            .where(eq(reportsRS.status, 'PE_COMPLETED')),
+    ]);
+
+    return {
+        rows,
+        page: current,
+        perPage: size,
+        total: Number(totals?.n ?? 0),
+    };
+}
+
 export async function listUsers(page?: number, perPage = PER_PAGE) {
     const db = getDb();
     const { current, size, offset } = pageSlice(page, perPage);

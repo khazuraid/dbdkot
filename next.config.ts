@@ -9,7 +9,7 @@ const isDev = process.env.NODE_ENV !== 'production';
  */
 const securityHeaders = [
     { key: 'X-Content-Type-Options', value: 'nosniff' },
-    { key: 'X-Frame-Options', value: 'DENY' },
+    { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     {
         key: 'Permissions-Policy',
@@ -37,7 +37,7 @@ const securityHeaders = [
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
-            "frame-ancestors 'none'",
+            "frame-ancestors 'self'",
             'upgrade-insecure-requests',
         ].join('; '),
     },

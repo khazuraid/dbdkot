@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { peHouseholdSurveys, reportsPE, reportsRS } from '@/db/schema';
 import { audit } from '@/lib/audit';
@@ -401,7 +401,11 @@ export async function peDetail(actor: Actor, id: string) {
             institutionId
                 ? and(
                       eq(reportsPE.id, id),
-                      inArray(reportsPE.institutionId, [institutionId]),
+                      or(
+                          eq(reportsPE.institutionId, institutionId),
+                          eq(reportsRS.institutionId, institutionId),
+                          eq(reportsRS.assignedPuskesmasId, institutionId),
+                      ),
                   )
                 : eq(reportsPE.id, id),
         )

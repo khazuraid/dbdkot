@@ -155,16 +155,33 @@ function uploadWithProgress(
     });
 }
 
-async function fetchAttachments(reportRSId: string): Promise<AttachmentRow[]> {
-    const res = await fetch(
-        `/api/attachments?reportRSId=${encodeURIComponent(reportRSId)}`,
-    );
+async function fetchAttachments({
+    reportRSId,
+    reportPEId,
+}: {
+    reportRSId?: string;
+    reportPEId?: string;
+}): Promise<AttachmentRow[]> {
+    const query = reportPEId
+        ? `reportPEId=${encodeURIComponent(reportPEId)}`
+        : `reportRSId=${encodeURIComponent(reportRSId ?? '')}`;
+    const res = await fetch(`/api/attachments?${query}`);
     if (!res.ok) throw new Error('Gagal memuat lampiran.');
     const { rows } = (await res.json()) as { rows: AttachmentRow[] };
     return rows.map((r) => ({ ...r, createdAt: new Date(r.createdAt) }));
 }
 
-export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
+export function AttachmentDropzone({
+    reportRSId,
+    reportPEId,
+    title,
+    subtitle,
+}: {
+    reportRSId?: string;
+    reportPEId?: string;
+    title?: string;
+    subtitle?: string;
+}) {
     const queryClient = useQueryClient();
     const reduceMotion = useReducedMotion();
     const [busy, setBusy] = useState(false);
@@ -172,9 +189,11 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
     const [previewItem, setPreviewItem] = useState<AttachmentRow | null>(null);
     const { compressing, lastStats, compressIfImage } = useCompressedUpload();
 
+    const targetKey = reportPEId ? `pe-${reportPEId}` : (reportRSId ?? 'default');
+
     const { data: uploaded = [], isPending } = useQuery({
-        queryKey: ['attachments', reportRSId],
-        queryFn: () => fetchAttachments(reportRSId),
+        queryKey: ['attachments', targetKey],
+        queryFn: () => fetchAttachments({ reportRSId, reportPEId }),
     });
 
     const updateQueueItem = useCallback(
@@ -234,7 +253,8 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
 
                     const body = new FormData();
                     body.set('file', file);
-                    body.set('reportRSId', reportRSId);
+                    if (reportPEId) body.set('reportPEId', reportPEId);
+                    if (reportRSId) body.set('reportRSId', reportRSId);
 
                     const result = await uploadWithProgress(body, (pct) => {
                         updateQueueItem(itemId, {
@@ -264,13 +284,13 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
                 }
 
                 await queryClient.invalidateQueries({
-                    queryKey: ['attachments', reportRSId],
+                    queryKey: ['attachments', targetKey],
                 });
             } finally {
                 setBusy(false);
             }
         },
-        [reportRSId, queryClient, compressIfImage, updateQueueItem],
+        [reportRSId, reportPEId, targetKey, queryClient, compressIfImage, updateQueueItem],
     );
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -358,10 +378,10 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
                             <p className="font-medium text-foreground">
                                 {isDragActive
                                     ? 'Lepaskan berkas untuk memulai validasi & unggahan'
-                                    : 'Tarik & letakkan berkas di sini, atau klik pilih'}
+                                    : title || 'Tarik & letakkan berkas di sini, atau klik pilih'}
                             </p>
                             <p className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
-                                <span>PDF, JPG, PNG, WEBP (maks 10 MB)</span>
+                                <span>{subtitle || 'PDF, JPG, PNG, WEBP (maks 10 MB)'}</span>
                                 <span aria-hidden="true">·</span>
                                 <span className="inline-flex items-center gap-1 text-[var(--positive)]">
                                     <ShieldCheck className="size-3.5" />
