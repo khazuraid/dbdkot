@@ -13,6 +13,7 @@ import { Stat, StatRow } from '@/components/shell/stat';
 import { DataTable, Dash } from '@/components/shell/data-table';
 import { Pager, readPage } from '@/components/shell/pager-view';
 import { StatusText } from '@/components/shell/status-text';
+import { PeActionToolbar } from './pe-actions';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -118,7 +119,32 @@ export default async function PePage({
                             {
                                 key: 'officer',
                                 header: 'Petugas',
-                                cell: (r) => r.officerName,
+                                cell: (r) => (
+                                    <div>
+                                        <div className="font-medium text-foreground">{r.officerName}</div>
+                                        {r.kelurahan && (
+                                            <div className="text-[11px] text-muted-foreground">Kel. {r.kelurahan}</div>
+                                        )}
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: 'abj',
+                                header: 'ABJ',
+                                align: 'right',
+                                cell: (r) => {
+                                    if (!r.abj) return <Dash />;
+                                    const val = Number(r.abj);
+                                    return (
+                                        <span
+                                            className={`font-mono text-[12.5px] font-semibold tabular-nums ${
+                                                val >= 95 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                            }`}
+                                        >
+                                            {val.toFixed(1)}%
+                                        </span>
+                                    );
+                                },
                             },
                             {
                                 key: 'hi',
@@ -131,6 +157,21 @@ export default async function PePage({
                                 header: 'CI',
                                 align: 'right',
                                 cell: (r) => index(r.containerIndex),
+                            },
+                            {
+                                key: 'risk',
+                                header: 'Hasil / Fogging',
+                                cell: (r) => (
+                                    <span
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                            r.foggingRecommended
+                                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                                                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                        }`}
+                                    >
+                                        {r.foggingRecommended ? 'Positif Fogging' : 'Bebas Jentik / Aman'}
+                                    </span>
+                                ),
                             },
                             {
                                 key: 'status',
@@ -174,6 +215,20 @@ export default async function PePage({
                                             <FileDown className="size-3" aria-hidden />
                                             Excel
                                         </a>
+                                    </div>
+                                ),
+                            },
+                            {
+                                key: 'actions',
+                                header: 'Aksi',
+                                align: 'right',
+                                cell: (r) => (
+                                    <div className="flex items-center justify-end">
+                                        <PeActionToolbar
+                                            peId={r.id}
+                                            reportNumber={r.reportNumber}
+                                            showDetail={true}
+                                        />
                                     </div>
                                 ),
                             },

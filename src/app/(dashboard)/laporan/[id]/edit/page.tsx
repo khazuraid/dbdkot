@@ -24,16 +24,21 @@ export default async function EditLaporanPage({
 
     if (!report) notFound();
 
-    // Only DRAFT or ADMIN can be edited
-    if (report.status !== 'DRAFT' && actor.role !== 'ADMIN') {
+    // Izinkan ADMIN, DINKES, atau faskes pembuat laporan
+    const canEdit =
+        actor.role === 'ADMIN' ||
+        actor.role === 'DINKES' ||
+        actor.institutionId === report.institutionId;
+
+    if (!canEdit) {
         redirect(`/laporan/${id}`);
     }
 
     return (
         <PageBody>
             <PageHeader
-                title={`Edit Draf Laporan ${report.reportNumber}`}
-                context="Perbarui informasi klinis, data pasien, atau titik lokasi domisili sebelum berkas kasus dikirim ke surveilans."
+                title={`Edit Laporan ${report.reportNumber}`}
+                context="Perbarui informasi klinis, data pasien, RT/RW, titik lokasi domisili, atau ubah status laporan."
                 aside={
                     <Button asChild variant="outline" size="sm">
                         <Link href={`/laporan/${id}`}>

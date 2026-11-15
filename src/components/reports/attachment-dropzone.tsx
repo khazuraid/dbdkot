@@ -7,7 +7,12 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
     AlertCircle,
     CheckCircle2,
+    ExternalLink,
+    Eye,
     FileCheck2,
+    FileDown,
+    FileText,
+    ImageIcon,
     Loader2,
     Paperclip,
     ShieldCheck,
@@ -17,6 +22,12 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { useCompressedUpload } from '@/hooks/use-compressed-upload';
 import type { AttachmentRow } from '@/lib/domain/attachments';
 import { cn } from '@/lib/utils';
@@ -158,6 +169,7 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
     const reduceMotion = useReducedMotion();
     const [busy, setBusy] = useState(false);
     const [queue, setQueue] = useState<UploadItem[]>([]);
+    const [previewItem, setPreviewItem] = useState<AttachmentRow | null>(null);
     const { compressing, lastStats, compressIfImage } = useCompressedUpload();
 
     const { data: uploaded = [], isPending } = useQuery({
@@ -491,39 +503,175 @@ export function AttachmentDropzone({ reportRSId }: { reportRSId: string }) {
                     <Skeleton className="h-4 w-40" />
                 </div>
             ) : uploaded.length > 0 ? (
-                <ul
-                    aria-live="polite"
-                    className="mt-3 flex flex-col gap-1.5 text-[13px]"
-                >
-                    <AnimatePresence initial={false}>
-                        {uploaded.map((u) => (
-                            <motion.li
-                                key={u.id}
-                                initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.18 }}
-                            >
-                                <a
-                                    href={u.href}
-                                    className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 underline-offset-4 transition-colors hover:bg-[var(--raised)] hover:underline"
-                                >
-                                    <Paperclip className="size-3.5 shrink-0 text-faint" />
-                                    <span className="truncate" title={u.fileName}>
-                                        {u.fileName}
-                                    </span>
-                                    <span className="shrink-0 font-mono text-[11.5px] text-muted-foreground tabular-nums">
-                                        {formatSize(u.fileSize)}
-                                    </span>
-                                </a>
-                            </motion.li>
-                        ))}
-                    </AnimatePresence>
-                </ul>
+                <div className="mt-3 space-y-2">
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                        {uploaded.length} berkas terlampir (klik &quot;Lihat Berkas&quot; untuk pratinjau langsung):
+                    </p>
+                    <ul
+                        aria-live="polite"
+                        className="flex flex-col gap-2 text-[13px]"
+                    >
+                        <AnimatePresence initial={false}>
+                            {uploaded.map((u) => {
+                                const isImg = u.fileType.startsWith('image/');
+                                const isPdf = u.fileType === 'application/pdf';
+                                const inlineUrl = `${u.href}&inline=true`;
+
+                                return (
+                                    <motion.li
+                                        key={u.id}
+                                        initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.18 }}
+                                        className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-2.5 transition-colors hover:bg-[var(--raised)]/50"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            {isImg ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewItem(u)}
+                                                    className="group relative size-11 shrink-0 overflow-hidden rounded-md border border-[var(--border)] bg-muted/40 cursor-pointer"
+                                                    title="Klik untuk melihat foto"
+                                                >
+                                                    <img
+                                                        src={inlineUrl}
+                                                        alt={u.fileName}
+                                                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                                                        loading="lazy"
+                                                    />
+                                                </button>
+                                            ) : (
+                                                <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-rose-500/20 bg-rose-500/10">
+                                                    <FileText className="size-5 text-rose-600 dark:text-rose-400" />
+                                                </div>
+                                            )}
+
+                                            <div className="min-w-0 space-y-0.5">
+                                                <p
+                                                    className="truncate font-medium text-xs text-foreground max-w-[220px] sm:max-w-[340px]"
+                                                    title={u.fileName}
+                                                >
+                                                    {u.fileName}
+                                                </p>
+                                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                    <span className="font-mono tabular-nums">
+                                                        {formatSize(u.fileSize)}
+                                                    </span>
+                                                    <span>·</span>
+                                                    <span>
+                                                        {isPdf
+                                                            ? 'Dokumen PDF'
+                                                            : isImg
+                                                              ? 'Foto / Gambar'
+                                                              : 'Lampiran Berkas'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex shrink-0 items-center gap-1.5 ml-auto sm:ml-0">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPreviewItem(u)}
+                                                className="h-7 text-xs font-medium gap-1 px-2.5 border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] shadow-2xs"
+                                            >
+                                                <Eye className="size-3.5" />
+                                                <span>Lihat Berkas</span>
+                                            </Button>
+
+                                            <Button
+                                                asChild
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-xs font-medium gap-1 px-2 text-muted-foreground hover:text-foreground"
+                                            >
+                                                <a href={u.href} download={u.fileName} title="Unduh berkas ke perangkat">
+                                                    <FileDown className="size-3.5" />
+                                                    <span className="sr-only sm:not-sr-only">Unduh</span>
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </motion.li>
+                                );
+                            })}
+                        </AnimatePresence>
+                    </ul>
+                </div>
             ) : (
                 <p className="mt-3 text-[12.5px] text-muted-foreground">
                     Belum ada lampiran.
                 </p>
             )}
+
+            {/* Preview Modal (Lightbox for Images & Embedded PDF Viewer) */}
+            <Dialog
+                open={Boolean(previewItem)}
+                onOpenChange={(open) => !open && setPreviewItem(null)}
+            >
+                <DialogContent className="sm:max-w-4xl max-w-full p-4 md:p-6">
+                    {previewItem && (
+                        <div className="space-y-4">
+                            <DialogHeader>
+                                <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
+                                    <div>
+                                        <DialogTitle className="text-sm font-semibold truncate max-w-[320px] sm:max-w-[480px]">
+                                            {previewItem.fileName}
+                                        </DialogTitle>
+                                        <p className="text-xs text-muted-foreground font-mono mt-0.5 tabular-nums">
+                                            Ukuran: {formatSize(previewItem.fileSize)} · Tipe: {previewItem.fileType}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button asChild variant="outline" size="sm" className="h-7 text-xs gap-1">
+                                            <a
+                                                href={`${previewItem.href}&inline=true`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <ExternalLink className="size-3" />
+                                                <span>Buka Tab Penuh</span>
+                                            </a>
+                                        </Button>
+                                        <Button asChild size="sm" className="h-7 text-xs gap-1 bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90">
+                                            <a href={previewItem.href} download={previewItem.fileName}>
+                                                <FileDown className="size-3" />
+                                                <span>Unduh</span>
+                                            </a>
+                                        </Button>
+                                    </div>
+                                </div>
+                            </DialogHeader>
+
+                            <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--border)] bg-muted/20">
+                                {previewItem.fileType.startsWith('image/') ? (
+                                    <div className="flex max-h-[72vh] items-center justify-center p-2 bg-black/5 dark:bg-black/20">
+                                        <img
+                                            src={`${previewItem.href}&inline=true`}
+                                            alt={previewItem.fileName}
+                                            className="max-h-[70vh] w-auto max-w-full object-contain rounded"
+                                        />
+                                    </div>
+                                ) : previewItem.fileType === 'application/pdf' ? (
+                                    <iframe
+                                        src={`${previewItem.href}&inline=true`}
+                                        title={previewItem.fileName}
+                                        className="h-[70vh] w-full border-0 bg-white"
+                                    />
+                                ) : (
+                                    <div className="flex h-48 flex-col items-center justify-center gap-2 p-6 text-center">
+                                        <FileText className="size-10 text-muted-foreground" />
+                                        <p className="text-xs text-muted-foreground">
+                                            Pratinjau langsung tidak didukung untuk tipe file ini. Silakan unduh atau buka tab penuh.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

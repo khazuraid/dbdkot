@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { updateDraftReportAction, submitDraftReportAction } from '../actions';
 import type { ReportDetail } from '@/lib/domain/report-detail';
 import type { KelurahanOption } from '@/app/(dashboard)/laporan/baru/report-form';
+import { cn } from '@/lib/utils';
 
 export function EditReportForm({
     report,
@@ -33,8 +34,8 @@ export function EditReportForm({
 }) {
     const router = useRouter();
     const [isSaving, startSave] = useTransition();
-    const [isSending, startSend] = useTransition();
     const [formError, setFormError] = useState<string | null>(null);
+    const [isDraftState, setIsDraftState] = useState(report.status === 'DRAFT');
 
     const [kelurahan, setKelurahan] = useState(report.kelurahan ?? '');
     const [kecamatan, setKecamatan] = useState(report.kecamatan ?? '');
@@ -53,41 +54,25 @@ export function EditReportForm({
         }
     };
 
-    const handleSave = (formData: FormData) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formEl = e.currentTarget;
+        const formData = new FormData(formEl);
+        formData.set('isDraft', isDraftState ? 'true' : 'false');
+
         setFormError(null);
         startSave(async () => {
             const res = await updateDraftReportAction(report.id, formData);
             if (res.ok) {
-                toast.success('Draf laporan berhasil diperbarui');
+                toast.success(
+                    isDraftState
+                        ? 'Laporan berhasil diperbarui dan disimpan sebagai draf.'
+                        : 'Laporan berhasil diperbarui dan dikirim ke surveilans.',
+                );
                 router.push(`/laporan/${report.id}`);
             } else {
                 setFormError(res.error || 'Gagal menyimpan perubahan');
                 toast.error(res.error || 'Gagal menyimpan perubahan');
-            }
-        });
-    };
-
-    const handleSaveAndSend = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const formEl = e.currentTarget;
-        const formData = new FormData(formEl);
-
-        setFormError(null);
-        startSend(async () => {
-            const updateRes = await updateDraftReportAction(report.id, formData);
-            if (!updateRes.ok) {
-                setFormError(updateRes.error || 'Gagal menyimpan data');
-                toast.error(updateRes.error || 'Gagal menyimpan data');
-                return;
-            }
-
-            const sendRes = await submitDraftReportAction(report.id);
-            if (sendRes.ok) {
-                toast.success('Laporan berhasil diperbarui dan dikirim ke surveilans!');
-                router.push(`/laporan/${report.id}`);
-            } else {
-                setFormError(sendRes.error || 'Gagal mengirim laporan');
-                toast.error(sendRes.error || 'Gagal mengirim laporan');
             }
         });
     };
@@ -102,7 +87,7 @@ export function EditReportForm({
     };
 
     return (
-        <form onSubmit={handleSaveAndSend} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
             {formError && (
                 <div className="rounded-[var(--radius-control)] border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-700 dark:text-rose-400">
                     {formError}
@@ -254,6 +239,26 @@ export function EditReportForm({
                             value={provinsi}
                             onChange={(e) => setProvinsi(e.target.value)}
                             required
+                        />
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="rt">RT</Label>
+                        <Input
+                            id="rt"
+                            name="rt"
+                            defaultValue={report.rt ?? ''}
+                            placeholder="Contoh: 003"
+                        />
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="rw">RW</Label>
+                        <Input
+                            id="rw"
+                            name="rw"
+                            defaultValue={report.rw ?? ''}
+                            placeholder="Contoh: 005"
                         />
                     </div>
 
@@ -413,6 +418,98 @@ export function EditReportForm({
                 </div>
             </Panel>
 
+            {/* Bagian 4: Status Alur Laporan */}
+            <Panel
+                padded
+                title={
+                    <span className="flex items-center gap-2">
+                        <CheckCircle2
+                            className="size-4 text-[var(--accent)]"
+                            aria-hidden
+                        />
+                        <span>Bagian 4: Status Alur Laporan</span>
+                    </span>
+                }
+            >
+                <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                        Pilih apakah laporan ini langsung diserahkan ke tim surveilans (Puskesmas / Dinkes) atau disimpan sementara sebagai Draf internal faskes Anda.
+                    </p>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setIsDraftState(false)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setIsDraftState(false);
+                                }
+                            }}
+                            className={cn(
+                                'flex cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border p-3.5 transition-colors',
+                                !isDraftState
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30'
+                                    : 'border-border bg-card/50 hover:bg-muted/50 text-foreground',
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name="statusChoice"
+                                checked={!isDraftState}
+                                onChange={() => setIsDraftState(false)}
+                                className="mt-0.5 size-4 accent-emerald-600"
+                            />
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 font-semibold text-xs">
+                                    <Send className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Terkirim ke Surveilans (Aktif)</span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Laporan terkirim ke sistem surveilans terpadu. Puskesmas terkait dan Dinkes dapat segera memverifikasi dan menugaskan PE (Penyelidikan Epidemiologi).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setIsDraftState(true)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setIsDraftState(true);
+                                }
+                            }}
+                            className={cn(
+                                'flex cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border p-3.5 transition-colors',
+                                isDraftState
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/30'
+                                    : 'border-border bg-card/50 hover:bg-muted/50 text-foreground',
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name="statusChoice"
+                                checked={isDraftState}
+                                onChange={() => setIsDraftState(true)}
+                                className="mt-0.5 size-4 accent-amber-600"
+                            />
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 font-semibold text-xs">
+                                    <Save className="size-3.5 text-amber-600 dark:text-amber-400" />
+                                    <span>Simpan sebagai Draf</span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Hanya disimpan di faskes Anda. Belum diteruskan ke puskesmas wilayah atau dinas kesehatan hingga Anda mengirimkannya.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Panel>
+
             {/* Bottom Actions Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <Button asChild variant="ghost" size="sm">
@@ -421,44 +518,29 @@ export function EditReportForm({
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isSaving || isSending}
-                        onClick={(e) => {
-                            const form = e.currentTarget.closest('form');
-                            if (form) {
-                                handleSave(new FormData(form));
-                            }
-                        }}
-                        className="gap-1.5 text-xs font-medium"
+                        type="submit"
+                        disabled={isSaving}
+                        className={cn(
+                            'gap-1.5 text-xs font-semibold shadow-xs',
+                            isDraftState
+                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                : 'bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90',
+                        )}
                     >
                         {isSaving ? (
                             <>
                                 <Loader2 className="size-3.5 animate-spin" />
                                 <span>Menyimpan Perubahan…</span>
                             </>
-                        ) : (
+                        ) : isDraftState ? (
                             <>
                                 <Save className="size-3.5" />
-                                <span>Simpan Perubahan Draf</span>
-                            </>
-                        )}
-                    </Button>
-
-                    <Button
-                        type="submit"
-                        disabled={isSaving || isSending}
-                        className="gap-1.5 text-xs font-semibold bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 shadow-xs"
-                    >
-                        {isSending ? (
-                            <>
-                                <Loader2 className="size-3.5 animate-spin" />
-                                <span>Mengirimkan…</span>
+                                <span>Simpan sebagai Draf</span>
                             </>
                         ) : (
                             <>
                                 <Send className="size-3.5" />
-                                <span>Simpan & Kirim Sekarang</span>
+                                <span>Simpan & Kirim ke Surveilans</span>
                             </>
                         )}
                     </Button>

@@ -39,6 +39,39 @@ import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
 import { useEntomologyCalculator } from '@/hooks/use-entomology-calculator';
 import { cn } from '@/lib/utils';
 import { submitPe } from './actions';
+import { updatePeAction } from '@/app/(dashboard)/pe/actions';
+
+export type InitialPeData = {
+    id: string;
+    reportRSId: string;
+    peDate: Date;
+    officerName: string;
+    officerNip?: string | null;
+    headOfPuskesmasName?: string | null;
+    headOfPuskesmasNip?: string | null;
+    respondentName?: string | null;
+    respondentRelation?: string | null;
+    travelHistory14d?: string | null;
+    otherFeverCasesCount?: number | null;
+    rt?: string | null;
+    rw?: string | null;
+    sourceLocation?: string | null;
+    conclusion?: string | null;
+    recommendation?: string | null;
+    formData?: Record<string, unknown> | null;
+    households?: Array<{
+        address: string;
+        houseCount: number;
+        population: number;
+        larvaCount: number;
+        larvaType?: string | null;
+        abateUsed?: boolean | null;
+        insidePositive?: boolean | null;
+        outsidePositive?: boolean | null;
+        containersChecked?: number | null;
+        positiveContainers?: number | null;
+    }>;
+};
 
 type FormValues = z.input<typeof createPeSchema>;
 type Household = FormValues['households'][number];
@@ -111,14 +144,28 @@ function toDateInputString(value: unknown): string | undefined {
     return undefined;
 }
 
+function extractRt(addr?: string | null): string {
+    if (!addr) return '';
+    const match = addr.match(/\bRT[\s.:/]*(\d{1,3})\b/i);
+    return match ? String(parseInt(match[1], 10)).padStart(2, '0') : '';
+}
+
+function extractRw(addr?: string | null): string {
+    if (!addr) return '';
+    const match = addr.match(/\bRW[\s.:/]*(\d{1,3})\b/i);
+    return match ? String(parseInt(match[1], 10)).padStart(2, '0') : '';
+}
+
 export function PeForm({
     candidates,
     initialReportId,
     defaultOfficerName,
+    initialPe,
 }: {
     candidates: PeCandidateDetail[];
     initialReportId?: string;
     defaultOfficerName: string;
+    initialPe?: InitialPeData;
 }) {
     const router = useRouter();
     const [submitting, start] = useTransition();
@@ -126,8 +173,10 @@ export function PeForm({
     const [customSymptom, setCustomSymptom] = useState('');
     const [houseFilter, setHouseFilter] = useState<'ALL' | 'POS' | 'NEG'>('ALL');
 
+    const effectiveReportId = initialPe?.reportRSId ?? initialReportId;
     const initialCandidate =
-        candidates.find((c) => c.id === initialReportId) ?? candidates[0];
+        candidates.find((c) => c.id === effectiveReportId) ?? candidates[0];
+    const initialFormData = (initialPe?.formData as Record<string, unknown>) ?? {};
 
     const {
         register,
@@ -139,26 +188,54 @@ export function PeForm({
         resolver: zodResolver(createPeSchema),
         mode: 'onTouched',
         defaultValues: {
-            reportRSId: initialCandidate?.id ?? '',
-            peDate: new Date(),
-            officerName: defaultOfficerName,
-            rt: '',
-            rw: '',
-            respondentAddress: initialCandidate?.patientAddress ?? '',
-            symptomOnsetDate: toIsoDate(initialCandidate?.symptomOnsetDate),
-            clinicalSymptoms: initialCandidate?.diagnosis
-                ? ['Demam']
-                : [],
-            dengueAttackOrder: 'Kesatu',
-            labRdtNs1: initialCandidate?.dengueBlot ?? 'TIDAK_DIPERIKSA',
-            labIgm: initialCandidate?.igm ?? 'TIDAK_DIPERIKSA',
-            labIgg: initialCandidate?.igg ?? 'TIDAK_DIPERIKSA',
-            labPlatelet: initialCandidate?.plateletCount ?? undefined,
-            labHematocrit: initialCandidate?.hematocrit ?? undefined,
-            hasOtherDenguePatients: false,
-            otherFeverCasesCount: 0,
-            currentPatientCondition: 'Masih dalam perawatan',
-            households: buildInitialHouses(40),
+            reportRSId: initialPe?.reportRSId ?? initialCandidate?.id ?? '',
+            peDate: initialPe?.peDate ? new Date(initialPe.peDate) : new Date(),
+            officerName: initialPe?.officerName || defaultOfficerName,
+            officerNip: (initialPe?.officerNip as string) ?? '',
+            headOfPuskesmasName: (initialPe?.headOfPuskesmasName as string) ?? '',
+            headOfPuskesmasNip: (initialPe?.headOfPuskesmasNip as string) ?? '',
+            respondentName: (initialPe?.respondentName as string) ?? '',
+            respondentRelation: (initialPe?.respondentRelation as string) ?? '',
+            rt: initialPe?.rt || initialCandidate?.rt || extractRt(initialCandidate?.patientAddress) || '',
+            rw: initialPe?.rw || initialCandidate?.rw || extractRw(initialCandidate?.patientAddress) || '',
+            respondentAddress: (initialFormData.respondentAddress as string) || initialCandidate?.patientAddress || '',
+            symptomOnsetDate: toIsoDate((initialFormData.symptomOnsetDate as Date) || initialCandidate?.symptomOnsetDate),
+            clinicalSymptoms: (initialFormData.clinicalSymptoms as string[]) || (initialCandidate?.diagnosis ? ['Demam'] : []),
+            dengueAttackOrder: (initialFormData.dengueAttackOrder as 'Kesatu' | 'Kedua' | 'Ketiga' | 'Lebih dari 3x') || 'Kesatu',
+            labRdtNs1: (initialFormData.labRdtNs1 as any) || initialCandidate?.dengueBlot || 'TIDAK_DIPERIKSA',
+            labIgm: (initialFormData.labIgm as any) || initialCandidate?.igm || 'TIDAK_DIPERIKSA',
+            labIgg: (initialFormData.labIgg as any) || initialCandidate?.igg || 'TIDAK_DIPERIKSA',
+            labPlatelet: (initialFormData.labPlatelet as number) ?? initialCandidate?.plateletCount ?? undefined,
+            labHematocrit: (initialFormData.labHematocrit as number) ?? initialCandidate?.hematocrit ?? undefined,
+            hasOtherDenguePatients: Boolean(initialFormData.hasOtherDenguePatients),
+            otherFeverCasesCount: initialPe?.otherFeverCasesCount ?? 0,
+            travelHistory14d: initialPe?.travelHistory14d ?? '',
+            respondentAge: (initialFormData.respondentAge as number) ?? undefined,
+            respondentJob: (initialFormData.respondentJob as string) ?? '',
+            patientJob: (initialFormData.patientJob as string) ?? '',
+            mainComplaint: (initialFormData.mainComplaint as string) ?? '',
+            firstActionTaken: (initialFormData.firstActionTaken as string) ?? '',
+            comorbidity: (initialFormData.comorbidity as string) ?? '',
+            treatmentGiven: (initialFormData.treatmentGiven as string) ?? '',
+            currentPatientCondition: (initialFormData.currentPatientCondition as string) || 'Masih dalam perawatan',
+            sourceLocation: initialPe?.sourceLocation ?? '',
+            conclusion: initialPe?.conclusion ?? '',
+            recommendation: initialPe?.recommendation ?? '',
+            additionalNotes: (initialFormData.additionalNotes as string) ?? '',
+            households: initialPe?.households && initialPe.households.length > 0
+                ? initialPe.households.map((h, idx) => ({
+                    address: h.address || `Rumah #${idx + 1}`,
+                    houseCount: h.houseCount ?? 1,
+                    population: h.population ?? 4,
+                    larvaCount: h.larvaCount ?? 0,
+                    larvaType: (h.larvaType as 'AEDES_AEGYPTI' | 'AEDES_ALBOPICTUS' | 'CAMPURAN' | 'LAINNYA') ?? undefined,
+                    abateUsed: h.abateUsed ?? false,
+                    insidePositive: h.insidePositive ?? (h.larvaCount > 0),
+                    outsidePositive: h.outsidePositive ?? false,
+                    containersChecked: h.containersChecked ?? 2,
+                    positiveContainers: h.positiveContainers ?? h.larvaCount ?? 0,
+                }))
+                : buildInitialHouses(40),
         },
     });
 
@@ -189,10 +266,12 @@ export function PeForm({
         [candidates, selectedReportId, initialCandidate],
     );
 
-    // Sync overlapping case-report fields automatically whenever selected report changes
-    const prevReportIdRef = useRef<string | undefined>(initialCandidate?.id);
+    // Sync overlapping case-report fields automatically whenever selected report changes (skip if edit mode)
+    const prevReportIdRef = useRef<string | undefined>(undefined);
     useEffect(() => {
-        if (!activeReport || prevReportIdRef.current === activeReport.id) return;
+        if (initialPe) return;
+        if (!activeReport) return;
+        if (prevReportIdRef.current === activeReport.id) return;
         prevReportIdRef.current = activeReport.id;
 
         setValue('labRdtNs1', activeReport.dengueBlot ?? 'TIDAK_DIPERIKSA');
@@ -203,12 +282,11 @@ export function PeForm({
         setValue('symptomOnsetDate', toIsoDate(activeReport.symptomOnsetDate));
         setValue('respondentAddress', activeReport.patientAddress ?? '');
 
-        // Auto pre-populate RT/RW from address if present
-        const addr = activeReport.patientAddress ?? '';
-        const rtMatch = addr.match(/\bRT[\s.:]*(\d{1,3})\b/i);
-        const rwMatch = addr.match(/\bRW[\s.:]*(\d{1,3})\b/i);
-        if (rtMatch) setValue('rt', String(parseInt(rtMatch[1], 10)).padStart(2, '0'));
-        if (rwMatch) setValue('rw', String(parseInt(rwMatch[1], 10)).padStart(2, '0'));
+        // Pre-populate RT & RW from report or fallback address extraction
+        const autoRt = activeReport.rt || extractRt(activeReport.patientAddress) || '';
+        const autoRw = activeReport.rw || extractRw(activeReport.patientAddress) || '';
+        if (autoRt) setValue('rt', autoRt);
+        if (autoRw) setValue('rw', autoRw);
     }, [activeReport, setValue]);
 
     const surveys = useMemo(
@@ -338,21 +416,39 @@ export function PeForm({
             fd.set('households', JSON.stringify(data.households));
 
             start(async () => {
-                const res = await submitPe({}, fd);
-                if (!res.ok) {
-                    const msg =
-                        res.error ??
-                        (res.fieldErrors
-                            ? Object.values(res.fieldErrors)[0]
-                            : undefined) ??
-                        'Gagal menyimpan PE.';
-                    toast.error(msg);
-                    return;
+                if (initialPe) {
+                    const res = await updatePeAction(initialPe.id, fd);
+                    if (!res.ok) {
+                        const msg =
+                            res.error ??
+                            (res.fieldErrors
+                                ? Object.values(res.fieldErrors)[0]
+                                : undefined) ??
+                            'Gagal menyimpan perubahan PE.';
+                        toast.error(msg);
+                        return;
+                    }
+                    toast.success(
+                        `PE berhasil diperbarui (${metrics.transmissionRisk === 'POSITIF_PENULARAN' ? 'Positif Penularan' : 'Negatif Penularan'}).`,
+                    );
+                    router.push(data.reportRSId ? `/laporan/${data.reportRSId}` : '/pe');
+                } else {
+                    const res = await submitPe({}, fd);
+                    if (!res.ok) {
+                        const msg =
+                            res.error ??
+                            (res.fieldErrors
+                                ? Object.values(res.fieldErrors)[0]
+                                : undefined) ??
+                            'Gagal menyimpan PE.';
+                        toast.error(msg);
+                        return;
+                    }
+                    toast.success(
+                        `PE tersimpan (${metrics.transmissionRisk === 'POSITIF_PENULARAN' ? 'Positif Penularan' : 'Negatif Penularan'}).`,
+                    );
+                    router.push('/pe');
                 }
-                toast.success(
-                    `PE tersimpan (${metrics.transmissionRisk === 'POSITIF_PENULARAN' ? 'Positif Penularan' : 'Negatif Penularan'}).`,
-                );
-                router.push('/pe');
             });
         },
         (fieldErrors) => {
@@ -1605,7 +1701,13 @@ export function PeForm({
                 ) : (
                     <Button type="submit" disabled={submitting}>
                         <CheckCircle2 data-icon="inline-start" />
-                        {submitting ? 'Menyimpan PE...' : 'Simpan Hasil PE'}
+                        {submitting
+                            ? initialPe
+                                ? 'Menyimpan Perubahan PE…'
+                                : 'Menyimpan PE...'
+                            : initialPe
+                              ? 'Simpan Perubahan PE'
+                              : 'Simpan Hasil PE'}
                     </Button>
                 )}
             </div>

@@ -40,6 +40,7 @@ import { StatusStepper } from '@/components/reports/status-stepper';
 import { SlaCountdown } from '@/components/reports/sla-countdown';
 import { PatientMapPanel } from '@/components/reports/patient-map-panel';
 import { DraftActionToolbar } from './draft-actions';
+import { PeActionToolbar } from '@/app/(dashboard)/pe/pe-actions';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -75,8 +76,10 @@ export default async function LaporanDetailPage({
         (report.status === 'VERIFIED' || report.status === 'SIKLUS_2_DONE');
 
     const isDraft = report.status === 'DRAFT';
-    const canManageDraft =
-        actor.role === 'ADMIN' || actor.institutionId === report.institutionId;
+    const canManageReport =
+        actor.role === 'ADMIN' ||
+        actor.role === 'DINKES' ||
+        actor.institutionId === report.institutionId;
 
     return (
         <PageBody>
@@ -113,11 +116,12 @@ export default async function LaporanDetailPage({
                 }
                 aside={
                     <div className="flex items-center gap-2">
-                        {isDraft && (
+                        {canManageReport && (
                             <DraftActionToolbar
                                 reportId={id}
                                 reportNumber={report.reportNumber}
-                                canManage={canManageDraft}
+                                canManage={canManageReport}
+                                isDraft={isDraft}
                             />
                         )}
                         <Button asChild variant="outline" size="sm">
@@ -150,7 +154,8 @@ export default async function LaporanDetailPage({
                                 <DraftActionToolbar
                                     reportId={id}
                                     reportNumber={report.reportNumber}
-                                    canManage={canManageDraft}
+                                    canManage={canManageReport}
+                                    isDraft={isDraft}
                                 />
                             </div>
                         </div>
@@ -589,17 +594,28 @@ export default async function LaporanDetailPage({
                         }
                         subtitle={`Petugas: ${report.pe.officerName} ${report.pe.officerNip ? `(NIP: ${report.pe.officerNip})` : ''} · Tanggal: ${formatDate(report.pe.peDate)}`}
                         aside={
-                            <StatusText
-                                tone={
-                                    report.pe.transmissionRisk === 'POSITIF_PENULARAN'
-                                        ? 'bad'
-                                        : 'good'
-                                }
-                            >
-                                {report.pe.transmissionRisk === 'POSITIF_PENULARAN'
-                                    ? 'Positif Penularan (Wajib Fogging)'
-                                    : 'Negatif Penularan'}
-                            </StatusText>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusText
+                                    tone={
+                                        report.pe.transmissionRisk === 'POSITIF_PENULARAN'
+                                            ? 'bad'
+                                            : 'good'
+                                    }
+                                >
+                                    {report.pe.transmissionRisk === 'POSITIF_PENULARAN'
+                                        ? 'Positif Penularan (Wajib Fogging)'
+                                        : 'Negatif Penularan'}
+                                </StatusText>
+                                {(actor.role === 'ADMIN' ||
+                                    actor.role === 'DINKES' ||
+                                    actor.institutionId === report.assignedPuskesmasId) && (
+                                    <PeActionToolbar
+                                        peId={report.pe.id}
+                                        reportNumber={report.reportNumber}
+                                        showDetail={true}
+                                    />
+                                )}
+                            </div>
                         }
                     >
                         {/* Entomology Metrics Grid */}

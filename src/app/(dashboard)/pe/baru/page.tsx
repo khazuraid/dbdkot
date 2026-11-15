@@ -22,7 +22,7 @@ export default async function PeBaruPage({
 }) {
     const sp = await searchParams;
     const actor = await requireRole('PUSKESMAS');
-    const { rows, total } = await peCandidates(actor);
+    const { rows, total } = await peCandidates(actor, sp.reportId);
     const leftOut = Math.max(0, total - rows.length);
 
     const [userRow] = await getDb()

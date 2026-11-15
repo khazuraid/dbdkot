@@ -33,6 +33,8 @@ export type ReportDetail = {
     kecamatan: string | null;
     kota: string | null;
     provinsi: string | null;
+    rt: string | null;
+    rw: string | null;
     latitude: number | null;
     longitude: number | null;
     clusterId: string | null;
@@ -262,6 +264,8 @@ export async function getReport(
         kecamatan: row.r.kecamatan,
         kota: row.r.kota,
         provinsi: row.r.provinsi,
+        rt: row.r.rt,
+        rw: row.r.rw,
         latitude: row.r.latitude,
         longitude: row.r.longitude,
         clusterId: row.r.clusterId,
@@ -578,7 +582,7 @@ export async function disposeCrossBorder(
     return { ok: true, status: updated.status };
 }
 
-export async function deleteDraftReport(
+export async function deleteReport(
     actor: Actor,
     id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -598,21 +602,15 @@ export async function deleteDraftReport(
         return { ok: false, error: 'Laporan tidak ditemukan.' };
     }
 
-    if (row.status !== 'DRAFT') {
-        return {
-            ok: false,
-            error: 'Hanya laporan dengan status Draf (belum dikirim) yang dapat dihapus.',
-        };
-    }
-
-    const isOwner =
+    const isAuthorized =
         actor.role === 'ADMIN' ||
+        actor.role === 'DINKES' ||
         (actor.institutionId && actor.institutionId === row.institutionId);
 
-    if (!isOwner) {
+    if (!isAuthorized) {
         return {
             ok: false,
-            error: 'Anda tidak memiliki hak untuk menghapus draf faskes lain.',
+            error: 'Anda tidak memiliki hak untuk menghapus laporan faskes lain.',
         };
     }
 
@@ -625,12 +623,14 @@ export async function deleteDraftReport(
         entityId: id,
         changes: {
             reportNumber: { from: row.reportNumber, to: null },
-            status: { from: 'DRAFT', to: null },
+            status: { from: row.status, to: null },
         },
     });
 
     return { ok: true };
 }
+
+export const deleteDraftReport = deleteReport;
 
 export async function submitDraftReport(
     actor: Actor,
@@ -797,7 +797,7 @@ export async function submitDraftReport(
     return { ok: true, status: targetStatus };
 }
 
-export async function updateDraftReport(
+export async function updateReport(
     actor: Actor,
     id: string,
     input: Partial<CreateReportInput>,
@@ -813,21 +813,15 @@ export async function updateDraftReport(
         return { ok: false, error: 'Laporan tidak ditemukan.' };
     }
 
-    if (row.status !== 'DRAFT' && actor.role !== 'ADMIN') {
-        return {
-            ok: false,
-            error: 'Hanya laporan berstatus draf yang dapat diubah.',
-        };
-    }
-
-    const isOwner =
+    const isAuthorized =
         actor.role === 'ADMIN' ||
+        actor.role === 'DINKES' ||
         (actor.institutionId && actor.institutionId === row.institutionId);
 
-    if (!isOwner) {
+    if (!isAuthorized) {
         return {
             ok: false,
-            error: 'Anda tidak memiliki hak untuk mengubah draf faskes lain.',
+            error: 'Anda tidak memiliki hak untuk mengubah laporan faskes lain.',
         };
     }
 
@@ -852,6 +846,8 @@ export async function updateDraftReport(
     if (input.kecamatan) updates.kecamatan = input.kecamatan;
     if (input.kota) updates.kota = input.kota;
     if (input.provinsi) updates.provinsi = input.provinsi;
+    if (input.rt !== undefined) updates.rt = input.rt || null;
+    if (input.rw !== undefined) updates.rw = input.rw || null;
     if (input.latitude !== undefined) updates.latitude = input.latitude;
     if (input.longitude !== undefined) updates.longitude = input.longitude;
     if (input.admissionDate) updates.admissionDate = input.admissionDate;
@@ -865,6 +861,32 @@ export async function updateDraftReport(
     if (input.igmResult !== undefined) updates.igm = input.igmResult ?? null;
     if (input.iggResult !== undefined) updates.igg = input.iggResult ?? null;
     if (input.diagnosis !== undefined) updates.diagnosis = input.diagnosis ?? null;
+
+    // Handle status toggling: kirim (terkirim) vs draf
+    if (input.isDraft === true) {
+        updates.status = 'DRAFT';
+    } else if (input.isDraft === false && row.status === 'DRAFT') {
+        const [{ localMatches }] = await db
+            .select({ localMatches: sql<number>`count(*)::int` })
+            .from(kelurahan)
+            .where(
+                and(
+                    sql`lower(${kelurahan.name}) = lower(${input.kelurahan ?? row.kelurahan ?? ''})`,
+                    sql`lower(${kelurahan.kota}) = lower(${input.kota ?? row.kota ?? ''})`,
+                ),
+            );
+        const [{ totalKelurahan }] = await db
+            .select({ totalKelurahan: sql<number>`count(*)::int` })
+            .from(kelurahan);
+        const isCrossBorder = totalKelurahan > 0 && localMatches === 0;
+        const isPuskesmasPoli =
+            actor.role === 'PUSKESMAS' || row.sourceType === 'PUSKESMAS_POLI';
+        updates.status = isCrossBorder
+            ? 'CROSS_BORDER_PENDING'
+            : isPuskesmasPoli
+              ? 'ASSIGNED_ACCEPTED'
+              : 'SUBMITTED';
+    }
 
     await db.update(reportsRS).set(updates).where(eq(reportsRS.id, id));
 
@@ -881,3 +903,5 @@ export async function updateDraftReport(
 
     return { ok: true };
 }
+
+export const updateDraftReport = updateReport;
