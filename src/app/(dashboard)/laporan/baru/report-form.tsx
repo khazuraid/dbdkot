@@ -32,7 +32,6 @@ import { Panel } from '@/components/shell/page';
 import { DateField } from '@/components/ui/date-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { WilayahCascadingSelect } from '@/components/geo/wilayah-cascading-select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -816,7 +815,7 @@ export function ReportForm({
                                 <Textarea
                                     id="f-address"
                                     rows={2}
-                                    placeholder="Nama jalan, nomor rumah, RT/RW, patokan terdekat…"
+                                    placeholder="Nama jalan, nomor rumah, blok, atau patokan terdekat…"
                                     aria-invalid={Boolean(errors.patientAddress)}
                                     {...register('patientAddress')}
                                     className="mt-1.5 resize-y text-[13.5px]"
@@ -828,33 +827,18 @@ export function ReportForm({
                                 )}
                             </div>
 
-                            <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--ground)]/60 p-3.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                                        <MapPin className="size-3.5 text-[var(--accent)]" />
-                                        Pilih Wilayah Administratif (Kemendagri)
-                                    </span>
-                                    <span className="text-[11px] text-muted-foreground">
-                                        Otomatis mengisi form
-                                    </span>
-                                </div>
-                                <WilayahCascadingSelect
-                                    onSelect={(sel) => {
-                                        if (sel.provinsi)
-                                            setValue('provinsi', sel.provinsi, {
-                                                shouldValidate: true,
-                                            });
-                                        if (sel.kota)
-                                            setValue('kota', sel.kota, { shouldValidate: true });
-                                        if (sel.kecamatan)
-                                            setValue('kecamatan', sel.kecamatan, {
-                                                shouldValidate: true,
-                                            });
-                                        if (sel.kelurahan)
-                                            setValue('kelurahan', sel.kelurahan, {
-                                                shouldValidate: true,
-                                            });
-                                    }}
+                            <div className="grid grid-cols-2 gap-4">
+                                <Field
+                                    label="RT"
+                                    placeholder="Contoh: 003"
+                                    error={errors.rt?.message}
+                                    reg={register('rt')}
+                                />
+                                <Field
+                                    label="RW"
+                                    placeholder="Contoh: 005"
+                                    error={errors.rw?.message}
+                                    reg={register('rw')}
                                 />
                             </div>
 

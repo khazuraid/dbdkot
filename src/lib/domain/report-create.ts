@@ -139,6 +139,8 @@ export async function createReport(
         kecamatan: input.kecamatan,
         kota: input.kota,
         provinsi: input.provinsi,
+        rt: input.rt || null,
+        rw: input.rw || null,
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
         sourceType: isPuskesmasPoli ? 'PUSKESMAS_POLI' : 'RS',

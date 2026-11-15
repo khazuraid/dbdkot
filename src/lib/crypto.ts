@@ -25,15 +25,26 @@ function key(): Buffer {
         throw new Error('PII_ENCRYPTION_KEY is not set');
     }
 
-    const buf = Buffer.from(secret, 'base64');
-
-    if (buf.length !== 32) {
-        throw new Error(
-            'PII_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32)',
-        );
+    // 1. Standard Base64 or URL-safe Base64 decoding to 32 bytes (e.g. `openssl rand -base64 32`)
+    const b64Normalized = secret.replace(/-/g, '+').replace(/_/g, '/');
+    const b64Buf = Buffer.from(b64Normalized, 'base64');
+    if (b64Buf.length === 32 && /^[A-Za-z0-9+/]+=*$/.test(b64Normalized)) {
+        return b64Buf;
     }
 
-    return buf;
+    // 2. 64-character hex encoding (e.g. `openssl rand -hex 32`)
+    if (/^[0-9a-fA-F]{64}$/.test(secret)) {
+        return Buffer.from(secret, 'hex');
+    }
+
+    // 3. Raw 32-byte UTF-8 secret
+    if (Buffer.byteLength(secret, 'utf8') === 32) {
+        return Buffer.from(secret, 'utf8');
+    }
+
+    throw new Error(
+        `PII_ENCRYPTION_KEY must be 32 bytes (base64/hex/utf8), got ${secret.length} chars (${b64Buf.length} base64 bytes)`,
+    );
 }
 
 export function encryptPii(plaintext: string): string {

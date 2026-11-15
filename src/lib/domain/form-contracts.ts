@@ -85,6 +85,8 @@ export const createReportSchema = z.object({
     kecamatan: z.string().trim().min(2, 'Kecamatan wajib diisi'),
     kota: z.string().trim().min(2, 'Kota wajib diisi'),
     provinsi: z.string().trim().min(2, 'Provinsi wajib diisi'),
+    rt: z.string().trim().max(10).optional(),
+    rw: z.string().trim().max(10).optional(),
     admissionDate: requiredDate('Tanggal masuk').refine(
         (d) => d.getTime() <= Date.now(),
         'Tanggal masuk tidak boleh di masa depan',

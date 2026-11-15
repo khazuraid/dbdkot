@@ -46,9 +46,19 @@ export async function submitReport(
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[submitReport] unhandled error:', err);
-        if (msg.includes('PII_ENCRYPTION_KEY') || msg.includes('PII_HASH_KEY')) {
+        if (msg.includes('PII_ENCRYPTION_KEY is not set')) {
             return {
-                error: 'Konfigurasi kunci enkripsi PII server belum valid (PII_ENCRYPTION_KEY harus 32 byte base64). Hubungi administrator.',
+                error: 'PII_ENCRYPTION_KEY belum terbaca di runtime container. Pastikan variabel disetel untuk Runtime (bukan Build-only) lalu restart/redeploy.',
+            };
+        }
+        if (msg.includes('PII_HASH_KEY is not set')) {
+            return {
+                error: 'PII_HASH_KEY belum terbaca di runtime container. Pastikan PII_HASH_KEY ikut disetel di env lalu redeploy.',
+            };
+        }
+        if (msg.includes('PII_ENCRYPTION_KEY')) {
+            return {
+                error: `Format PII_ENCRYPTION_KEY tidak valid (${msg}). Gunakan 32 byte base64 (openssl rand -base64 32) atau 64 karakter hex (openssl rand -hex 32).`,
             };
         }
         return {
