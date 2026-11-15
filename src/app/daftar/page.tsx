@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { eq } from 'drizzle-orm';
+import { getDb } from '@/db';
+import { institutions } from '@/db/schema';
 import { FadeIn } from '@/components/shell/fade-in';
 import {
     Card,
@@ -9,13 +12,27 @@ import {
 } from '@/components/ui/card';
 import { RegisterForm } from './register-form';
 
+export const instant = false;
+
 export const metadata: Metadata = {
     title: 'Ajukan akun: WALI-EPI',
 };
 
-const REVIEW = ['Diajukan', 'Ditinjau', 'Disetujui'];
+const REVIEW = ['Verifikasi OTP', 'Ditinjau Dinkes', 'Akun Aktif'];
 
-export default function DaftarPage() {
+export default async function DaftarPage() {
+    const db = getDb();
+    const instList = await db
+        .select({
+            id: institutions.id,
+            name: institutions.name,
+            type: institutions.type,
+            city: institutions.city,
+        })
+        .from(institutions)
+        .where(eq(institutions.isActive, true))
+        .orderBy(institutions.name);
+
     return (
         <FadeIn className="w-full">
             <Card className="gap-0 py-0">
@@ -24,13 +41,13 @@ export default function DaftarPage() {
                         Ajukan akun instansi
                     </h2>
                     <CardDescription className="text-[13px] leading-relaxed">
-                        Untuk staf Rumah Sakit, Puskesmas, atau Dinas Kesehatan.
-                        Permohonan akan ditinjau administrator sebelum aktif.
+                        Pilih peran instansi (Dinas Kesehatan, Rumah Sakit, atau Puskesmas).
+                        Permohonan diverifikasi via kode OTP email lalu ditinjau administrator.
                     </CardDescription>
                 </CardHeader>
 
                 <CardContent className="px-6 py-5">
-                    <RegisterForm />
+                    <RegisterForm institutions={instList} />
                 </CardContent>
 
                 <div className="space-y-3 border-t border-[var(--rule)] bg-[var(--raised)]/45 px-6 py-3.5">

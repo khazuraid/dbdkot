@@ -162,6 +162,13 @@ export async function saveSettingAction(
         return fail('Kunci hanya huruf, angka, titik, dan garis bawah.');
     }
 
+    if (
+        (key === 'SMTP_PASS' || key === 'REGIONAL_API_KEY') &&
+        value('value') === '••••••••'
+    ) {
+        return fail('Nilai rahasia disamarkan. Masukkan nilai baru jika ingin mengganti.');
+    }
+
     const actor = await requireActor();
     const result = await saveSetting(actor, {
         id: value('id') || undefined,

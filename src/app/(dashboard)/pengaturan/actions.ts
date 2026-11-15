@@ -172,6 +172,7 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
 
     const db = getDb();
     const now = new Date();
+    const preserveApiKey = parsed.data.apiKey === '••••••••';
 
     const keysToUpsert: Array<{
         key: string;
@@ -191,12 +192,16 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
             type: 'string',
             description: 'Base URL API wilayah Kemendagri / BPS / SatuData',
         },
-        {
-            key: 'REGIONAL_API_KEY',
-            value: parsed.data.apiKey ?? '',
-            type: 'string',
-            description: 'API Key / Token integrasi data wilayah',
-        },
+        ...(preserveApiKey
+            ? []
+            : [
+                  {
+                      key: 'REGIONAL_API_KEY',
+                      value: parsed.data.apiKey ?? '',
+                      type: 'string',
+                      description: 'API Key / Token integrasi data wilayah',
+                  },
+              ]),
         {
             key: 'REGIONAL_CODE_CITY',
             value: parsed.data.cityCode,
@@ -422,3 +427,139 @@ export async function saveBrandingSettingsAction(input: BrandingConfig) {
     revalidatePath('/');
     return { ok: true as const };
 }
+
+const smtpSettingsSchema = z.object({
+    host: z.string().trim().min(1, 'Host SMTP wajib diisi'),
+    port: z.coerce.number().int().min(1).max(65535),
+    secure: z.boolean(),
+    user: z.string().trim().min(1, 'Username SMTP wajib diisi'),
+    pass: z.string().optional().default(''),
+    fromEmail: z.string().trim().email('Email pengirim tidak valid'),
+    fromName: z.string().trim().min(1, 'Nama pengirim wajib diisi'),
+});
+
+export async function saveSmtpSettingsAction(formData: FormData) {
+    await requireRole('ADMIN');
+
+    const parsed = smtpSettingsSchema.safeParse({
+        host: formData.get('host'),
+        port: formData.get('port'),
+        secure: formData.get('secure') === 'true' || formData.get('secure') === 'on',
+        user: formData.get('user'),
+        pass: formData.get('pass') ?? '',
+        fromEmail: formData.get('fromEmail'),
+        fromName: formData.get('fromName'),
+    });
+
+    if (!parsed.success) {
+        return {
+            ok: false as const,
+            error: parsed.error.issues[0]?.message || 'Input pengaturan SMTP tidak valid',
+        };
+    }
+
+    const db = getDb();
+    const now = new Date();
+    const submittedPass = parsed.data.pass ?? '';
+    const isMaskedOrBlank = submittedPass === '' || submittedPass === '••••••••';
+
+    let finalPass = submittedPass;
+    if (isMaskedOrBlank) {
+        const [existingPass] = await db
+            .select({ value: systemSettings.value })
+            .from(systemSettings)
+            .where(eq(systemSettings.key, 'SMTP_PASS'))
+            .limit(1);
+        finalPass = existingPass?.value || process.env.SMTP_PASS || '';
+        if (!finalPass) {
+            return {
+                ok: false as const,
+                error: 'Password SMTP wajib diisi untuk konfigurasi awal.',
+            };
+        }
+    }
+
+    const items = [
+        { key: 'SMTP_HOST', value: parsed.data.host, description: 'Host server SMTP (contoh: smtp.sumopod.com)' },
+        { key: 'SMTP_PORT', value: String(parsed.data.port), description: 'Port server SMTP (465 SSL / 587 TLS)' },
+        { key: 'SMTP_SECURE', value: String(parsed.data.secure), description: 'Apakah menggunakan SSL langsung' },
+        { key: 'SMTP_USER', value: parsed.data.user, description: 'Username autentikasi SMTP' },
+        ...(isMaskedOrBlank
+            ? []
+            : [{ key: 'SMTP_PASS', value: finalPass, description: 'Password autentikasi SMTP' }]),
+        { key: 'SMTP_FROM_EMAIL', value: parsed.data.fromEmail, description: 'Alamat email pengirim default' },
+        { key: 'SMTP_FROM_NAME', value: parsed.data.fromName, description: 'Nama tampilan pengirim email' },
+    ];
+
+    for (const item of items) {
+        await db
+            .insert(systemSettings)
+            .values({
+                key: item.key,
+                value: item.value,
+                type: 'string',
+                category: 'SMTP',
+                description: item.description,
+                isPublic: false,
+                createdAt: now,
+                updatedAt: now,
+            })
+            .onConflictDoUpdate({
+                target: systemSettings.key,
+                set: {
+                    value: item.value,
+                    category: 'SMTP',
+                    description: item.description,
+                    updatedAt: now,
+                },
+            });
+    }
+
+    revalidatePath('/pengaturan');
+    return { ok: true as const };
+}
+
+export async function testSmtpConnectionAction(targetEmail?: string) {
+    const actor = await requireRole('ADMIN');
+
+    try {
+        const { createTransporter, sendEmail } = await import('@/lib/email');
+        const transporter = await createTransporter();
+        await transporter.verify();
+
+        const recipient = targetEmail?.trim() || actor.userId;
+        // Find recipient email if recipient is userId or email
+        let to = recipient;
+        if (!to.includes('@')) {
+            const db = getDb();
+            const [u] = await db
+                .select({ email: users.email })
+                .from(users)
+                .where(eq(users.id, actor.userId))
+                .limit(1);
+            to = u?.email || '';
+        }
+
+        if (to && to.includes('@')) {
+            await sendEmail({
+                to,
+                subject: '[WALI-EPI] Uji Coba Pengiriman Email SMTP Sumopod Berhasil',
+                text: 'Koneksi ke server SMTP Sumopod berhasil! Layanan pengiriman email siap digunakan untuk verifikasi OTP pendaftaran dan reset kata sandi.',
+                html: `
+                    <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <h2 style="color: #0d9488; margin-top: 0;">Uji Coba SMTP Sumopod Berhasil!</h2>
+                        <p>Koneksi server SMTP berjalan normal dan siap mengirim email verifikasi OTP serta notifikasi sistem WALI-EPI.</p>
+                        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
+                        <small style="color: #64748b;">WALI-EPI Kota Cirebon &bull; Layanan Email Sumopod</small>
+                    </div>
+                `,
+            });
+        }
+
+        return { ok: true as const, recipient: to };
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Gagal menghubungkan ke server SMTP';
+        return { ok: false as const, error: message };
+    }
+}
+

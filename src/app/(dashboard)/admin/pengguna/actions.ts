@@ -6,6 +6,7 @@ import {
     approveAccount,
     createAccount,
     createAccountSchema,
+    deleteAccount,
     rejectAccount,
     setAccountActive,
     updateAccount,
@@ -140,4 +141,19 @@ export async function updateAccountAction(
 
     revalidatePath('/admin/pengguna');
     return { ok: true, message: 'Perubahan akun disimpan.' };
+}
+
+export async function deleteAccountAction(
+    _state: ActionState,
+    formData: FormData,
+): Promise<ActionState> {
+    const { actor, error } = await actorOrError();
+    if (!actor) return { ok: false, error };
+
+    const userId = String(formData.get('userId') ?? '');
+    const result = await deleteAccount(actor, userId);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    revalidatePath('/admin/pengguna');
+    return { ok: true, message: 'Pengguna berhasil dihapus permanen.' };
 }

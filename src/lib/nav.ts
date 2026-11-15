@@ -148,6 +148,7 @@ export const NAV: Record<Role, NavGroup[]> = {
                 { href: '/admin/kelurahan', label: 'Kelurahan & Batas' },
                 { href: '/admin/koreksi-wilayah', label: 'Koreksi Wilayah' },
                 { href: '/admin/audit-log', label: 'Audit Log Keamanan' },
+                { href: '/admin/berkas', label: 'Berkas Unggahan' },
             ],
         },
         {

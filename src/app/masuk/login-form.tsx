@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ const loginSchema = z.object({
 export function LoginForm() {
     const router = useRouter();
     const [pending, setPending] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -69,11 +71,16 @@ export function LoginForm() {
 
         if (failure) {
             setPending(false);
+            const isRateLimited =
+                failure.status === 429 || failure.code === 'TOO_MANY_REQUESTS';
             setError(
-                failure.code === 'FORBIDDEN'
+                isRateLimited
                     ? (failure.message ??
-                          'Akun belum disetujui administrator atau sedang dinonaktifkan.')
-                    : 'Email atau password salah.',
+                          'Terlalu banyak percobaan masuk gagal. Tunggu beberapa menit sebelum mencoba lagi.')
+                    : failure.code === 'FORBIDDEN'
+                      ? (failure.message ??
+                            'Akun belum disetujui administrator atau sedang dinonaktifkan.')
+                      : 'Email atau password salah.',
             );
             return;
         }
@@ -107,18 +114,40 @@ export function LoginForm() {
                 </Field>
 
                 <Field data-invalid={Boolean(fieldErrors.password || error)}>
-                    <FieldLabel htmlFor="password" className="text-[13px]">
-                        Password
-                    </FieldLabel>
-                    <Input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="current-password"
-                        required
-                        aria-invalid={Boolean(fieldErrors.password || error)}
-                        className="h-10"
-                    />
+                    <div className="flex items-center justify-between">
+                        <FieldLabel htmlFor="password" className="text-[13px]">
+                            Password
+                        </FieldLabel>
+                        <Link
+                            href="/lupa-password"
+                            className="text-[12px] text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                        >
+                            Lupa kata sandi?
+                        </Link>
+                    </div>
+                    <div className="relative">
+                        <Input
+                            id="password"
+                            name="password"
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="current-password"
+                            required
+                            aria-invalid={Boolean(fieldErrors.password || error)}
+                            className="h-10 pr-10"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                            aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                        >
+                            {showPassword ? (
+                                <EyeOff className="size-4" strokeWidth={1.5} />
+                            ) : (
+                                <Eye className="size-4" strokeWidth={1.5} />
+                            )}
+                        </button>
+                    </div>
                     {fieldErrors.password && (
                         <FieldError>{fieldErrors.password}</FieldError>
                     )}

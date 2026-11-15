@@ -3,13 +3,17 @@
 import { useActionState, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+    AlertTriangle,
     ChevronDown,
     Eye,
     EyeOff,
     Info,
     KeyRound,
     PencilIcon,
+    Power,
+    PowerOff,
     RefreshCw,
+    Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ROLES, type Role } from '@/lib/roles';
@@ -27,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     approveAccountAction,
+    deleteAccountAction,
     rejectAccountAction,
     setAccountActiveAction,
     updateAccountAction,
@@ -258,11 +263,16 @@ export function AccountToggle({
     status: string;
     self: boolean;
 }) {
+    const router = useRouter();
     const [state, action, pending] = useActionState(
         setAccountActiveAction,
         initial,
     );
     useNotified(state);
+
+    useEffect(() => {
+        if (state.ok) router.refresh();
+    }, [state.ok, router]);
 
     if (self) {
         return (
@@ -300,13 +310,144 @@ export function AccountToggle({
                 disabled={pending}
                 className={
                     isActive
-                        ? 'hover:border-[var(--pill-negative-border)] hover:bg-[var(--pill-negative-bg)] hover:text-[var(--negative)]'
-                        : undefined
+                        ? 'gap-1 hover:border-[var(--pill-negative-border)] hover:bg-[var(--pill-negative-bg)] hover:text-[var(--negative)]'
+                        : 'gap-1'
+                }
+                title={
+                    isActive
+                        ? 'Nonaktifkan akses login pengguna ini'
+                        : 'Aktifkan kembali akses login pengguna ini'
                 }
             >
-                {isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                {isActive ? (
+                    <>
+                        <PowerOff className="size-3" aria-hidden />
+                        {pending ? 'Memproses…' : 'Nonaktifkan'}
+                    </>
+                ) : (
+                    <>
+                        <Power className="size-3" aria-hidden />
+                        {pending ? 'Memproses…' : 'Aktifkan'}
+                    </>
+                )}
             </Button>
         </form>
+    );
+}
+
+export function DeleteAccountButton({
+    userId,
+    userName,
+    userEmail,
+    self,
+}: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    self: boolean;
+}) {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, setPending] = useState(false);
+
+    if (self) return null;
+
+    async function handleDelete(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        setError(null);
+        setPending(true);
+        try {
+            const formData = new FormData(e.currentTarget);
+            const res = await deleteAccountAction(initial, formData);
+            if (!res.ok) {
+                const msg = res.error ?? 'Gagal menghapus pengguna.';
+                setError(msg);
+                toast.error(msg);
+                return;
+            }
+            toast.success(res.message ?? 'Pengguna berhasil dihapus permanen.');
+            setOpen(false);
+            router.refresh();
+        } catch {
+            const msg = 'Terjadi kesalahan saat menghapus pengguna.';
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setPending(false);
+        }
+    }
+
+    return (
+        <>
+            <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={() => {
+                    setError(null);
+                    setOpen(true);
+                }}
+                className="gap-1 hover:border-[var(--pill-negative-border)] hover:bg-[var(--pill-negative-bg)] hover:text-[var(--negative)]"
+                title={`Hapus permanen akun ${userName}`}
+                aria-label={`Hapus pengguna ${userName}`}
+            >
+                <Trash2 className="size-3" aria-hidden />
+                Hapus
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-[440px]">
+                    <form onSubmit={handleDelete}>
+                        <input type="hidden" name="userId" value={userId} />
+                        <DialogHeader className="border-b border-[var(--rule)] px-5 py-4">
+                            <DialogTitle className="flex items-center gap-2 text-[16px] text-[var(--negative)]">
+                                <AlertTriangle className="size-4 shrink-0" aria-hidden />
+                                Hapus Pengguna Permanen
+                            </DialogTitle>
+                            <DialogDescription className="text-[13px] pt-1">
+                                Anda yakin ingin menghapus akun berikut secara permanen?
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3 px-5 py-4 text-[13px]">
+                            <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/60 p-3 space-y-0.5">
+                                <p className="font-medium text-foreground">{userName}</p>
+                                <p className="font-mono text-[12px] text-muted-foreground">{userEmail}</p>
+                            </div>
+                            <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+                                Tindakan ini tidak dapat dibatalkan. Jika pengguna sudah memiliki riwayat laporan atau aktivitas sistem, penghapusan akan ditolak otomatis dan Anda disarankan menggunakan tombol <strong>Nonaktifkan</strong>.
+                            </p>
+                            {error && (
+                                <p
+                                    role="alert"
+                                    className="rounded-[var(--radius-control)] border border-[var(--pill-negative-border)] bg-[var(--pill-negative-bg)] px-3 py-2 text-[12.5px] text-[var(--pill-negative-ink)]"
+                                >
+                                    {error}
+                                </p>
+                            )}
+                        </div>
+
+                        <DialogFooter className="mx-0 mb-0 rounded-b-[var(--radius-card)] border-t border-[var(--rule)] bg-[var(--raised)]/65 px-5 py-3.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                                disabled={pending}
+                            >
+                                Batal
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="destructive"
+                                disabled={pending}
+                            >
+                                {pending ? 'Menghapus…' : 'Ya, Hapus Permanen'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 

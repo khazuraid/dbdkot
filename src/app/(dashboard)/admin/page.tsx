@@ -4,6 +4,7 @@ import {
     ArrowRight,
     Building2,
     Database,
+    FolderOpen,
     Globe2,
     Lock,
     MapPin,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { requireRole } from '@/lib/session';
 import { getDb } from '@/db';
-import { institutions, kelurahan, users, auditLogs } from '@/db/schema';
+import { institutions, kelurahan, users, auditLogs, attachments } from '@/db/schema';
 import { count } from 'drizzle-orm';
 import {
     PageBody,
@@ -36,7 +37,7 @@ export default async function AdminHubPage() {
     const isAdmin = actor.role === 'ADMIN';
 
     // Query stats
-    const [[instCount], [kelCount], [userCount], [logCount]] = await Promise.all([
+    const [[instCount], [kelCount], [userCount], [logCount], [fileCount]] = await Promise.all([
         db.select({ value: count() }).from(institutions),
         db.select({ value: count() }).from(kelurahan),
         isAdmin
@@ -44,6 +45,9 @@ export default async function AdminHubPage() {
             : Promise.resolve([{ value: 0 }]),
         isAdmin
             ? db.select({ value: count() }).from(auditLogs)
+            : Promise.resolve([{ value: 0 }]),
+        isAdmin
+            ? db.select({ value: count() }).from(attachments)
             : Promise.resolve([{ value: 0 }]),
     ]);
 
@@ -106,6 +110,18 @@ export default async function AdminHubPage() {
             roles: ['ADMIN'],
             badge: 'Admin Only',
             tone: 'bad',
+            allowed: isAdmin,
+        },
+        {
+            title: 'Berkas Unggahan',
+            description:
+                'Daftar lengkap seluruh lampiran PDF & gambar yang terunggah beserta pengunggah, laporan terkait, dan kontrol penghapusan.',
+            href: '/admin/berkas',
+            icon: FolderOpen,
+            stat: isAdmin ? `${fileCount.value} Berkas` : 'Terkunci',
+            roles: ['ADMIN'],
+            badge: 'Admin Only',
+            tone: 'brand',
             allowed: isAdmin,
         },
         {

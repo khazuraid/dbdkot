@@ -1,9 +1,16 @@
 import { betterAuth, APIError } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { account, session, user, users, verification } from '@/db/schema';
+import {
+    betterAuthRateLimitStorage,
+    clearLoginFailures,
+    isLoginLocked,
+    recordLoginFailure,
+} from './rate-limit';
 import { ROLES } from './roles';
 
 export const auth = betterAuth({
@@ -23,20 +30,27 @@ export const auth = betterAuth({
     // sign-up path is safe to expose.
     emailAndPassword: {
         enabled: true,
-        minPasswordLength: 10,
+        autoSignIn: false,
+        minPasswordLength: 7,
         requireEmailVerification: false,
     },
     // Rejects cross-site POSTs with a valid-looking Origin; the cookie is
     // SameSite anyway, but auth endpoints are the one place worth both.
-    trustedOrigins: [process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'],
+    trustedOrigins: [
+        process.env.BETTER_AUTH_URL,
+        process.env.NEXT_PUBLIC_APP_URL,
+        'http://localhost:3000',
+    ].filter((v): v is string => Boolean(v)),
     rateLimit: {
         enabled: true,
         window: 60,
-        max: 20,
+        max: 30,
+        customStorage: betterAuthRateLimitStorage,
         customRules: {
-            // Credential stuffing: sign-in gets a much tighter budget than
-            // the read endpoints a page refresh hits.
-            '/sign-in/email': { window: 60, max: 5 },
+            // Credential stuffing: IP-level burst cap paired with per-account
+            // lockout in `hooks` below so shared clinic NATs aren't disrupted.
+            '/sign-in/email': { window: 60, max: 10 },
+            '/sign-up/email': { window: 60, max: 5 },
         },
     },
     user: {
@@ -77,6 +91,73 @@ export const auth = betterAuth({
         // IDs come from the Drizzle schema's uuid().defaultRandom(), so
         // better-auth must generate a UUID, not its default 32-char string.
         database: { generateId: 'uuid' },
+        ipAddress: {
+            ipAddressHeaders: ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for'],
+        },
+    },
+    hooks: {
+        before: createAuthMiddleware(async (ctx) => {
+            if (ctx.path === '/sign-up/email' && ctx.request) {
+                throw new APIError('FORBIDDEN', {
+                    message:
+                        'Pendaftaran akun wajib melalui verifikasi OTP di halaman /daftar.',
+                });
+            }
+
+            if (ctx.path === '/sign-in/email') {
+                const rawEmail = (ctx.body as { email?: unknown } | undefined)
+                    ?.email;
+                const email =
+                    typeof rawEmail === 'string'
+                        ? rawEmail.toLowerCase().trim()
+                        : '';
+                if (email) {
+                    const lock = await isLoginLocked(email);
+                    if (lock.locked) {
+                        const mins = Math.max(
+                            1,
+                            Math.ceil(lock.retryAfterSeconds / 60),
+                        );
+                        throw new APIError('TOO_MANY_REQUESTS', {
+                            code: 'TOO_MANY_REQUESTS',
+                            message: `Terlalu banyak percobaan masuk gagal. Coba lagi dalam ${mins} menit.`,
+                        });
+                    }
+                }
+            }
+        }),
+        after: createAuthMiddleware(async (ctx) => {
+            if (ctx.path !== '/sign-in/email') return;
+
+            const rawEmail = (ctx.body as { email?: unknown } | undefined)?.email;
+            const email =
+                typeof rawEmail === 'string'
+                    ? rawEmail.toLowerCase().trim()
+                    : '';
+            if (!email) return;
+
+            const returned = ctx.context.returned;
+            if (isAPIError(returned)) {
+                if (returned.statusCode !== 429) {
+                    const result = await recordLoginFailure(email);
+                    if (result.locked) {
+                        const mins = Math.max(
+                            1,
+                            Math.ceil(result.retryAfterSeconds / 60),
+                        );
+                        throw new APIError('TOO_MANY_REQUESTS', {
+                            code: 'TOO_MANY_REQUESTS',
+                            message: `Terlalu banyak percobaan masuk gagal. Akun dikunci sementara selama ${mins} menit.`,
+                        });
+                    }
+                }
+                return;
+            }
+
+            if (returned) {
+                await clearLoginFailures(email);
+            }
+        }),
     },
     databaseHooks: {
         session: {

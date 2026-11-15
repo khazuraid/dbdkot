@@ -12,6 +12,7 @@ import {
     attachmentUploadSchema,
     buildStoragePath,
     isAllowedExtension,
+    validateMagicBytes,
 } from '@/lib/attachments';
 
 const UPLOAD_ROOT = join(process.cwd(), 'uploads');
@@ -49,21 +50,30 @@ async function serve(request: Request) {
         .where(eq(attachments.id, id))
         .limit(1);
 
-    if (!row?.reportRSId) {
+    if (!row) {
         return NextResponse.json(
             { error: 'Berkas tidak ditemukan.' },
             { status: 404 },
         );
     }
 
-    // Same tenant check as the list: a report the caller is not party to is a
-    // 404, so ids cannot be probed.
-    const report = await getReport(actor, row.reportRSId);
-    if (!report) {
-        return NextResponse.json(
-            { error: 'Berkas tidak ditemukan.' },
-            { status: 404 },
-        );
+    if (actor.role !== 'ADMIN') {
+        if (!row.reportRSId) {
+            return NextResponse.json(
+                { error: 'Berkas tidak ditemukan.' },
+                { status: 404 },
+            );
+        }
+
+        // Same tenant check as the list: a report the caller is not party to is a
+        // 404, so ids cannot be probed.
+        const report = await getReport(actor, row.reportRSId);
+        if (!report) {
+            return NextResponse.json(
+                { error: 'Berkas tidak ditemukan.' },
+                { status: 404 },
+            );
+        }
     }
 
     const absolute = join(UPLOAD_ROOT, row.filePath);
@@ -90,6 +100,7 @@ async function serve(request: Request) {
             'Content-Type': row.fileType,
             'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
             'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'none'; sandbox",
             'Cache-Control': 'private, no-store',
         },
     });
@@ -177,6 +188,12 @@ export async function POST(request: Request) {
         );
     }
 
+    const rawBytes = new Uint8Array(await file.arrayBuffer());
+    const magic = validateMagicBytes(rawBytes, file.type, file.name);
+    if (!magic.ok) {
+        return NextResponse.json({ error: magic.error }, { status: 415 });
+    }
+
     const storagePath = buildStoragePath(report.id, file.name);
     const absolute = join(UPLOAD_ROOT, storagePath);
 
@@ -185,7 +202,7 @@ export async function POST(request: Request) {
         // `wx`: the generated path is derived from the name, so a second
         // upload with the same name would otherwise replace the first file
         // while its row keeps the old type and size.
-        await writeFile(absolute, Buffer.from(await file.arrayBuffer()), {
+        await writeFile(absolute, rawBytes, {
             flag: 'wx',
         });
     } catch (error) {
@@ -204,8 +221,8 @@ export async function POST(request: Request) {
             reportRSId: report.id,
             fileName: file.name,
             filePath: storagePath,
-            fileType: file.type,
-            fileSize: file.size,
+            fileType: magic.mime,
+            fileSize: rawBytes.byteLength,
             uploadedBy: actor.userId,
         })
         .returning({ id: attachments.id });

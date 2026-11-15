@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import {
     AccountToggle,
     ApprovalRow,
+    DeleteAccountButton,
     EditAccountButton,
 } from './account-controls';
 import { CreateAccountDialog } from './baru/create-account-form';
@@ -357,6 +358,12 @@ export default async function PenggunaPage({
                                             status={u.status}
                                             self={u.id === actor.userId}
                                         />
+                                        <DeleteAccountButton
+                                            userId={u.id}
+                                            userName={u.name}
+                                            userEmail={u.email}
+                                            self={u.id === actor.userId}
+                                        />
                                     </div>
                                 ),
                             },
@@ -370,7 +377,7 @@ export default async function PenggunaPage({
                 </Panel>
 
                 <p className="text-[12px] text-muted-foreground">
-                    Akun yang dinonaktifkan tidak bisa membuat sesi baru.
+                    Akun yang dinonaktifkan langsung dicabut sesi aktifnya dan tidak dapat masuk kembali. Akun tanpa riwayat laporan atau aktivitas sistem dapat dihapus permanen.
                 </p>
             </PageContent>
 

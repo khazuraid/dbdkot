@@ -20,6 +20,7 @@ import {
     Users,
     ScrollText,
     Settings,
+    FolderOpen,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -52,5 +53,6 @@ export const NAV_ICON: Record<string, LucideIcon> = {
     '/admin/koreksi-wilayah': MapPinned,
     '/admin/pengguna': Users,
     '/admin/audit-log': ScrollText,
+    '/admin/berkas': FolderOpen,
     '/pengaturan': Settings,
 };

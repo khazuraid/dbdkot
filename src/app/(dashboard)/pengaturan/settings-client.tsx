@@ -22,6 +22,7 @@ import {
     Sun,
     User,
     Globe2,
+    Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -45,6 +46,7 @@ import {
 } from './settings-editor';
 import { RegionalApiSettings } from './regional-api-settings';
 import { BrandingSettings } from './branding-settings';
+import { SmtpSettings } from './smtp-settings';
 
 type UserProfileData = {
     id: string;
@@ -251,6 +253,13 @@ export function SettingsClient({
                                 >
                                     <Globe2 className="size-4" />
                                     API Wilayah (Sumopod)
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="smtp"
+                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                >
+                                    <Mail className="size-4" />
+                                    Email & SMTP (Sumopod)
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="sistem"
@@ -736,7 +745,17 @@ export function SettingsClient({
                     </TabsContent>
                 )}
 
-                {/* 6. Parameter Sistem & SLA (Dinkes / Admin) */}
+                {/* 6. Layanan Email & SMTP Sumopod (Dinkes / Admin) */}
+                {canManageSystem && (
+                    <TabsContent value="smtp" className="space-y-6 pt-4">
+                        <SmtpSettings
+                            settings={systemSettings}
+                            canManage={canManageSystem}
+                        />
+                    </TabsContent>
+                )}
+
+                {/* 7. Parameter Sistem & SLA (Dinkes / Admin) */}
                 {canManageSystem && (
                     <TabsContent value="sistem" className="space-y-6 pt-4">
                         {/* SLA Standard Reference Cards */}

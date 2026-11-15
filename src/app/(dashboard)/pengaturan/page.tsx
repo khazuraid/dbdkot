@@ -50,7 +50,13 @@ export default async function PengaturanPage() {
         institutionName = inst?.name ?? null;
     }
 
-    const { rows: systemSettings, total: totalSettings } = settingsData;
+    const { rows: rawSystemSettings, total: totalSettings } = settingsData;
+    const SECRET_KEYS = new Set(['SMTP_PASS', 'REGIONAL_API_KEY']);
+    const systemSettings = rawSystemSettings.map((row) =>
+        SECRET_KEYS.has(row.key) && row.value
+            ? { ...row, value: '••••••••' }
+            : row,
+    );
     const categorySet = new Set<string>();
     for (const s of systemSettings) {
         if (s.category) categorySet.add(s.category);

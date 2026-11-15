@@ -2,7 +2,22 @@ import { and, count, eq, ilike, ne, or, sql, type SQL } from 'drizzle-orm';
 import { APIError } from 'better-auth';
 import { hashPassword } from 'better-auth/crypto';
 import { getDb } from '@/db';
-import { accounts, institutions, sessions, users } from '@/db/schema';
+import {
+    accounts,
+    assetRequests,
+    assets,
+    auditLogs,
+    comments,
+    foggingCycles,
+    institutions,
+    messages,
+    peTasks,
+    reportsPE,
+    reportsRS,
+    riskPredictions,
+    sessions,
+    users,
+} from '@/db/schema';
 import { auth } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 import type { Role } from '@/lib/roles';
@@ -304,6 +319,11 @@ export async function setAccountActive(
 
     await db.update(users).set({ isActive }).where(eq(users.id, userId));
 
+    // Terminate existing sessions immediately when an account is disabled.
+    if (!isActive) {
+        await db.delete(sessions).where(eq(sessions.userId, userId));
+    }
+
     await audit({
         actor,
         action: 'UPDATE',
@@ -481,6 +501,144 @@ export async function updateAccount(
         }
         console.error('updateAccount failed', error);
         return { ok: false, error: 'Akun gagal diperbarui. Coba lagi.' };
+    }
+}
+
+/**
+ * Permanently delete an account when it has no immutable clinical or audit
+ * history. Nullable assignee/updater references are cleared first.
+ */
+export async function deleteAccount(
+    actor: Actor,
+    userId: string,
+): Promise<AccountResult> {
+    if (actor.role !== 'ADMIN') return { ok: false, error: 'FORBIDDEN' };
+    if (userId === actor.userId) {
+        return { ok: false, error: 'Tidak bisa menghapus akun sendiri.' };
+    }
+
+    const db = getDb();
+    const [before] = await db
+        .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            status: users.status,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+    if (!before) return { ok: false, error: 'Akun tidak ditemukan.' };
+
+    // Pre-check immutable records that reference users.id with NOT NULL
+    const [
+        rsCount,
+        peCount,
+        taskCount,
+        assetCount,
+        reqCount,
+        txCount,
+        msgCount,
+        commentCount,
+        auditCount,
+    ] = await Promise.all([
+        db.select({ n: count() }).from(reportsRS).where(eq(reportsRS.createdById, userId)),
+        db
+            .select({ n: count() })
+            .from(reportsPE)
+            .where(or(eq(reportsPE.officerId, userId), eq(reportsPE.createdById, userId))),
+        db.select({ n: count() }).from(peTasks).where(eq(peTasks.createdById, userId)),
+        db.select({ n: count() }).from(assets).where(eq(assets.createdById, userId)),
+        db
+            .select({ n: count() })
+            .from(assetRequests)
+            .where(eq(assetRequests.requestedById, userId)),
+        db
+            .select({ n: count() })
+            .from(riskPredictions)
+            .where(eq(riskPredictions.createdById, userId)),
+        db.select({ n: count() }).from(messages).where(eq(messages.senderId, userId)),
+        db.select({ n: count() }).from(comments).where(eq(comments.userId, userId)),
+        db.select({ n: count() }).from(auditLogs).where(eq(auditLogs.userId, userId)),
+    ]);
+
+    const hasHistory =
+        (rsCount[0]?.n ?? 0) > 0 ||
+        (peCount[0]?.n ?? 0) > 0 ||
+        (taskCount[0]?.n ?? 0) > 0 ||
+        (assetCount[0]?.n ?? 0) > 0 ||
+        (reqCount[0]?.n ?? 0) > 0 ||
+        (txCount[0]?.n ?? 0) > 0 ||
+        (msgCount[0]?.n ?? 0) > 0 ||
+        (commentCount[0]?.n ?? 0) > 0 ||
+        (auditCount[0]?.n ?? 0) > 0;
+
+    if (hasHistory) {
+        return {
+            ok: false,
+            error: 'Akun memiliki riwayat laporan atau aktivitas sistem sehingga tidak dapat dihapus permanen. Gunakan fitur Nonaktifkan.',
+        };
+    }
+
+    try {
+        // Clear nullable foreign-key references before removing the user row
+        await Promise.all([
+            db
+                .update(reportsRS)
+                .set({ assignedToId: null })
+                .where(eq(reportsRS.assignedToId, userId)),
+            db
+                .update(reportsRS)
+                .set({ updatedById: null })
+                .where(eq(reportsRS.updatedById, userId)),
+            db
+                .update(reportsPE)
+                .set({ updatedById: null })
+                .where(eq(reportsPE.updatedById, userId)),
+            db
+                .update(peTasks)
+                .set({ assignedUserId: null })
+                .where(eq(peTasks.assignedUserId, userId)),
+            db
+                .update(assetRequests)
+                .set({ approvedById: null })
+                .where(eq(assetRequests.approvedById, userId)),
+            db
+                .update(foggingCycles)
+                .set({ executedById: null })
+                .where(eq(foggingCycles.executedById, userId)),
+        ]);
+
+        await db.delete(users).where(eq(users.id, userId));
+
+        await audit({
+            actor,
+            action: 'DELETE',
+            entityType: 'USER',
+            entityId: userId,
+            changes: {
+                name: { from: before.name, to: null },
+                email: { from: before.email, to: null },
+                role: { from: before.role, to: null },
+            },
+        });
+
+        return { ok: true, id: userId };
+    } catch (error: unknown) {
+        const pgCode =
+            typeof error === 'object' && error !== null && 'code' in error
+                ? String((error as { code?: unknown }).code)
+                : '';
+        if (pgCode === '23503') {
+            return {
+                ok: false,
+                error: 'Akun masih tertaut pada data sistem sehingga tidak dapat dihapus permanen. Gunakan fitur Nonaktifkan.',
+            };
+        }
+        console.error('deleteAccount failed', error);
+        return { ok: false, error: 'Gagal menghapus akun. Coba lagi.' };
     }
 }
 
