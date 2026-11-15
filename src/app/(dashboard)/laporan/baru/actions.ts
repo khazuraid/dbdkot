@@ -27,21 +27,34 @@ export async function submitReport(
         return { fieldErrors };
     }
 
-    const actor = await requireActor();
-    const result = await createReport(actor, parsed.data);
+    try {
+        const actor = await requireActor();
+        const result = await createReport(actor, parsed.data);
 
-    if (!result.ok) {
-        return { error: result.error };
+        if (!result.ok) {
+            return { error: result.error };
+        }
+
+        revalidatePath('/laporan');
+        revalidatePath('/dasbor');
+
+        return {
+            ok: true,
+            id: result.id,
+            isDraft: result.isDraft,
+        };
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[submitReport] unhandled error:', err);
+        if (msg.includes('PII_ENCRYPTION_KEY') || msg.includes('PII_HASH_KEY')) {
+            return {
+                error: 'Konfigurasi kunci enkripsi PII server belum valid (PII_ENCRYPTION_KEY harus 32 byte base64). Hubungi administrator.',
+            };
+        }
+        return {
+            error: 'Terjadi kesalahan pada server saat menyimpan laporan. Silakan coba lagi.',
+        };
     }
-
-    revalidatePath('/laporan');
-    revalidatePath('/dasbor');
-
-    return {
-        ok: true,
-        id: result.id,
-        isDraft: result.isDraft,
-    };
 }
 
 export type GeocodeResult = {

@@ -18,7 +18,8 @@ const VERSION = 'v1';
 const IV_BYTES = 12;
 
 function key(): Buffer {
-    const secret = process.env.PII_ENCRYPTION_KEY;
+    const raw = process.env.PII_ENCRYPTION_KEY;
+    const secret = raw?.trim().replace(/^['"]|['"]$/g, '');
 
     if (!secret) {
         throw new Error('PII_ENCRYPTION_KEY is not set');

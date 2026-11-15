@@ -16,6 +16,12 @@ export default async function LaporanBaruPage() {
     ]);
 
     const isPuskesmas = actor.role === 'PUSKESMAS';
+    const defaultAdmissionDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
 
     return (
         <PageBody>
@@ -44,6 +50,8 @@ export default async function LaporanBaruPage() {
                 <ReportForm
                     kelurahanOptions={kelurahanOptions}
                     sourceType={isPuskesmas ? 'PUSKESMAS_POLI' : 'RS'}
+                    actorRole={actor.role}
+                    defaultAdmissionDate={defaultAdmissionDate}
                 />
             </PageContent>
         </PageBody>

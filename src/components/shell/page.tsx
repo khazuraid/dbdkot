@@ -84,6 +84,7 @@ export function PageContent({
  * Raised clinical sheet for tables, charts, and structured records.
  */
 export function Panel({
+    id,
     title,
     subtitle,
     aside,
@@ -91,6 +92,7 @@ export function Panel({
     padded = false,
     className,
 }: {
+    id?: string;
     title?: React.ReactNode;
     subtitle?: React.ReactNode;
     aside?: React.ReactNode;
@@ -100,6 +102,7 @@ export function Panel({
 }) {
     return (
         <section
+            id={id}
             className={cn(
                 'surface overflow-hidden',
                 className,

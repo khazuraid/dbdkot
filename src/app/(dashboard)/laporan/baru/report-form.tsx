@@ -1,15 +1,9 @@
 'use client';
 
-import {
-    Controller,
-    useForm,
-    useWatch,
-    type Control,
-    type UseFormRegisterReturn,
-} from 'react-hook-form';
+import { useMemo, useState, useTransition } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { NumericFormat, PatternFormat } from 'react-number-format';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -19,22 +13,20 @@ import {
     Building2,
     CheckCircle2,
     ChevronDown,
-    Circle,
+    Clock,
     Compass,
-    FileEdit,
     Loader2,
     MapPin,
+    Paperclip,
     Phone,
     Save,
     Search,
     Send,
-    ShieldCheck,
     Stethoscope,
     User,
-    Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { createReportSchema } from '@/lib/domain/form-contracts';
 import { Panel } from '@/components/shell/page';
 import { DateField } from '@/components/ui/date-field';
@@ -43,17 +35,26 @@ import { Input } from '@/components/ui/input';
 import { WilayahCascadingSelect } from '@/components/geo/wilayah-cascading-select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    StagedAttachmentPicker,
+    uploadStagedAttachment,
+    type StagedAttachment,
+} from '@/components/reports/staged-attachment-picker';
 import { cn } from '@/lib/utils';
 import { submitReport, geocodePatientAddress } from './actions';
+import {
+    CASE_TYPES,
+    ControllerField,
+    Field,
+    LAB_RESULT_OPTIONS,
+    StepNavigator,
+    SummarySidebar,
+    type ChecklistItem,
+    type FormValues,
+    type KelurahanOption,
+} from './form-fields';
 
-type FormValues = z.input<typeof createReportSchema>;
-
-export type KelurahanOption = {
-    name: string;
-    kecamatan: string;
-    kota: string;
-    provinsi: string;
-};
+export type { KelurahanOption };
 
 const PatientLocationMap = dynamic(
     () => import('@/components/reports/patient-location-map'),
@@ -61,75 +62,38 @@ const PatientLocationMap = dynamic(
         ssr: false,
         loading: () => (
             <div
-                className="flex h-[260px] w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] text-[12px] text-muted-foreground"
+                className="flex h-[260px] w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/60 text-sm text-muted-foreground"
                 aria-busy
                 role="status"
             >
                 <Loader2 className="size-4 animate-spin text-[var(--accent)]" />
-                <span>Memuat peta interaktif domisili...</span>
+                <span>Memuat peta interaktif domisili…</span>
             </div>
         ),
     },
 );
 
-const CASE_TYPES: {
-    value: FormValues['caseType'];
-    label: string;
-    badge: string;
-    hint: string;
-    tone: 'warn' | 'bad' | 'info';
-}[] = [
-    {
-        value: 'DENGUE',
-        label: 'DBD (Dengue)',
-        badge: 'Terkonfirmasi',
-        hint: 'Demam Berdarah Dengue dengan manifestasi perdarahan / efusi',
-        tone: 'warn',
-    },
-    {
-        value: 'SUSPECTED_DENGUE',
-        label: 'Suspek DBD',
-        badge: 'Observasi',
-        hint: 'Gejala klinis mengarah ke dengue, menunggu hasil lab lanjutan',
-        tone: 'info',
-    },
-    {
-        value: 'DHF',
-        label: 'DHF (Grade I-II)',
-        badge: 'Serius',
-        hint: 'Kebocoran plasma, hemokonsentrasi, trombositopenia (<100.000)',
-        tone: 'bad',
-    },
-    {
-        value: 'DSS',
-        label: 'DSS (Dengue Shock)',
-        badge: 'Kritis',
-        hint: 'Kegagalan sirkulasi darah, nadi cepat dan lemah, hipotensi',
-        tone: 'bad',
-    },
-];
-
-const LAB_RESULT_OPTIONS = [
-    { value: 'TIDAK_DIPERIKSA', label: 'Tidak diperiksa' },
-    { value: 'POSITIF', label: 'Positif (+)' },
-    { value: 'NEGATIF', label: 'Negatif (-)' },
-] as const;
-
 export function ReportForm({
     kelurahanOptions = [],
     sourceType = 'RS',
+    actorRole,
+    defaultAdmissionDate,
 }: {
     kelurahanOptions?: KelurahanOption[];
     sourceType?: 'RS' | 'PUSKESMAS_POLI';
+    actorRole?: string;
+    defaultAdmissionDate?: string;
 }) {
     const router = useRouter();
     const [submitting, start] = useTransition();
+    const [uploadingAttachments, setUploadingAttachments] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [selectedPreset, setSelectedPreset] = useState('');
     const [gpsBusy, setGpsBusy] = useState(false);
     const [geocodingBusy, setGeocodingBusy] = useState(false);
     const [geocodeNotice, setGeocodeNotice] = useState<string | null>(null);
     const [skipGeotag, setSkipGeotag] = useState(false);
+    const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
 
     const {
         register,
@@ -148,7 +112,8 @@ export function ReportForm({
             ns1Result: 'TIDAK_DIPERIKSA',
             igmResult: 'TIDAK_DIPERIKSA',
             iggResult: 'TIDAK_DIPERIKSA',
-            admissionDate: new Date().toISOString().split('T')[0],
+            admissionDate:
+                defaultAdmissionDate ?? new Date().toISOString().split('T')[0],
         },
     });
 
@@ -158,16 +123,18 @@ export function ReportForm({
     const parsedLng = watched.longitude ? parseFloat(String(watched.longitude)) : null;
 
     const checklist = useMemo(() => {
-        const items = [
+        const items: ChecklistItem[] = [
             {
                 key: 'name',
                 label: 'Nama lengkap pasien (min. 3)',
                 done: (watched.patientName ?? '').trim().length >= 3,
+                sectionId: 'sec-identitas',
             },
             {
                 key: 'nik',
                 label: 'NIK 16 digit angka',
                 done: /^\d{16}$/.test((watched.patientNik ?? '').trim()),
+                sectionId: 'sec-identitas',
             },
             {
                 key: 'age',
@@ -176,11 +143,13 @@ export function ReportForm({
                     watched.patientAge !== undefined &&
                     watched.patientAge !== '' &&
                     !Number.isNaN(Number(watched.patientAge)),
+                sectionId: 'sec-identitas',
             },
             {
                 key: 'address',
                 label: 'Alamat domisili lengkap',
                 done: (watched.patientAddress ?? '').trim().length >= 5,
+                sectionId: 'sec-domisili',
             },
             {
                 key: 'kelurahan',
@@ -189,16 +158,19 @@ export function ReportForm({
                     (watched.kelurahan ?? '').trim() &&
                         (watched.kecamatan ?? '').trim(),
                 ),
+                sectionId: 'sec-domisili',
             },
             {
                 key: 'admission',
                 label: 'Tanggal masuk / dirawat',
                 done: Boolean(watched.admissionDate),
+                sectionId: 'sec-klinis',
             },
             {
                 key: 'caseType',
                 label: 'Jenis kasus klinis dipilih',
                 done: Boolean(watched.caseType),
+                sectionId: 'sec-klinis',
             },
         ];
 
@@ -216,6 +188,38 @@ export function ReportForm({
     ]);
 
     const pct = Math.round((checklist.completed / checklist.total) * 100);
+    const steps = useMemo(
+        () => [
+            {
+                id: 'sec-identitas',
+                num: 1,
+                label: 'Identitas Pasien',
+                done:
+                    checklist.items[0].done &&
+                    checklist.items[1].done &&
+                    checklist.items[2].done,
+            },
+            {
+                id: 'sec-domisili',
+                num: 2,
+                label: 'Domisili & Peta',
+                done: checklist.items[3].done && checklist.items[4].done,
+            },
+            {
+                id: 'sec-klinis',
+                num: 3,
+                label: 'Klinis & Lab',
+                done: checklist.items[5].done && checklist.items[6].done,
+            },
+            {
+                id: 'sec-lampiran',
+                num: 4,
+                label: 'Lampiran Berkas',
+                done: stagedAttachments.length > 0,
+            },
+        ],
+        [checklist.items, stagedAttachments.length],
+    );
 
     const applyKelurahanPreset = (idxStr: string) => {
         setSelectedPreset(idxStr);
@@ -233,21 +237,18 @@ export function ReportForm({
             toast.error('Perangkat Anda tidak mendukung geolokasi GPS.');
             return;
         }
-
         setGpsBusy(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                setValue(
-                    'latitude',
-                    Number(pos.coords.latitude.toFixed(6)) as unknown as string,
-                    { shouldValidate: true },
-                );
-                setValue(
-                    'longitude',
-                    Number(pos.coords.longitude.toFixed(6)) as unknown as string,
-                    { shouldValidate: true },
-                );
+                setSkipGeotag(false);
+                setValue('latitude', pos.coords.latitude.toFixed(6), {
+                    shouldValidate: true,
+                });
+                setValue('longitude', pos.coords.longitude.toFixed(6), {
+                    shouldValidate: true,
+                });
                 setGpsBusy(false);
+                setGeocodeNotice('Koordinat GPS perangkat berhasil disematkan.');
                 toast.success('Koordinat GPS berhasil diambil dari perangkat.');
             },
             (err) => {
@@ -286,10 +287,11 @@ export function ReportForm({
                 setSkipGeotag(false);
                 setValue('latitude', String(res.lat), { shouldValidate: true });
                 setValue('longitude', String(res.lng), { shouldValidate: true });
-                const label = res.isFallback
-                    ? `Perkiraan kelurahan: ${res.displayName}`
-                    : `Alamat terverifikasi: ${res.displayName}`;
-                setGeocodeNotice(label);
+                setGeocodeNotice(
+                    res.isFallback
+                        ? `Perkiraan kelurahan: ${res.displayName}`
+                        : `Alamat terverifikasi: ${res.displayName}`,
+                );
                 toast.success('Koordinat geospasial berhasil ditemukan dari alamat.');
             } else {
                 toast.error(
@@ -310,7 +312,9 @@ export function ReportForm({
             setValue('latitude', '', { shouldValidate: true });
             setValue('longitude', '', { shouldValidate: true });
             setGeocodeNotice(null);
-            toast.info('Geotag dilewati. Koordinat dapat diisi saat Penyelidikan Epidemiologi (PE) di lapangan.');
+            toast.info(
+                'Geotag dilewati. Koordinat dapat diisi saat Penyelidikan Epidemiologi (PE) di lapangan.',
+            );
         }
     };
 
@@ -326,6 +330,11 @@ export function ReportForm({
         data: z.output<typeof createReportSchema>,
         isDraft = false,
     ) => {
+        if (stagedAttachments.some((a) => a.status === 'compressing')) {
+            toast.info('Mohon tunggu hingga kompresi gambar selesai sebelum mengirim.');
+            return;
+        }
+
         setFormError(null);
         start(async () => {
             const formData = new FormData();
@@ -342,29 +351,92 @@ export function ReportForm({
                 formData.set('isDraft', 'true');
             }
 
-            const result = await submitReport({}, formData);
+            let result: Awaited<ReturnType<typeof submitReport>>;
+            try {
+                result = await submitReport({}, formData);
+            } catch (err) {
+                console.error('[ReportForm] submitReport threw:', err);
+                const message =
+                    'Koneksi atau pemrosesan server terganggu saat menyimpan laporan. Silakan coba lagi.';
+                setFormError(message);
+                toast.error(message);
+                return;
+            }
 
-            if (result.ok) {
-                if (result.isDraft) {
+            if (result.ok && result.id) {
+                const pendingFiles = stagedAttachments.filter(
+                    (item) => item.status !== 'done',
+                );
+                let failedUploads = 0;
+
+                if (pendingFiles.length > 0) {
+                    setUploadingAttachments(true);
+                    for (const item of pendingFiles) {
+                        setStagedAttachments((prev) =>
+                            prev.map((x) =>
+                                x.id === item.id
+                                    ? { ...x, status: 'uploading', progress: 5 }
+                                    : x,
+                            ),
+                        );
+                        const uploadRes = await uploadStagedAttachment(
+                            item.file,
+                            result.id,
+                            (pctValue) => {
+                                setStagedAttachments((prev) =>
+                                    prev.map((x) =>
+                                        x.id === item.id
+                                            ? { ...x, progress: pctValue }
+                                            : x,
+                                    ),
+                                );
+                            },
+                        );
+                        if (uploadRes.ok) {
+                            setStagedAttachments((prev) =>
+                                prev.map((x) =>
+                                    x.id === item.id
+                                        ? { ...x, status: 'done', progress: 100 }
+                                        : x,
+                                ),
+                            );
+                        } else {
+                            failedUploads += 1;
+                            setStagedAttachments((prev) =>
+                                prev.map((x) =>
+                                    x.id === item.id
+                                        ? {
+                                              ...x,
+                                              status: 'error',
+                                              error: uploadRes.error ?? 'Gagal unggah',
+                                          }
+                                        : x,
+                                ),
+                            );
+                        }
+                    }
+                    setUploadingAttachments(false);
+                }
+
+                if (failedUploads > 0) {
+                    toast.warning(
+                        `Laporan tersimpan, namun ${failedUploads} lampiran gagal diunggah. Anda bisa mengunggah ulang dari halaman detail laporan.`,
+                    );
+                } else if (result.isDraft) {
                     toast.success('Laporan berhasil disimpan sebagai draf', {
                         description:
-                            'Laporan belum dikirim ke surveilans. Anda dapat memeriksa, mengedit, atau menghapusnya.',
+                            'Laporan belum dikirim ke surveilans. Anda dapat melengkapinya kembali nanti.',
                     });
-                    if (result.id) {
-                        router.push(`/laporan/${result.id}`);
-                        return;
-                    }
                 } else {
                     toast.success('Laporan kasus berhasil dikirim', {
                         description:
-                            'Notifikasi penugasan PE otomatis diteruskan ke Puskesmas wilayah.',
+                            pendingFiles.length > 0
+                                ? `${pendingFiles.length} lampiran terenkripsi ikut tersimpan.`
+                                : 'Puskesmas wilayah menerima penugasan Penyelidikan Epidemiologi.',
                     });
-                    if (result.id) {
-                        router.push(`/laporan/${result.id}`);
-                        return;
-                    }
                 }
-                router.push('/laporan');
+
+                router.push(`/laporan/${result.id}`);
                 return;
             }
 
@@ -384,14 +456,6 @@ export function ReportForm({
         });
     };
 
-    const onSubmit = (data: z.output<typeof createReportSchema>) => {
-        executeSubmit(data, false);
-    };
-
-    const onSaveDraft = () => {
-        handleSubmit((data) => executeSubmit(data, true), onInvalid)();
-    };
-
     const onInvalid = (fieldErrors: Record<string, unknown>) => {
         const errCount = Object.keys(fieldErrors).length;
         if (errCount > 0) {
@@ -401,10 +465,23 @@ export function ReportForm({
         }
     };
 
+    const busy = submitting || uploadingAttachments;
+    const trombositNum =
+        watched.plateletCount !== undefined && watched.plateletCount !== ''
+            ? Number(watched.plateletCount)
+            : null;
+    const isLowPlatelet =
+        trombositNum !== null && !Number.isNaN(trombositNum) && trombositNum < 100_000;
+
     return (
-        <form onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-                {/* Left Primary Column: 3 Form Sections */}
+        <form
+            onSubmit={handleSubmit((d) => executeSubmit(d, false), onInvalid)}
+            noValidate
+            className="space-y-6 pb-20 sm:pb-6"
+        >
+            <StepNavigator steps={steps} />
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_330px]">
                 <div className="min-w-0 space-y-6">
                     {formError && (
                         <div
@@ -424,127 +501,123 @@ export function ReportForm({
                         </div>
                     )}
 
-                    {/* Sumber Pelaporan Kasus (RS vs Puskesmas) */}
+                    {/* Sumber Pelaporan */}
                     <Panel
                         padded
                         title={
                             <span className="flex items-center gap-2.5">
-                                <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                                <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
                                     <Building2 className="size-4" aria-hidden />
                                 </span>
                                 <span>Sumber Pelaporan Kasus</span>
                             </span>
                         }
+                        aside={
+                            actorRole ? (
+                                <span className="rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                    Peran: {actorRole}
+                                </span>
+                            ) : undefined
+                        }
                     >
-                        <div className="space-y-2">
-                            <Label className="text-[12.5px] font-semibold text-foreground">
-                                Asal Sumber Laporan <span className="text-[var(--negative)]">*</span>
-                            </Label>
-                            <p className="text-[12px] text-muted-foreground">
-                                Pilih asal fasilitas pelapor kasus: Rumah Sakit (KDRS) atau Puskesmas (Poli/IGD).
-                            </p>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setValue('sourceType', 'RS', { shouldValidate: true })}
-                                    className={cn(
-                                        'flex items-start gap-3 rounded-[var(--radius-control)] border p-3.5 text-left transition-all',
-                                        watched.sourceType === 'RS'
-                                            ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/30'
-                                            : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]',
-                                    )}
-                                >
-                                    <div className="grid size-8 shrink-0 place-items-center rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400">
-                                        <Building2 className="size-4" aria-hidden />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-[13px] text-foreground flex items-center gap-1.5">
-                                            Rumah Sakit (KDRS)
-                                            {watched.sourceType === 'RS' && (
-                                                <span className="text-[10px] rounded bg-sky-500/20 px-1 py-0.2 font-bold text-sky-700 dark:text-sky-300">
-                                                    Aktif
-                                                </span>
-                                            )}
-                                        </p>
-                                        <p className="text-[11.5px] text-muted-foreground mt-0.5">
-                                            Laporan Kewaspadaan Dini Rumah Sakit dari IGD atau bangsal rawat inap.
-                                        </p>
-                                    </div>
-                                </button>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setValue('sourceType', 'RS', { shouldValidate: true })
+                                }
+                                className={cn(
+                                    'flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
+                                    watched.sourceType === 'RS'
+                                        ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/25'
+                                        : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]',
+                                )}
+                            >
+                                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                                    <Building2 className="size-4" aria-hidden />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                                        Rumah Sakit (KDRS)
+                                        {watched.sourceType === 'RS' && (
+                                            <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                                                Aktif
+                                            </span>
+                                        )}
+                                    </p>
+                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                        Rujukan rawat inap / IGD RS; menugaskan Puskesmas wilayah pasien.
+                                    </p>
+                                </div>
+                            </button>
 
-                                <button
-                                    type="button"
-                                    onClick={() => setValue('sourceType', 'PUSKESMAS_POLI', { shouldValidate: true })}
-                                    className={cn(
-                                        'flex items-start gap-3 rounded-[var(--radius-control)] border p-3.5 text-left transition-all',
-                                        watched.sourceType === 'PUSKESMAS_POLI'
-                                            ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
-                                            : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]',
-                                    )}
-                                >
-                                    <div className="grid size-8 shrink-0 place-items-center rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                                        <Activity className="size-4" aria-hidden />
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-[13px] text-foreground flex items-center gap-1.5">
-                                            Puskesmas (Poli / IGD)
-                                            {watched.sourceType === 'PUSKESMAS_POLI' && (
-                                                <span className="text-[10px] rounded bg-emerald-500/20 px-1 py-0.2 font-bold text-emerald-700 dark:text-emerald-300">
-                                                    Aktif
-                                                </span>
-                                            )}
-                                        </p>
-                                        <p className="text-[11.5px] text-muted-foreground mt-0.5">
-                                            Pelaporan langsung dari Poli Umum/Anak Puskesmas; otomatis masuk ke tugas PE internal.
-                                        </p>
-                                    </div>
-                                </button>
-                            </div>
-                            <input type="hidden" {...register('sourceType')} />
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setValue('sourceType', 'PUSKESMAS_POLI', {
+                                        shouldValidate: true,
+                                    })
+                                }
+                                className={cn(
+                                    'flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
+                                    watched.sourceType === 'PUSKESMAS_POLI'
+                                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]/50 ring-2 ring-[var(--accent)]/25'
+                                        : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]',
+                                )}
+                            >
+                                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                                    <Stethoscope className="size-4" aria-hidden />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                                        Puskesmas (Poli / IGD)
+                                        {watched.sourceType === 'PUSKESMAS_POLI' && (
+                                            <span className="rounded bg-[var(--accent)]/20 px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent)]">
+                                                Aktif
+                                            </span>
+                                        )}
+                                    </p>
+                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                        Temuan langsung Poli/IGD Puskesmas untuk alur PE terpadu.
+                                    </p>
+                                </div>
+                            </button>
                         </div>
                     </Panel>
 
                     {/* Section 1: Identitas Pasien */}
                     <Panel
+                        id="sec-identitas"
                         padded
                         title={
                             <span className="flex items-center gap-2.5">
-                                <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
+                                <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
                                     <User className="size-4" aria-hidden />
                                 </span>
                                 <span>Identitas Pasien</span>
                             </span>
                         }
                         aside={
-                            <span className="inline-flex items-center rounded-md bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground border border-[var(--border)]">
-                                Bagian 1 dari 3
+                            <span className="rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                Bagian 1 dari 4
                             </span>
                         }
                     >
-                        <div className="space-y-5">
-                            {/* AES Security Callout */}
-                            <div className="flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--raised)]/40 p-3 text-[12px] text-muted-foreground">
-                                <ShieldCheck className="size-4 shrink-0 text-[var(--accent)]" />
-                                <span>
-                                    Data NIK, nama lengkap, dan nomor kontak pasien dilindungi enkripsi standar medis{' '}
-                                    <strong className="text-foreground">AES-256-GCM</strong>.
-                                </span>
-                            </div>
-
+                        <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                {/* NIK */}
                                 <div>
                                     <div className="flex items-center justify-between">
                                         <Label htmlFor="f-patientNik">
                                             NIK (Nomor Induk Kependudukan){' '}
-                                            <span className="text-[var(--negative)]" aria-hidden>*</span>
+                                            <span className="text-[var(--negative)]" aria-hidden>
+                                                *
+                                            </span>
                                         </Label>
                                         <span
-                                            data-numeric
                                             className={cn(
-                                                'text-[11.5px] tabular-nums font-mono',
+                                                'font-mono text-[11.5px] tabular-nums',
                                                 nikDigits === 16
-                                                    ? 'text-[var(--positive)] font-semibold'
+                                                    ? 'font-semibold text-[var(--positive)]'
                                                     : 'text-muted-foreground',
                                             )}
                                         >
@@ -558,10 +631,13 @@ export function ReportForm({
                                         render={({ id, value, onChange, invalid }) => (
                                             <PatternFormat
                                                 id={id}
-                                                value={typeof value === 'string' || typeof value === 'number' ? value : ''}
-                                                onValueChange={(val) =>
-                                                    onChange(val.value)
+                                                value={
+                                                    typeof value === 'string' ||
+                                                    typeof value === 'number'
+                                                        ? value
+                                                        : ''
                                                 }
+                                                onValueChange={(val) => onChange(val.value)}
                                                 format="#### #### #### ####"
                                                 mask="_"
                                                 placeholder="3274 0123 4567 8901"
@@ -575,27 +651,28 @@ export function ReportForm({
                                     />
                                 </div>
 
-                                {/* Nama Pasien */}
                                 <Field
-                                    label="Nama lengkap pasien"
+                                    label="Nama Lengkap Pasien"
                                     required
-                                    placeholder="Nama sesuai KTP / KK"
+                                    placeholder="Sesuai KTP / KK"
                                     error={errors.patientName?.message}
                                     reg={register('patientName')}
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                {/* Jenis Kelamin */}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label id="lbl-gender">
                                         Jenis Kelamin{' '}
-                                        <span className="text-[var(--negative)]" aria-hidden>*</span>
+                                        <span className="text-[var(--negative)]" aria-hidden>
+                                            *
+                                        </span>
                                     </Label>
-                                    <Controller
-                                        control={control}
+                                    <ControllerField
                                         name="patientGender"
-                                        render={({ field }) => (
+                                        control={control}
+                                        error={errors.patientGender?.message}
+                                        render={({ value, onChange }) => (
                                             <div
                                                 role="radiogroup"
                                                 aria-labelledby="lbl-gender"
@@ -605,24 +682,23 @@ export function ReportForm({
                                                     { value: 'L', label: 'Laki-laki' },
                                                     { value: 'P', label: 'Perempuan' },
                                                 ].map((opt) => {
-                                                    const active = field.value === opt.value;
+                                                    const active = value === opt.value;
                                                     return (
                                                         <label
                                                             key={opt.value}
                                                             className={cn(
-                                                                'flex h-[var(--control-height)] cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius-control)] border text-[13px] font-medium transition-all select-none',
+                                                                'flex h-[var(--control-height)] cursor-pointer items-center justify-center rounded-[var(--radius-control)] border text-[13px] font-medium transition-colors',
                                                                 active
-                                                                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-semibold shadow-xs ring-1 ring-[var(--accent)]'
-                                                                    : 'border-[var(--control)] bg-[var(--surface)] text-foreground hover:bg-[var(--raised)]/50',
+                                                                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                                                                    : 'border-[var(--control)] bg-[var(--surface)] text-foreground hover:bg-[var(--raised)]',
                                                             )}
                                                         >
                                                             <input
                                                                 type="radio"
                                                                 className="sr-only"
-                                                                name={field.name}
                                                                 value={opt.value}
                                                                 checked={active}
-                                                                onChange={() => field.onChange(opt.value)}
+                                                                onChange={() => onChange(opt.value)}
                                                             />
                                                             {opt.label}
                                                         </label>
@@ -631,40 +707,35 @@ export function ReportForm({
                                             </div>
                                         )}
                                     />
-                                    {errors.patientGender && (
-                                        <p className="mt-1 text-[12px] text-[var(--negative)]">
-                                            {errors.patientGender.message}
-                                        </p>
-                                    )}
                                 </div>
 
-                                {/* Umur */}
                                 <Field
-                                    label="Umur (Tahun)"
+                                    label="Umur"
                                     required
                                     type="number"
                                     min={0}
                                     max={130}
-                                    placeholder="Contoh: 28"
+                                    suffix="Tahun"
+                                    placeholder="28"
                                     error={errors.patientAge?.message}
                                     reg={register('patientAge')}
                                 />
                             </div>
 
-                            {/* Nomor Telepon */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="f-phone" className="text-[13px] font-medium">
+                                <Label htmlFor="f-phone">
                                     Nomor Telepon / WhatsApp Pasien (Opsional)
                                 </Label>
                                 <div className="relative max-w-md">
-                                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                                        <Phone className="size-4 text-muted-foreground" aria-hidden />
-                                    </div>
+                                    <Phone
+                                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                                        aria-hidden
+                                    />
                                     <Input
                                         id="f-phone"
                                         type="tel"
                                         inputMode="tel"
-                                        placeholder="Contoh: 0812-3456-7890 atau 81234567890"
+                                        placeholder="0812-3456-7890"
                                         aria-invalid={Boolean(errors.phoneNumber)}
                                         {...register('phoneNumber')}
                                         className={cn(
@@ -680,15 +751,16 @@ export function ReportForm({
                                     </p>
                                 ) : (
                                     <p className="text-[11.5px] text-muted-foreground">
-                                        Format Indonesia (08... atau +62...). Digunakan untuk koordinasi investigasi kontak dan surveilans PE Puskesmas lapangan.
+                                        Digunakan tim Puskesmas untuk koordinasi PE lapangan.
                                     </p>
                                 )}
                             </div>
                         </div>
                     </Panel>
 
-                    {/* Section 2: Domisili & Wilayah Puskesmas */}
+                    {/* Section 2: Domisili & Peta */}
                     <Panel
+                        id="sec-domisili"
                         padded
                         title={
                             <span className="flex items-center gap-2.5">
@@ -699,59 +771,53 @@ export function ReportForm({
                             </span>
                         }
                         aside={
-                            <span className="inline-flex items-center rounded-md bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground border border-[var(--border)]">
-                                Bagian 2 dari 3
+                            <span className="rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                Bagian 2 dari 4
                             </span>
                         }
                     >
                         <div className="space-y-5">
-                            {/* Quick Preset Autocomplete */}
                             {kelurahanOptions.length > 0 && (
-                                <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/45 p-3.5 space-y-2">
-                                    <Label htmlFor="kelurahan-preset" className="text-[12.5px] font-semibold text-foreground">
-                                        Isi cepat dari kelurahan terdaftar (Kota Cirebon):
+                                <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--raised)]/45 p-3.5">
+                                    <Label htmlFor="kelurahan-preset" className="text-[12.5px] font-semibold">
+                                        Isi Cepat dari Daftar Kelurahan Terdaftar
                                     </Label>
                                     <div className="relative">
                                         <select
                                             id="kelurahan-preset"
                                             value={selectedPreset}
                                             onChange={(e) => applyKelurahanPreset(e.target.value)}
-                                            className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-9 pl-3 text-[13.5px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
+                                            className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-9 pl-3 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
                                         >
                                             <option value="">
-                                                -- Pilih kelurahan untuk otomatis mengisi 4 wilayah --
+                                                — Pilih kelurahan untuk melengkapi kecamatan/kota otomatis —
                                             </option>
                                             {kelurahanOptions.map((opt, idx) => (
                                                 <option
-                                                    key={`${opt.name}-${opt.kecamatan}-${idx}`}
-                                                    value={String(idx)}
+                                                    key={`${opt.name}-${opt.kecamatan}`}
+                                                    value={idx}
                                                 >
-                                                    {opt.name} — Kec. {opt.kecamatan}, {opt.kota}
+                                                    {opt.name} · Kec. {opt.kecamatan} ({opt.kota})
                                                 </option>
                                             ))}
                                         </select>
-                                        <ChevronDown
-                                            aria-hidden
-                                            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-                                        />
+                                        <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
                                     </div>
-                                    <p className="text-[11.5px] text-muted-foreground">
-                                        Memilih kelurahan dari daftar memastikan otomatisasi penugasan ke Puskesmas berjalan akurat.
-                                    </p>
                                 </div>
                             )}
 
-                            {/* Alamat Lengkap */}
                             <div>
                                 <Label htmlFor="f-address">
-                                    Alamat tempat tinggal / domisili pasien{' '}
-                                    <span className="text-[var(--negative)]" aria-hidden>*</span>
+                                    Alamat Lengkap Domisili{' '}
+                                    <span className="text-[var(--negative)]" aria-hidden>
+                                        *
+                                    </span>
                                 </Label>
                                 <Textarea
                                     id="f-address"
                                     rows={2}
-                                    placeholder="Nama jalan, gang, nomor rumah, atau patokan lokasi domisili..."
-                                    aria-invalid={Boolean(errors.patientAddress) ? true : undefined}
+                                    placeholder="Nama jalan, nomor rumah, RT/RW, patokan terdekat…"
+                                    aria-invalid={Boolean(errors.patientAddress)}
                                     {...register('patientAddress')}
                                     className="mt-1.5 resize-y text-[13.5px]"
                                 />
@@ -762,26 +828,36 @@ export function ReportForm({
                                 )}
                             </div>
 
-                            {/* Cascading Wilayah Selector (Kemendagri / Sumopod) */}
-                            <div className="rounded-lg border border-[var(--border)] bg-[var(--ground)]/40 p-3.5 space-y-2">
+                            <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--ground)]/60 p-3.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                        <MapPin className="size-3.5 text-primary" />
-                                        Pilih Wilayah Domisili (Database Kemendagri)
+                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                        <MapPin className="size-3.5 text-[var(--accent)]" />
+                                        Pilih Wilayah Administratif (Kemendagri)
                                     </span>
-                                    <span className="text-[11px] text-muted-foreground">Otomatis mengisi form</span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        Otomatis mengisi form
+                                    </span>
                                 </div>
                                 <WilayahCascadingSelect
                                     onSelect={(sel) => {
-                                        if (sel.provinsi) setValue('provinsi', sel.provinsi, { shouldValidate: true });
-                                        if (sel.kota) setValue('kota', sel.kota, { shouldValidate: true });
-                                        if (sel.kecamatan) setValue('kecamatan', sel.kecamatan, { shouldValidate: true });
-                                        if (sel.kelurahan) setValue('kelurahan', sel.kelurahan, { shouldValidate: true });
+                                        if (sel.provinsi)
+                                            setValue('provinsi', sel.provinsi, {
+                                                shouldValidate: true,
+                                            });
+                                        if (sel.kota)
+                                            setValue('kota', sel.kota, { shouldValidate: true });
+                                        if (sel.kecamatan)
+                                            setValue('kecamatan', sel.kecamatan, {
+                                                shouldValidate: true,
+                                            });
+                                        if (sel.kelurahan)
+                                            setValue('kelurahan', sel.kelurahan, {
+                                                shouldValidate: true,
+                                            });
                                     }}
                                 />
                             </div>
 
-                            {/* Wilayah Grid (2x2) */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <Field
                                     label="Kelurahan"
@@ -797,9 +873,6 @@ export function ReportForm({
                                     error={errors.kecamatan?.message}
                                     reg={register('kecamatan')}
                                 />
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <Field
                                     label="Kota / Kabupaten"
                                     required
@@ -816,32 +889,31 @@ export function ReportForm({
                                 />
                             </div>
 
-                            {/* Koordinat GPS & Lokasi Geospasial */}
-                            <div className="space-y-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/40 p-3.5">
+                            {/* Koordinat & Peta */}
+                            <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--raised)]/35 p-4">
                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
                                         <p className="text-[13px] font-semibold text-foreground">
                                             Koordinat Geospasial Domisili Pasien
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
-                                            Diperlukan untuk pemetaan klaster 100 meter dan radius penyelidikan epidemiologi.
+                                            Untuk pemetaan klaster 100 m & penentuan radius fokus PE.
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                                         <Button
                                             type="button"
-                                            variant="default"
                                             size="sm"
                                             onClick={handleSearchAddressCoords}
                                             disabled={geocodingBusy || skipGeotag}
-                                            className="h-8 gap-1.5 text-[12px] shadow-xs"
+                                            className="h-8 gap-1.5 text-[12px]"
                                         >
                                             {geocodingBusy ? (
                                                 <Loader2 className="size-3.5 animate-spin" />
                                             ) : (
                                                 <Search className="size-3.5" />
                                             )}
-                                            {geocodingBusy ? 'Mencari Alamat…' : 'Cari dari Alamat'}
+                                            {geocodingBusy ? 'Mencari…' : 'Cari dari Alamat'}
                                         </Button>
                                         <Button
                                             type="button"
@@ -861,81 +933,78 @@ export function ReportForm({
                                     </div>
                                 </div>
 
-                                {/* Option to skip geotag if coordinates cannot be found */}
-                                <div className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px]">
-                                    <label htmlFor="skip-geotag-checkbox" className="flex items-center gap-2 cursor-pointer select-none">
+                                <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px]">
+                                    <label
+                                        htmlFor="skip-geotag-checkbox"
+                                        className="flex cursor-pointer items-center gap-2 select-none"
+                                    >
                                         <input
                                             id="skip-geotag-checkbox"
                                             type="checkbox"
                                             checked={skipGeotag}
-                                            onChange={(e) => handleToggleSkipGeotag(e.target.checked)}
-                                            className="size-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                                            onChange={(e) =>
+                                                handleToggleSkipGeotag(e.target.checked)
+                                            }
+                                            className="size-4 rounded border-[var(--border)] accent-[var(--accent)]"
                                         />
                                         <span className="font-medium text-foreground">
                                             Lewati geotag / Tanpa koordinat saat ini
                                         </span>
                                     </label>
-                                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                                    <span className="hidden text-[11px] text-muted-foreground sm:inline">
                                         Bisa dilengkapi saat PE lapangan
                                     </span>
                                 </div>
 
                                 {skipGeotag ? (
-                                    <div className="rounded-md border border-dashed border-[var(--border)] bg-[var(--raised)]/20 px-3.5 py-2.5 text-[12px] text-muted-foreground">
-                                        <p className="font-medium text-foreground">Geotag dilewati</p>
-                                        <p className="mt-0.5 text-[11.5px]">
-                                            Petugas surveilans Puskesmas akan mengambil koordinat GPS langsung saat pelaksanaan Penyelidikan Epidemiologi (PE) di rumah pasien.
-                                        </p>
+                                    <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/60 px-3.5 py-2.5 text-[12px] text-muted-foreground">
+                                        Geotag dilewati. Petugas Puskesmas dapat melakukan geotagging rumah pasien saat kunjungan lapangan.
                                     </div>
                                 ) : (
                                     <>
                                         {geocodeNotice && (
-                                            <div className="flex items-start gap-2 rounded-md border border-[var(--positive)]/30 bg-[var(--positive)]/10 px-3 py-2 text-[12px] text-foreground">
-                                                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[var(--positive)]" />
-                                                <p className="leading-snug">{geocodeNotice}</p>
+                                            <div className="flex items-center gap-2 rounded-lg border border-[var(--pill-positive-border)] bg-[var(--pill-positive-bg)] px-3 py-2 text-[11.5px] text-[var(--pill-positive-ink)]">
+                                                <CheckCircle2 className="size-3.5 shrink-0" />
+                                                <span className="truncate">{geocodeNotice}</span>
                                             </div>
                                         )}
-
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <Field
-                                                label="Latitude (Garis Lintang)"
-                                                placeholder="Contoh: -6.721450"
+                                                label="Latitude"
+                                                placeholder="-6.720000"
                                                 error={errors.latitude?.message}
                                                 reg={register('latitude')}
                                             />
                                             <Field
-                                                label="Longitude (Garis Bujur)"
-                                                placeholder="Contoh: 108.556210"
+                                                label="Longitude"
+                                                placeholder="108.550000"
                                                 error={errors.longitude?.message}
                                                 reg={register('longitude')}
                                             />
                                         </div>
-
-                                        {/* Interactive Map Preview */}
-                                        <div className="space-y-1.5 pt-1">
-                                            <div className="flex items-center justify-between">
-                                                <Label className="text-[12.5px] font-medium text-foreground">
-                                                    Peta Domisili & Radius Penyelidikan (100 Meter)
-                                                </Label>
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    Klik pada peta untuk menyesuaikan titik
-                                                </span>
-                                            </div>
-                                            <PatientLocationMap
-                                                lat={parsedLat}
-                                                lng={parsedLng}
-                                                onLocationSelect={handleMapLocationSelect}
-                                                height="260px"
-                                            />
-                                        </div>
+                                        <PatientLocationMap
+                                            lat={
+                                                parsedLat !== null && !Number.isNaN(parsedLat)
+                                                    ? parsedLat
+                                                    : null
+                                            }
+                                            lng={
+                                                parsedLng !== null && !Number.isNaN(parsedLng)
+                                                    ? parsedLng
+                                                    : null
+                                            }
+                                            onLocationSelect={handleMapLocationSelect}
+                                            height="250px"
+                                        />
                                     </>
                                 )}
                             </div>
                         </div>
                     </Panel>
 
-                    {/* Section 3: Data Klinis & Laboratorium */}
+                    {/* Section 3: Diagnosis Klinis & Lab */}
                     <Panel
+                        id="sec-klinis"
                         padded
                         title={
                             <span className="flex items-center gap-2.5">
@@ -946,95 +1015,75 @@ export function ReportForm({
                             </span>
                         }
                         aside={
-                            <span className="inline-flex items-center rounded-md bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground border border-[var(--border)]">
-                                Bagian 3 dari 3
+                            <span className="rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                Bagian 3 dari 4
                             </span>
                         }
                     >
                         <div className="space-y-5">
-                            {/* Case Type Cards Selector */}
                             <div>
                                 <Label id="lbl-casetype">
                                     Klasifikasi Kasus Dengue{' '}
-                                    <span className="text-[var(--negative)]" aria-hidden>*</span>
+                                    <span className="text-[var(--negative)]" aria-hidden>
+                                        *
+                                    </span>
                                 </Label>
-                                <Controller
-                                    control={control}
+                                <ControllerField
                                     name="caseType"
-                                    render={({ field }) => (
+                                    control={control}
+                                    error={errors.caseType?.message}
+                                    render={({ value, onChange }) => (
                                         <div
                                             role="radiogroup"
                                             aria-labelledby="lbl-casetype"
                                             className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2"
                                         >
                                             {CASE_TYPES.map((ct) => {
-                                                const active = field.value === ct.value;
+                                                const active = value === ct.value;
                                                 return (
                                                     <label
                                                         key={ct.value}
                                                         className={cn(
-                                                            'flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border p-3.5 transition-all select-none',
+                                                            'cursor-pointer rounded-xl border p-3.5 transition-all',
                                                             active
-                                                                ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-xs ring-1 ring-[var(--accent)]'
-                                                                : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]/45',
+                                                                ? 'border-[var(--accent)] bg-[var(--accent-soft)]/50 ring-2 ring-[var(--accent)]/25'
+                                                                : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]',
                                                         )}
                                                     >
                                                         <input
                                                             type="radio"
                                                             className="sr-only"
-                                                            name={field.name}
-                                                            value={ct.value}
                                                             checked={active}
-                                                            onChange={() => field.onChange(ct.value)}
+                                                            onChange={() => onChange(ct.value)}
                                                         />
-                                                        <span
-                                                            className={cn(
-                                                                'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border transition-colors',
-                                                                active
-                                                                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                                                                    : 'border-[var(--control)] bg-[var(--surface)]',
-                                                            )}
-                                                        >
-                                                            {active && (
-                                                                <span className="size-1.5 rounded-full bg-white" />
-                                                            )}
-                                                        </span>
-                                                        <div className="min-w-0 flex-1 space-y-1">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="font-semibold text-[13.5px] text-foreground">
-                                                                    {ct.label}
-                                                                </span>
-                                                                <span
-                                                                    className={cn(
-                                                                        'rounded px-1.5 py-0.5 text-[10.5px] font-semibold border',
-                                                                        ct.tone === 'bad'
-                                                                            ? 'border-[var(--pill-negative-border)] bg-[var(--pill-negative-bg)] text-[var(--negative)]'
-                                                                            : ct.tone === 'warn'
-                                                                              ? 'border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] text-[var(--warning)]'
-                                                                              : 'border-[var(--pill-info-border)] bg-[var(--pill-info-bg)] text-[var(--info)]',
-                                                                    )}
-                                                                >
-                                                                    {ct.badge}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[12px] text-muted-foreground leading-relaxed">
-                                                                {ct.hint}
-                                                            </p>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-[13px] font-semibold text-foreground">
+                                                                {ct.label}
+                                                            </span>
+                                                            <span
+                                                                className={cn(
+                                                                    'rounded px-1.5 py-0.5 text-[10.5px] font-semibold',
+                                                                    ct.tone === 'bad'
+                                                                        ? 'bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]'
+                                                                        : ct.tone === 'warn'
+                                                                          ? 'bg-[var(--pill-warning-bg)] text-[var(--pill-warning-ink)]'
+                                                                          : 'bg-[var(--pill-info-bg)] text-[var(--pill-info-ink)]',
+                                                                )}
+                                                            >
+                                                                {ct.badge}
+                                                            </span>
                                                         </div>
+                                                        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                                                            {ct.hint}
+                                                        </p>
                                                     </label>
                                                 );
                                             })}
                                         </div>
                                     )}
                                 />
-                                {errors.caseType && (
-                                    <p className="mt-1 text-[12px] text-[var(--negative)]">
-                                        {errors.caseType.message}
-                                    </p>
-                                )}
                             </div>
 
-                            {/* Dates Grid */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <ControllerField
                                     name="admissionDate"
@@ -1055,7 +1104,7 @@ export function ReportForm({
 
                                 <ControllerField
                                     name="symptomOnsetDate"
-                                    label="Tanggal Mulai Demam (Onset)"
+                                    label="Tanggal Mulai Demam"
                                     control={control}
                                     error={errors.symptomOnsetDate?.message}
                                     render={({ id, value, onChange, invalid }) => (
@@ -1086,21 +1135,33 @@ export function ReportForm({
                                 />
                             </div>
 
-                            {/* Lab Parameters */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label htmlFor="f-platelet">
-                                        Trombosit Terakhir (sel/µL)
-                                    </Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="f-platelet">
+                                            Trombosit Terakhir (sel/µL)
+                                        </Label>
+                                        {isLowPlatelet && (
+                                            <span className="inline-flex items-center gap-1 rounded bg-[var(--pill-negative-bg)] px-1.5 py-0.5 text-[10.5px] font-semibold text-[var(--pill-negative-ink)]">
+                                                <Activity className="size-3" />
+                                                Trombositopenia (&lt;100rb)
+                                            </span>
+                                        )}
+                                    </div>
                                     <ControllerField
                                         name="plateletCount"
                                         control={control}
                                         error={errors.plateletCount?.message}
                                         render={({ id, value, onChange, invalid }) => (
-                                            <div className="relative mt-1.5 flex items-center">
+                                            <div className="relative mt-1.5">
                                                 <NumericFormat
                                                     id={id}
-                                                    value={typeof value === 'number' || typeof value === 'string' ? value : ''}
+                                                    value={
+                                                        typeof value === 'number' ||
+                                                        typeof value === 'string'
+                                                            ? value
+                                                            : ''
+                                                    }
                                                     onValueChange={(val) =>
                                                         onChange(
                                                             val.value === ''
@@ -1112,109 +1173,83 @@ export function ReportForm({
                                                     decimalSeparator=","
                                                     placeholder="Contoh: 75.000"
                                                     className={cn(
-                                                        'h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 text-[13.5px] text-foreground outline-none transition-colors placeholder:text-faint focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
+                                                        'h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 pr-16 font-mono text-[13.5px] tabular-nums text-foreground outline-none transition-colors focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
                                                         invalid &&
                                                             'border-[var(--negative)] ring-2 ring-[var(--negative)]/20',
                                                     )}
                                                 />
+                                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11.5px] text-muted-foreground">
+                                                    sel/µL
+                                                </span>
                                             </div>
                                         )}
                                     />
-                                    <p className="mt-1 text-[11.5px] text-muted-foreground">
-                                        Nilai &lt; 100.000 sel/µL masuk kriteria trombositopenia
-                                    </p>
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="f-hematocrit">Hematokrit (%)</Label>
-                                    <Input
-                                        id="f-hematocrit"
+                                    <Field
+                                        label="Hematokrit (%)"
                                         type="number"
                                         step="0.1"
                                         min={0}
                                         max={100}
+                                        suffix="%"
                                         placeholder="Contoh: 42.5"
-                                        {...register('hematocrit')}
-                                        className="mt-1.5"
+                                        error={errors.hematocrit?.message}
+                                        reg={register('hematocrit')}
                                     />
                                     <p className="mt-1 text-[11.5px] text-muted-foreground">
-                                        Kenaikan ≥ 20% mengindikasikan hemokonsentrasi
+                                        Kenaikan ≥ 20% mengindikasikan hemokonsentrasi.
                                     </p>
                                 </div>
                             </div>
 
-                            {/* RDT Rapid Test Grid (3 Columns) */}
                             <div>
                                 <Label className="mb-2 block font-semibold text-foreground">
                                     Hasil Pemeriksaan Serologi / RDT Dengue
                                 </Label>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    {/* NS1 */}
-                                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/30 p-3 space-y-1.5">
-                                        <Label htmlFor="f-ns1" className="text-[12.5px] font-medium">
-                                            NS1 Antigen
-                                        </Label>
-                                        <div className="relative">
-                                            <select
-                                                id="f-ns1"
-                                                {...register('ns1Result')}
-                                                className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
-                                            >
-                                                {LAB_RESULT_OPTIONS.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                    {(
+                                        [
+                                            { id: 'f-ns1', name: 'ns1Result', label: 'NS1 Antigen' },
+                                            {
+                                                id: 'f-igm',
+                                                name: 'igmResult',
+                                                label: 'IgM Anti-Dengue',
+                                            },
+                                            {
+                                                id: 'f-igg',
+                                                name: 'iggResult',
+                                                label: 'IgG Anti-Dengue',
+                                            },
+                                        ] as const
+                                    ).map((ser) => (
+                                        <div
+                                            key={ser.name}
+                                            className="space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--raised)]/30 p-3"
+                                        >
+                                            <Label htmlFor={ser.id} className="text-[12.5px] font-medium">
+                                                {ser.label}
+                                            </Label>
+                                            <div className="relative">
+                                                <select
+                                                    id={ser.id}
+                                                    {...register(ser.name)}
+                                                    className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
+                                                >
+                                                    {LAB_RESULT_OPTIONS.map((opt) => (
+                                                        <option key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    {/* IgM */}
-                                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/30 p-3 space-y-1.5">
-                                        <Label htmlFor="f-igm" className="text-[12.5px] font-medium">
-                                            IgM Anti-Dengue
-                                        </Label>
-                                        <div className="relative">
-                                            <select
-                                                id="f-igm"
-                                                {...register('igmResult')}
-                                                className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
-                                            >
-                                                {LAB_RESULT_OPTIONS.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                                        </div>
-                                    </div>
-
-                                    {/* IgG */}
-                                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/30 p-3 space-y-1.5">
-                                        <Label htmlFor="f-igg" className="text-[12.5px] font-medium">
-                                            IgG Anti-Dengue
-                                        </Label>
-                                        <div className="relative">
-                                            <select
-                                                id="f-igg"
-                                                {...register('iggResult')}
-                                                className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
-                                            >
-                                                {LAB_RESULT_OPTIONS.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
 
-                            {/* Catatan Diagnosis Tambahan */}
                             <div>
                                 <Label htmlFor="f-diagnosis">
                                     Catatan Klinis / Komplikasi Tambahan (Opsional)
@@ -1222,7 +1257,7 @@ export function ReportForm({
                                 <Textarea
                                     id="f-diagnosis"
                                     rows={3}
-                                    placeholder="Catatan gejala penyerta, penyakit komorbid, atau kondisi klinis khusus..."
+                                    placeholder="Catatan gejala penyerta, penyakit komorbid, atau kondisi klinis khusus…"
                                     {...register('diagnosis')}
                                     className="mt-1.5 text-[13.5px]"
                                 />
@@ -1230,15 +1265,40 @@ export function ReportForm({
                         </div>
                     </Panel>
 
-                    {/* Bottom Primary Action Bar */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
+                    {/* Section 4: Lampiran Berkas PDF / JPG Terkompresi */}
+                    <Panel
+                        id="sec-lampiran"
+                        padded
+                        title={
+                            <span className="flex items-center gap-2.5">
+                                <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                                    <Paperclip className="size-4" aria-hidden />
+                                </span>
+                                <span>Berkas Lampiran Hasil Lab & Dokumentasi</span>
+                            </span>
+                        }
+                        aside={
+                            <span className="rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                                Bagian 4 dari 4 · Opsional
+                            </span>
+                        }
+                    >
+                        <StagedAttachmentPicker
+                            items={stagedAttachments}
+                            onChange={setStagedAttachments}
+                            disabled={busy}
+                        />
+                    </Panel>
+
+                    {/* Action Bar */}
+                    <div className="flex flex-col items-center justify-between gap-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)] sm:flex-row">
                         <div className="flex items-center gap-3">
                             <div
                                 className={cn(
                                     'grid size-10 shrink-0 place-items-center rounded-xl transition-colors',
                                     pct === 100
                                         ? 'bg-[var(--positive)]/15 text-[var(--positive)]'
-                                        : 'bg-[var(--accent)]/15 text-[var(--accent)]',
+                                        : 'bg-[var(--accent-soft)] text-[var(--accent)]',
                                 )}
                             >
                                 {pct === 100 ? (
@@ -1254,12 +1314,14 @@ export function ReportForm({
                                         : `${checklist.completed} dari ${checklist.total} data wajib terisi (${pct}%)`}
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">
-                                    Target investigasi PE Puskesmas wilayah ≤ 24 jam sejak laporan dikirim.
+                                    {stagedAttachments.length > 0
+                                        ? `${stagedAttachments.length} berkas lampiran akan diunggah otomatis setelah laporan dibuat.`
+                                        : 'Target investigasi PE Puskesmas wilayah ≤ 24 jam sejak dikirim.'}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex w-full sm:w-auto flex-wrap items-center gap-2.5">
+                        <div className="flex w-full flex-wrap items-center justify-end gap-2.5 sm:w-auto">
                             <Button
                                 asChild
                                 variant="ghost"
@@ -1270,22 +1332,28 @@ export function ReportForm({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={onSaveDraft}
-                                disabled={submitting}
-                                className="h-10 px-4 text-[13px] font-medium gap-2 border-[var(--border)] hover:bg-[var(--raised)]"
+                                onClick={() =>
+                                    handleSubmit((d) => executeSubmit(d, true), onInvalid)()
+                                }
+                                disabled={busy}
+                                className="h-10 gap-2 px-4 text-[13px] font-medium"
                             >
                                 <Save className="size-4 text-[var(--accent)]" />
-                                <span>Simpan Draf (Belum Dikirim)</span>
+                                <span>Simpan Draf</span>
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={submitting}
-                                className="h-10 px-5 text-[13.5px] font-semibold gap-2 shadow-sm bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90"
+                                disabled={busy}
+                                className="h-10 gap-2 px-5 text-[13.5px] font-semibold"
                             >
-                                {submitting ? (
+                                {busy ? (
                                     <>
                                         <Loader2 className="size-4 animate-spin" />
-                                        <span>Menyimpan Laporan…</span>
+                                        <span>
+                                            {uploadingAttachments
+                                                ? 'Mengunggah Berkas…'
+                                                : 'Menyimpan Laporan…'}
+                                        </span>
                                     </>
                                 ) : (
                                     <>
@@ -1298,230 +1366,16 @@ export function ReportForm({
                     </div>
                 </div>
 
-                {/* Right Sticky Column: Compact Validation & SLA Assistant */}
-                <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-                    {/* Compact Validation & SLA Card */}
-                    <Panel
-                        padded
-                        title="Validasi & Protokol SLA"
-                        subtitle="Kriteria data minimum dan alur respon"
-                    >
-                        <div className="space-y-4">
-                            {/* Progress Bar */}
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-[12px]">
-                                    <span className="font-medium text-foreground">
-                                        Kelengkapan Berkas
-                                    </span>
-                                    <span
-                                        data-numeric
-                                        className={cn(
-                                            'font-semibold tabular-nums text-[12px]',
-                                            pct === 100
-                                                ? 'text-[var(--positive)]'
-                                                : 'text-[var(--accent)]',
-                                        )}
-                                    >
-                                        {pct}% ({checklist.completed}/{checklist.total})
-                                    </span>
-                                </div>
-                                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--raised)]">
-                                    <div
-                                        className={cn(
-                                            'h-full rounded-full transition-all duration-300',
-                                            pct === 100
-                                                ? 'bg-[var(--positive)]'
-                                                : 'bg-[var(--accent)]',
-                                        )}
-                                        style={{ width: `${pct}%` }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Checklist Items */}
-                            <ul className="divide-y divide-[var(--rule)] text-[12px]">
-                                {checklist.items.map((item) => (
-                                    <li
-                                        key={item.key}
-                                        className="flex items-center gap-2 py-1.5 transition-colors"
-                                    >
-                                        {item.done ? (
-                                            <CheckCircle2
-                                                className="size-3.5 shrink-0 text-[var(--positive)]"
-                                                aria-hidden
-                                            />
-                                        ) : (
-                                            <Circle
-                                                className="size-3.5 shrink-0 text-muted-foreground/40"
-                                                aria-hidden
-                                            />
-                                        )}
-                                        <span
-                                            className={
-                                                item.done
-                                                    ? 'text-foreground font-medium'
-                                                    : 'text-muted-foreground'
-                                            }
-                                        >
-                                            {item.label}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {/* Compact SLA Box */}
-                            <div className="rounded-lg border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] p-2.5 text-[11.5px] text-[var(--warning)]">
-                                <div className="flex items-start gap-2">
-                                    <Clock className="mt-0.5 size-3.5 shrink-0" />
-                                    <div>
-                                        <p className="font-semibold text-foreground">
-                                            Respon Puskesmas: ≤ 24 Jam
-                                        </p>
-                                        <p className="mt-0.5 text-muted-foreground leading-relaxed">
-                                            Otomatis ditugaskan ke Puskesmas kelurahan domisili pasien.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Quick Submit Button in Sidebar */}
-                            <Button
-                                type="submit"
-                                disabled={submitting}
-                                className="h-10 w-full text-[13px] font-semibold gap-2 shadow-xs"
-                            >
-                                {submitting ? (
-                                    <>
-                                        <Loader2 className="size-4 animate-spin" />
-                                        <span>Menyimpan…</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Send className="size-4" />
-                                        <span>Kirim laporan kasus</span>
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </Panel>
-                </aside>
+                <SummarySidebar
+                    checklist={checklist}
+                    pct={pct}
+                    stagedCount={stagedAttachments.length}
+                    patientName={watched.patientName}
+                    kelurahan={watched.kelurahan}
+                    caseType={watched.caseType}
+                    sourceType={watched.sourceType}
+                />
             </div>
         </form>
-    );
-}
-
-function Field({
-    label,
-    placeholder,
-    error,
-    reg,
-    required = false,
-    type = 'text',
-    min,
-    max,
-    className,
-}: {
-    label: string;
-    placeholder?: string;
-    error?: string;
-    reg: UseFormRegisterReturn;
-    required?: boolean;
-    type?: string;
-    min?: number;
-    max?: number;
-    className?: string;
-}) {
-    const invalid = Boolean(error);
-    const id = `f-${reg.name}`;
-
-    return (
-        <div className={className}>
-            <Label htmlFor={id}>
-                {label}
-                {required && (
-                    <span className="text-[var(--negative)]" aria-hidden>
-                        {' '}*
-                    </span>
-                )}
-            </Label>
-            <Input
-                id={id}
-                type={type}
-                min={min}
-                max={max}
-                placeholder={placeholder}
-                aria-invalid={invalid ? true : undefined}
-                aria-describedby={invalid ? `${id}-err` : undefined}
-                {...reg}
-                className={cn('mt-1.5', invalid && 'border-[var(--negative)] ring-2 ring-[var(--negative)]/20')}
-            />
-            {error && (
-                <p
-                    id={`${id}-err`}
-                    role="alert"
-                    className="mt-1 text-[12px] text-[var(--negative)]"
-                >
-                    {error}
-                </p>
-            )}
-        </div>
-    );
-}
-
-function ControllerField({
-    name,
-    label,
-    required = false,
-    error,
-    control,
-    render,
-    className,
-}: {
-    name: keyof FormValues;
-    label?: string;
-    required?: boolean;
-    error?: string;
-    control: Control<FormValues>;
-    render: (props: {
-        id: string;
-        value: unknown;
-        onChange: (v: unknown) => void;
-        invalid: boolean;
-    }) => React.ReactElement | null;
-    className?: string;
-}) {
-    const id = `f-${String(name)}`;
-    const invalid = Boolean(error);
-
-    return (
-        <div className={className}>
-            {label && (
-                <Label htmlFor={id}>
-                    {label}
-                    {required && (
-                        <span className="text-[var(--negative)]" aria-hidden>
-                            {' '}*
-                        </span>
-                    )}
-                </Label>
-            )}
-            <Controller
-                name={name}
-                control={control}
-                render={({ field }) =>
-                    (render({
-                        id,
-                        value: field.value,
-                        onChange: field.onChange,
-                        invalid,
-                    }) as React.ReactElement)
-                }
-            />
-            {error && (
-                <p role="alert" className="mt-1 text-[12px] text-[var(--negative)]">
-                    {error}
-                </p>
-            )}
-        </div>
     );
 }
