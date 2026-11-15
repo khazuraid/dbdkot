@@ -191,17 +191,18 @@ export async function createAccount(
 export async function approveAccount(
     actor: Actor,
     userId: string,
-    role: Role,
-    institutionId: string | null,
+    role?: Role | null,
+    institutionId?: string | null,
 ): Promise<AccountResult> {
     if (actor.role !== 'ADMIN') return { ok: false, error: 'FORBIDDEN' };
-    if (needsInstitution(role) && !institutionId) {
-        return { ok: false, error: 'Institusi wajib dipilih untuk peran ini' };
-    }
 
     const db = getDb();
     const [before] = await db
-        .select({ status: users.status, role: users.role })
+        .select({
+            status: users.status,
+            role: users.role,
+            institutionId: users.institutionId,
+        })
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
@@ -217,13 +218,21 @@ export async function approveAccount(
         };
     }
 
+    const resolvedRole = role || before.role;
+    const resolvedInstitutionId =
+        institutionId !== undefined ? institutionId : before.institutionId;
+
+    if (needsInstitution(resolvedRole) && !resolvedInstitutionId) {
+        return { ok: false, error: 'Institusi wajib dipilih untuk peran ini' };
+    }
+
     await db
         .update(users)
         .set({
             status: 'APPROVED',
             isActive: true,
-            role,
-            institutionId: needsInstitution(role) ? institutionId : null,
+            role: resolvedRole,
+            institutionId: needsInstitution(resolvedRole) ? resolvedInstitutionId : null,
         })
         .where(eq(users.id, userId));
 
@@ -234,7 +243,7 @@ export async function approveAccount(
         entityId: userId,
         changes: {
             status: { from: before.status, to: 'APPROVED' },
-            role: { from: before.role, to: role },
+            role: { from: before.role, to: resolvedRole },
         },
     });
 
@@ -708,6 +717,7 @@ export async function listManagedAccounts(
                 role: users.role,
                 status: users.status,
                 isActive: users.isActive,
+                emailVerified: users.emailVerified,
                 institutionId: users.institutionId,
                 institutionName: institutions.name,
                 createdAt: users.createdAt,
@@ -745,8 +755,13 @@ export async function listManagedAccounts(
                 name: users.name,
                 email: users.email,
                 role: users.role,
+                emailVerified: users.emailVerified,
+                institutionId: users.institutionId,
+                institutionName: institutions.name,
+                createdAt: users.createdAt,
             })
             .from(users)
+            .leftJoin(institutions, eq(institutions.id, users.institutionId))
             .where(eq(users.status, 'PENDING'))
             .orderBy(users.createdAt)
             .limit(PENDING_LIMIT),

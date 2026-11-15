@@ -4,7 +4,11 @@ import { useActionState, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     AlertTriangle,
+    Building2,
+    Check,
+    CheckCircle2,
     ChevronDown,
+    Clock,
     Eye,
     EyeOff,
     Info,
@@ -13,7 +17,9 @@ import {
     Power,
     PowerOff,
     RefreshCw,
+    SlidersHorizontal,
     Trash2,
+    X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ROLES, type Role } from '@/lib/roles';
@@ -75,16 +81,31 @@ export function ApprovalRow({
     userId,
     name,
     email,
+    role,
+    emailVerified,
+    institutionId,
+    institutionName,
+    createdAt,
     institutions,
 }: {
     userId: string;
     name: string;
     email: string;
+    role: Role;
+    emailVerified?: boolean;
+    institutionId?: string | null;
+    institutionName?: string | null;
+    createdAt?: Date | null;
     institutions: Institution[];
 }) {
-    const [open, setOpen] = useState(false);
-    const [role, setRole] = useState<Role>('PUSKESMAS');
-    const [institutionId, setInstitutionId] = useState('');
+    const router = useRouter();
+    const [editRole, setEditRole] = useState(false);
+    const [selectedRole, setSelectedRole] = useState<Role>(role || 'PUSKESMAS');
+    const [selectedInstitutionId, setSelectedInstitutionId] = useState(
+        institutionId ?? '',
+    );
+    const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+
     const [state, action, pending] = useActionState(
         approveAccountAction,
         initial,
@@ -97,81 +118,154 @@ export function ApprovalRow({
     useNotified(state);
     useNotified(rejectState);
 
-    const kind = institutionKind(role);
+    useEffect(() => {
+        if (state.ok || rejectState.ok) {
+            router.refresh();
+        }
+    }, [state.ok, rejectState.ok, router]);
+
+    const kind = institutionKind(selectedRole);
     const options = kind
         ? institutions.filter((i) => i.type === kind)
         : institutions;
 
     return (
-        <li className="py-3 first:pt-1 last:pb-1">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
+        <li className="px-4 py-3.5 transition-colors hover:bg-[var(--raised)]/45">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
                     <span
                         aria-hidden
-                        className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] text-[11.5px] font-semibold text-[var(--pill-warning-ink)]"
+                        className="grid size-9 shrink-0 place-items-center rounded-xl border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] text-[12px] font-semibold text-[var(--pill-warning-ink)]"
                     >
                         {initialsOf(name)}
                     </span>
-                    <div className="min-w-0">
-                        <p className="truncate text-[13.5px] font-medium text-foreground">
-                            {name}
-                        </p>
-                        {/* A truncated address with no title leaves the approver
-                            unable to check who they are approving. */}
+                    <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-[13.5px] font-semibold text-foreground">
+                                {name}
+                            </p>
+                            {emailVerified ? (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-[var(--pill-positive-border)] bg-[var(--pill-positive-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--pill-positive-ink)]">
+                                    <CheckCircle2 className="size-3 shrink-0" aria-hidden />
+                                    Email Terverif (OTP)
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--pill-warning-ink)]">
+                                    <Clock className="size-3 shrink-0" aria-hidden />
+                                    Belum Verif OTP
+                                </span>
+                            )}
+                        </div>
                         <p
-                            className="truncate text-[12.5px] text-muted-foreground"
+                            className="truncate font-mono text-[12px] text-muted-foreground"
                             title={email}
                         >
                             {email}
                         </p>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11.5px]">
+                            <span className="inline-flex items-center rounded-md border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-2 py-0.5 font-medium text-[var(--accent)]">
+                                {ROLE_LABEL[role] ?? role}
+                            </span>
+                            {institutionName && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--ground)] px-2 py-0.5 text-muted-foreground">
+                                    <Building2 className="size-3 shrink-0" aria-hidden />
+                                    <span className="truncate max-w-[240px]">{institutionName}</span>
+                                </span>
+                            )}
+                            {createdAt && (
+                                <span className="text-muted-foreground/80 tabular-nums">
+                                    • Daftar{' '}
+                                    {new Date(createdAt).toLocaleDateString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                    })}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
                     <Button
                         type="button"
                         size="sm"
-                        variant={open ? 'outline' : 'default'}
-                        onClick={() => setOpen((v) => !v)}
-                        aria-expanded={open}
+                        variant="ghost"
+                        onClick={() => setEditRole((v) => !v)}
+                        aria-expanded={editRole}
+                        className="h-8 gap-1.5 px-2.5 text-[12px] text-muted-foreground hover:text-foreground"
+                        title="Sesuaikan peran atau institusi bila perlu"
                     >
-                        {open ? 'Tutup' : 'Tinjau'}
+                        <SlidersHorizontal className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">
+                            {editRole ? 'Tutup' : 'Sesuaikan'}
+                        </span>
                     </Button>
-                    <form action={reject}>
+
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={rejecting || pending}
+                        onClick={() => setRejectConfirmOpen(true)}
+                        className="h-8 gap-1.5 border-[var(--border)] text-[12.5px] text-muted-foreground hover:border-[var(--pill-negative-border)] hover:bg-[var(--pill-negative-bg)] hover:text-[var(--negative)]"
+                    >
+                        <X className="size-3.5" aria-hidden />
+                        <span>Tolak</span>
+                    </Button>
+
+                    <form action={action}>
                         <input type="hidden" name="userId" value={userId} />
+                        {editRole && (
+                            <>
+                                <input type="hidden" name="role" value={selectedRole} />
+                                {kind && (
+                                    <input
+                                        type="hidden"
+                                        name="institutionId"
+                                        value={selectedInstitutionId}
+                                    />
+                                )}
+                            </>
+                        )}
                         <Button
                             type="submit"
                             size="sm"
-                            variant="outline"
-                            disabled={rejecting}
-                            className="hover:border-[var(--pill-negative-border)] hover:bg-[var(--pill-negative-bg)] hover:text-[var(--negative)]"
+                            disabled={pending || rejecting}
+                            className="h-8 gap-1.5 bg-[var(--accent)] px-3.5 text-[12.5px] font-semibold text-[var(--accent-ink)] hover:opacity-95"
                         >
-                            Tolak
+                            {pending ? (
+                                <RefreshCw className="size-3.5 animate-spin" aria-hidden />
+                            ) : (
+                                <Check className="size-3.5" aria-hidden />
+                            )}
+                            <span>{pending ? 'Menyetujui…' : 'Setujui'}</span>
                         </Button>
                     </form>
                 </div>
             </div>
 
-            {open && (
-                <form
-                    action={action}
-                    className="mt-3 grid gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/55 p-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
-                >
-                    <input type="hidden" name="userId" value={userId} />
+            {editRole && (
+                <div className="mt-3 grid gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/55 p-3.5 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                        <label
+                        <Label
                             htmlFor={`role-${userId}`}
-                            className="block text-[12px] font-medium text-muted-foreground"
+                            className="text-[12px] font-medium text-muted-foreground"
                         >
-                            Peran
-                        </label>
+                            Ubah Peran (Opsional)
+                        </Label>
                         <div className="relative">
                             <select
                                 id={`role-${userId}`}
-                                name="role"
-                                value={role}
+                                value={selectedRole}
                                 onChange={(e) => {
-                                    setRole(e.target.value as Role);
-                                    setInstitutionId('');
+                                    const next = e.target.value as Role;
+                                    setSelectedRole(next);
+                                    const nextKind = institutionKind(next);
+                                    const first = nextKind
+                                        ? institutions.find((i) => i.type === nextKind)
+                                        : null;
+                                    setSelectedInstitutionId(first ? first.id : '');
                                 }}
                                 className={SELECT_CONTROL}
                             >
@@ -190,28 +284,23 @@ export function ApprovalRow({
 
                     {kind && (
                         <div className="space-y-1.5">
-                            <label
+                            <Label
                                 htmlFor={`inst-${userId}`}
-                                className="block text-[12px] font-medium text-muted-foreground"
+                                className="text-[12px] font-medium text-muted-foreground"
                             >
-                                Institusi
-                            </label>
+                                Ubah Institusi / Faskes (Opsional)
+                            </Label>
                             <div className="relative">
                                 <select
                                     id={`inst-${userId}`}
-                                    name="institutionId"
-                                    required
-                                    value={institutionId}
+                                    value={selectedInstitutionId}
                                     onChange={(e) =>
-                                        setInstitutionId(e.target.value)
+                                        setSelectedInstitutionId(e.target.value)
                                     }
                                     className={SELECT_CONTROL}
                                 >
-                                    <option value="" disabled>
-                                        Pilih{' '}
-                                        {kind === 'PUSKESMAS'
-                                            ? 'puskesmas'
-                                            : 'rumah sakit'}
+                                    <option value="">
+                                        Gunakan faskes terdaftar
                                     </option>
                                     {options.map((i) => (
                                         <option key={i.id} value={i.id}>
@@ -227,27 +316,56 @@ export function ApprovalRow({
                         </div>
                     )}
 
-                    <Button type="submit" size="sm" disabled={pending}>
-                        {pending ? 'Menyimpan…' : 'Setujui'}
-                    </Button>
-
                     {options.length === 0 && kind && (
-                        <p className="text-[12px] text-[var(--warning)] sm:col-span-3">
-                            Belum ada{' '}
-                            {kind === 'PUSKESMAS' ? 'puskesmas' : 'rumah sakit'}{' '}
-                            aktif. Tambahkan di menu Institusi lebih dulu.
+                        <p className="text-[12px] text-[var(--warning)] sm:col-span-2">
+                            Belum ada {kind === 'PUSKESMAS' ? 'puskesmas' : 'rumah sakit'} aktif.
                         </p>
                     )}
-                    {state.error && (
-                        <p
-                            role="alert"
-                            className="text-[12px] text-[var(--negative)] sm:col-span-3"
-                        >
-                            {state.error}
-                        </p>
-                    )}
-                </form>
+                </div>
             )}
+
+            {(state.error || rejectState.error) && (
+                <p role="alert" className="mt-2 text-[12px] text-[var(--negative)]">
+                    {state.error || rejectState.error}
+                </p>
+            )}
+
+            <Dialog
+                open={rejectConfirmOpen && !rejectState.ok}
+                onOpenChange={setRejectConfirmOpen}
+            >
+                <DialogContent className="sm:max-w-[440px]">
+                    <DialogHeader>
+                        <DialogTitle>Tolak Pendaftaran Akun?</DialogTitle>
+                        <DialogDescription>
+                            Pendaftaran atas nama{' '}
+                            <strong className="font-semibold text-foreground">{name}</strong> (
+                            <span className="font-mono">{email}</span>) akan ditolak dan
+                            tidak dapat masuk ke sistem.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setRejectConfirmOpen(false)}
+                            disabled={rejecting}
+                        >
+                            Batal
+                        </Button>
+                        <form action={reject}>
+                            <input type="hidden" name="userId" value={userId} />
+                            <Button
+                                type="submit"
+                                variant="destructive"
+                                disabled={rejecting}
+                            >
+                                {rejecting ? 'Menolak…' : 'Ya, Tolak Pendaftaran'}
+                            </Button>
+                        </form>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </li>
     );
 }

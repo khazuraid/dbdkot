@@ -37,14 +37,19 @@ export async function approveAccountAction(
     if (!actor) return { ok: false, error };
 
     const userId = String(formData.get('userId') ?? '');
-    const role = String(formData.get('role') ?? '') as Role;
-    const institutionId = String(formData.get('institutionId') ?? '') || null;
+    const roleInput = formData.get('role');
+    const role = roleInput ? (String(roleInput) as Role) : undefined;
+    const institutionIdInput = formData.get('institutionId');
+    const institutionId =
+        institutionIdInput !== null
+            ? String(institutionIdInput) || null
+            : undefined;
 
     const result = await approveAccount(actor, userId, role, institutionId);
     if (!result.ok) return { ok: false, error: result.error };
 
     revalidatePath('/admin/pengguna');
-    return { ok: true, message: 'Akun disetujui.' };
+    return { ok: true, message: 'Akun berhasil disetujui dan diaktifkan.' };
 }
 
 export async function rejectAccountAction(

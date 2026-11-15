@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import {
+    CheckCircle2,
     Clock,
     Search,
+    ShieldCheck,
     UserCheck,
     UserMinus,
     Users,
@@ -139,7 +141,7 @@ export default async function PenggunaPage({
         <PageBody>
             <PageHeader
                 title="Pengguna"
-                context="Setujui pendaftaran baru, tetapkan peran, dan kelola status akses akun."
+                context="Tinjau antrean pendaftar baru secara langsung, pantau verifikasi OTP email, dan kelola akses akun."
                 action={{
                     href: buildHref({ tambah: true }),
                     label: 'Tambah akun',
@@ -153,7 +155,7 @@ export default async function PenggunaPage({
                         {filter !== 'ALL' && (
                             <input type="hidden" name="status" value={filter} />
                         )}
-                        <InputGroup className="h-9 w-full sm:w-[260px]">
+                        <InputGroup className="h-9 w-full sm:w-[280px]">
                             <InputGroupAddon>
                                 <Search className="size-4" aria-hidden />
                             </InputGroupAddon>
@@ -179,18 +181,40 @@ export default async function PenggunaPage({
                     >
                         {STATUS_FILTERS.map((opt) => {
                             const active = filter === opt.value;
+                            const badgeCount =
+                                opt.value === 'ALL'
+                                    ? summary.total
+                                    : opt.value === 'ACTIVE'
+                                      ? summary.active
+                                      : opt.value === 'INACTIVE'
+                                        ? summary.inactive
+                                        : opt.value === 'PENDING'
+                                          ? summary.pending
+                                          : null;
                             return (
                                 <Link
                                     key={opt.value}
                                     href={buildHref({ status: opt.value })}
                                     className={cn(
-                                        'inline-flex h-8 items-center rounded-[var(--radius-pill)] border px-3 text-[12.5px] font-medium transition-colors',
+                                        'inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 text-[12.5px] font-medium transition-colors',
                                         active
                                             ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
                                             : 'border-[var(--border)] bg-[var(--surface)] text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground',
                                     )}
                                 >
-                                    {opt.label}
+                                    <span>{opt.label}</span>
+                                    {badgeCount !== null && (
+                                        <span
+                                            className={cn(
+                                                'tabular-nums text-[11px]',
+                                                active
+                                                    ? 'text-[var(--accent)]/85'
+                                                    : 'text-muted-foreground/70',
+                                            )}
+                                        >
+                                            {formatNumber(badgeCount)}
+                                        </span>
+                                    )}
                                 </Link>
                             );
                         })}
@@ -217,7 +241,7 @@ export default async function PenggunaPage({
                         signal={summary.pending > 0 ? 'warn' : 'good'}
                         hint={
                             summary.pending > 0
-                                ? 'Perlu peninjauan peran & institusi'
+                                ? 'Siap disetujui atau ditolak'
                                 : 'Tidak ada antrean pendaftaran'
                         }
                         icon={Clock}
@@ -233,10 +257,12 @@ export default async function PenggunaPage({
                 {pending > 0 && (
                     <Panel
                         title={`${formatNumber(pending)} pendaftaran menunggu persetujuan`}
+                        subtitle="Peran & faskes telah dipilih saat daftar. Klik Setujui atau Tolak langsung."
                         className="border-l-[3px] border-l-[var(--warning)]"
                         aside={
-                            <span className="inline-flex items-center rounded-[var(--radius-pill)] border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--pill-warning-ink)]">
-                                Perlu ditinjau
+                            <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--pill-warning-ink)]">
+                                <Clock className="size-3" aria-hidden />
+                                Antrean peninjauan
                             </span>
                         }
                     >
@@ -247,12 +273,17 @@ export default async function PenggunaPage({
                                     userId={u.id}
                                     name={u.name}
                                     email={u.email}
+                                    role={u.role as Role}
+                                    emailVerified={u.emailVerified}
+                                    institutionId={u.institutionId}
+                                    institutionName={u.institutionName}
+                                    createdAt={u.createdAt}
                                     institutions={institutions}
                                 />
                             ))}
                         </ul>
                         {pending > waiting.length && (
-                            <p className="pt-3 text-[12px] text-muted-foreground">
+                            <p className="border-t border-[var(--rule)] px-4 py-2.5 text-[12px] text-muted-foreground">
                                 Menampilkan {waiting.length} dari {pending}{' '}
                                 pendaftaran, terlama lebih dahulu.
                             </p>
@@ -262,11 +293,13 @@ export default async function PenggunaPage({
 
                 <Panel
                     title={`${formatNumber(total)} akun${filter !== 'ALL' ? ` · ${STATUS_FILTERS.find((f) => f.value === filter)?.label}` : ''}${q ? ` · “${q}”` : ''}`}
+                    subtitle="Daftar seluruh akun terkelola beserta status verifikasi OTP email dan hak akses."
                     aside={
                         <Link
                             href="/admin/audit-log"
-                            className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+                            className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline"
                         >
+                            <ShieldCheck className="size-3.5" aria-hidden />
                             Lihat audit log
                         </Link>
                     }
@@ -275,6 +308,7 @@ export default async function PenggunaPage({
                         rows={rows}
                         empty="Tidak ada akun yang cocok dengan filter saat ini."
                         caption="Daftar akun"
+                        className="rounded-none border-0 shadow-none"
                         columns={[
                             {
                                 key: 'name',
@@ -283,7 +317,7 @@ export default async function PenggunaPage({
                                     <div className="flex items-center gap-2.5">
                                         <span
                                             aria-hidden
-                                            className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--raised)] text-[11px] font-semibold text-muted-foreground"
+                                            className="grid size-8 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--raised)] text-[11px] font-semibold text-muted-foreground"
                                         >
                                             {initialsOf(u.name)}
                                         </span>
@@ -291,7 +325,10 @@ export default async function PenggunaPage({
                                             <p className="truncate font-medium text-foreground">
                                                 {u.name}
                                             </p>
-                                            <p className="truncate text-[12px] text-muted-foreground">
+                                            <p
+                                                className="truncate font-mono text-[11.5px] text-muted-foreground"
+                                                title={u.email}
+                                            >
                                                 {u.email}
                                             </p>
                                         </div>
@@ -300,20 +337,36 @@ export default async function PenggunaPage({
                             },
                             {
                                 key: 'role',
-                                header: 'Peran',
+                                header: 'Peran & Institusi',
                                 cell: (u) => (
-                                    <Badge
-                                        variant="outline"
-                                        className={roleBadgeClass(u.role)}
-                                    >
-                                        {ROLE_LABEL[u.role as Role] ?? u.role}
-                                    </Badge>
+                                    <div className="space-y-1">
+                                        <Badge
+                                            variant="outline"
+                                            className={roleBadgeClass(u.role)}
+                                        >
+                                            {ROLE_LABEL[u.role as Role] ?? u.role}
+                                        </Badge>
+                                        <p className="truncate text-[12px] text-muted-foreground max-w-[220px]">
+                                            {u.institutionName ?? <Dash />}
+                                        </p>
+                                    </div>
                                 ),
                             },
                             {
-                                key: 'inst',
-                                header: 'Institusi',
-                                cell: (u) => u.institutionName ?? <Dash />,
+                                key: 'emailVerified',
+                                header: 'Verif Email',
+                                cell: (u) =>
+                                    u.emailVerified ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-[var(--pill-positive-border)] bg-[var(--pill-positive-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--pill-positive-ink)] whitespace-nowrap">
+                                            <CheckCircle2 className="size-3 shrink-0" aria-hidden />
+                                            Terverif OTP
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--pill-warning-ink)] whitespace-nowrap">
+                                            <Clock className="size-3 shrink-0" aria-hidden />
+                                            Belum Verif
+                                        </span>
+                                    ),
                             },
                             {
                                 key: 'status',
@@ -329,7 +382,7 @@ export default async function PenggunaPage({
                                 header: 'Dibuat',
                                 align: 'right',
                                 cell: (u) => (
-                                    <span className="whitespace-nowrap text-muted-foreground">
+                                    <span className="whitespace-nowrap tabular-nums text-[12.5px] text-muted-foreground">
                                         {formatDate(u.createdAt)}
                                     </span>
                                 ),
