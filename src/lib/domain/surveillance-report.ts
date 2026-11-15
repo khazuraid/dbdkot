@@ -122,6 +122,13 @@ const MONTH_NAMES = [
     'DESEMBER',
 ];
 
+const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validUuid(v?: string | null): string | undefined {
+    return v && UUID_RE.test(v) ? v : undefined;
+}
+
 export async function getSurveillanceReportData(
     actor: Actor,
     params: {
@@ -133,19 +140,25 @@ export async function getSurveillanceReportData(
 ): Promise<SurveillanceReportResult> {
     const db = getDb();
     const now = new Date();
-    const year = params.year && params.year > 2000 ? params.year : now.getFullYear();
-    const month = params.month && params.month >= 1 && params.month <= 12 ? params.month : now.getMonth() + 1;
+    const year =
+        params.year && Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+            ? params.year
+            : now.getFullYear();
+    const month =
+        params.month && Number.isInteger(params.month) && params.month >= 1 && params.month <= 12
+            ? params.month
+            : now.getMonth() + 1;
 
     let level: 'kota' | 'puskesmas' = params.level === 'puskesmas' ? 'puskesmas' : 'kota';
-    let targetPuskesmasId = params.puskesmasId;
+    let targetPuskesmasId = validUuid(params.puskesmasId);
 
     // Enforce role-based boundaries
     if (actor.role === 'PUSKESMAS') {
         level = 'puskesmas';
-        targetPuskesmasId = actor.institutionId ?? undefined;
+        targetPuskesmasId = validUuid(actor.institutionId);
     } else if (actor.role === 'RUMAH_SAKIT') {
         level = 'puskesmas';
-        targetPuskesmasId = actor.institutionId ?? undefined;
+        targetPuskesmasId = validUuid(actor.institutionId);
     }
 
     const startDate = new Date(Date.UTC(year, month - 1, 1));
@@ -942,9 +955,16 @@ export async function getEpiWeekReportData(
     },
 ): Promise<EpiWeekReportResult> {
     const db = getDb();
-    const year = params.year;
+    const nowYear = new Date().getFullYear();
+    const year =
+        Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+            ? params.year
+            : nowYear;
     const level = actor.role === 'PUSKESMAS' ? 'puskesmas' : params.level ?? 'kota';
-    const puskesmasId = actor.role === 'PUSKESMAS' ? actor.institutionId : params.puskesmasId;
+    const puskesmasId =
+        actor.role === 'PUSKESMAS'
+            ? validUuid(actor.institutionId)
+            : validUuid(params.puskesmasId);
 
     const startDate = new Date(Date.UTC(year, 0, 1));
     const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
@@ -1069,7 +1089,9 @@ export async function getEpiWeekReportData(
             }
         }
 
-        const week = getEpiWeek(r.createdAt);
+        const createdAt =
+            r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+        const week = Math.min(52, Math.max(1, getEpiWeek(createdAt)));
         const entry = groupMap.get(key);
         if (entry) {
             entry.weeks[week - 1]++;
@@ -1184,9 +1206,13 @@ export async function getEndemicityStratification(
     currentYear: number = new Date().getFullYear(),
 ): Promise<EndemicityResult> {
     const db = getDb();
-    const y0 = currentYear;
-    const y1 = currentYear - 1;
-    const y2 = currentYear - 2;
+    const safeYear =
+        Number.isInteger(currentYear) && currentYear >= 2000 && currentYear <= 2100
+            ? currentYear
+            : new Date().getFullYear();
+    const y0 = safeYear;
+    const y1 = safeYear - 1;
+    const y2 = safeYear - 2;
 
     const start3Years = new Date(Date.UTC(y2, 0, 1));
     const end3Years = new Date(Date.UTC(y0, 11, 31, 23, 59, 59, 999));
@@ -1361,7 +1387,15 @@ export async function getPeComplianceReport(
     params: { year: number; month?: number },
 ): Promise<PeComplianceResult> {
     const db = getDb();
-    const { year, month } = params;
+    const now = new Date();
+    const year =
+        Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+            ? params.year
+            : now.getFullYear();
+    const month =
+        params.month && Number.isInteger(params.month) && params.month >= 1 && params.month <= 12
+            ? params.month
+            : undefined;
 
     let start: Date;
     let end: Date;

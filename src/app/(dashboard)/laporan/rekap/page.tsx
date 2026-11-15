@@ -11,6 +11,11 @@ import {
 import { PageBody, PageHeader } from '@/components/shell/page';
 import { SurveillanceReportView } from '@/components/reports/surveillance-report-view';
 
+export const instant = false;
+
+const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function RekapLaporanPage({
     searchParams,
 }: {
@@ -32,13 +37,32 @@ export default async function RekapLaporanPage({
     const isDinkesOrAdmin = actor.role === 'DINKES' || actor.role === 'ADMIN';
 
     const now = new Date();
-    const month = params.m ? parseInt(params.m, 10) : params.month ? parseInt(params.month, 10) : now.getMonth() + 1;
-    const year = params.y ? parseInt(params.y, 10) : params.year ? parseInt(params.year, 10) : now.getFullYear();
+    const rawMonth = params.m
+        ? parseInt(params.m, 10)
+        : params.month
+          ? parseInt(params.month, 10)
+          : NaN;
+    const rawYear = params.y
+        ? parseInt(params.y, 10)
+        : params.year
+          ? parseInt(params.year, 10)
+          : NaN;
+    const month =
+        Number.isInteger(rawMonth) && rawMonth >= 1 && rawMonth <= 12
+            ? rawMonth
+            : now.getMonth() + 1;
+    const year =
+        Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= 2100
+            ? rawYear
+            : now.getFullYear();
 
     // Auto-detect puskesmas role: lock to their own institution without requiring long URL params
+    const requestedPk = params.pk || params.puskesmasId || undefined;
+    const validRequestedPk =
+        requestedPk && UUID_RE.test(requestedPk) ? requestedPk : undefined;
     const puskesmasId = isPuskesmas
         ? (actor.institutionId ?? undefined)
-        : (params.pk || params.puskesmasId || undefined);
+        : validRequestedPk;
     const level = isPuskesmas || params.lvl === 'puskesmas' || params.level === 'puskesmas' ? 'puskesmas' : 'kota';
 
     // Fetch Puskesmas list for selector (only needed for Dinkes/Admin)
@@ -118,6 +142,7 @@ export default async function RekapLaporanPage({
                     peComplianceData={peComplianceData}
                     userRole={actor.role}
                     puskesmasOptions={puskesmasList}
+                    initialPuskesmasId={puskesmasId ?? ''}
                 />
             </div>
         </PageBody>

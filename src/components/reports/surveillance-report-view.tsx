@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
     Download,
     FileSpreadsheet,
@@ -34,6 +34,7 @@ type Props = {
     peComplianceData: PeComplianceResult;
     userRole: string;
     puskesmasOptions: Array<{ id: string; name: string }>;
+    initialPuskesmasId?: string;
 };
 
 const MONTHS = [
@@ -60,9 +61,9 @@ export function SurveillanceReportView({
     peComplianceData,
     userRole,
     puskesmasOptions,
+    initialPuskesmasId,
 }: Props) {
     const router = useRouter();
-    const searchParams = useSearchParams();
     const [, startTransition] = useTransition();
 
     const [activeTab, setActiveTab] = useState<ReportTab>('age');
@@ -70,7 +71,7 @@ export function SurveillanceReportView({
     const [year, setYear] = useState<number>(initialData.year);
     const [level, setLevel] = useState<'kota' | 'puskesmas'>(initialData.level);
     const [selectedPuskesmasId, setSelectedPuskesmasId] = useState<string>(
-        searchParams.get('puskesmasId') || puskesmasOptions[0]?.id || '',
+        initialPuskesmasId || puskesmasOptions[0]?.id || '',
     );
     const [searchQuery, setSearchQuery] = useState('');
     const [downloading, setDownloading] = useState(false);
