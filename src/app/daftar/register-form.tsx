@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -14,23 +15,29 @@ import {
     Loader2,
     Mail,
     Stethoscope,
+    User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     Field,
-    FieldDescription,
     FieldError,
     FieldGroup,
     FieldLabel,
 } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
+import { registerSchema, type RegisterInput } from '@/lib/auth-schemas';
 import {
-    registerSchema,
     sendRegisterOtpAction,
     verifyAndRegisterAction,
-    type RegisterInput,
 } from './actions';
+import {
+    AuthCardFooter,
+    AuthErrorAlert,
+    AuthSteps,
+    OtpCodeInput,
+    PasswordRequirements,
+} from '@/components/auth/auth-ui';
 
 type InstitutionItem = {
     id: string;
@@ -47,22 +54,24 @@ const ROLE_OPTIONS = [
     {
         id: 'PUSKESMAS' as const,
         title: 'Puskesmas',
-        desc: 'Fasilitas pelayanan primer di tingkat kecamatan/kelurahan',
+        desc: 'Fasilitas primer & penyelidikan lapangan',
         icon: Stethoscope,
     },
     {
         id: 'RUMAH_SAKIT' as const,
         title: 'Rumah Sakit',
-        desc: 'Fasilitas rujukan & laporan kasus DBD',
+        desc: 'Fasilitas rujukan & laporan bangsal DBD',
         icon: Hospital,
     },
     {
         id: 'DINKES' as const,
-        title: 'Dinas Kesehatan',
+        title: 'Dinkes',
         desc: 'Pengelola surveilans kota & koordinator PE',
         icon: Building2,
     },
 ];
+
+const STEPS = ['Profil Instansi', 'Verifikasi OTP', 'Selesai'];
 
 export function RegisterForm({ institutions = [] }: Props) {
     const router = useRouter();
@@ -85,22 +94,12 @@ export function RegisterForm({ institutions = [] }: Props) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-    const [resendTimer, setResendTimer] = useState<number>(0);
+    const [resendTimer, setResendTimer] = useState(0);
 
-    // Filter institutions by active role
+    // Filter institutions matching the active role
     const filteredInstitutions = institutions.filter((i) => i.type === role);
 
-    const handleRoleChange = (nextRole: 'PUSKESMAS' | 'RUMAH_SAKIT' | 'DINKES') => {
-        setRole(nextRole);
-        if (nextRole === 'DINKES') {
-            setInstitutionId('');
-        } else {
-            const first = institutions.find((i) => i.type === nextRole);
-            setInstitutionId(first?.id || '');
-        }
-    };
-
-    // Countdown timer for resending OTP
+    // Resend OTP countdown
     useEffect(() => {
         if (resendTimer <= 0) return;
         const interval = setInterval(() => {
@@ -109,423 +108,469 @@ export function RegisterForm({ institutions = [] }: Props) {
         return () => clearInterval(interval);
     }, [resendTimer]);
 
+    const handleRoleChange = (newRole: 'PUSKESMAS' | 'RUMAH_SAKIT' | 'DINKES') => {
+        setRole(newRole);
+        if (newRole === 'DINKES') {
+            setInstitutionId('');
+        } else {
+            const first = institutions.find((i) => i.type === newRole);
+            setInstitutionId(first ? first.id : '');
+        }
+        setFieldErrors((prev) => ({ ...prev, role: '', institutionId: '' }));
+    };
+
+    // Step 1: Send registration OTP
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setFieldErrors({});
 
+        if (password !== confirm) {
+            setFieldErrors({ confirm: 'Konfirmasi kata sandi tidak cocok' });
+            return;
+        }
+
         const payload: RegisterInput = {
             name: name.trim(),
             email: email.trim(),
-            role,
-            institutionId: role === 'DINKES' ? null : institutionId,
             password,
             confirm,
+            role,
+            institutionId: role === 'DINKES' ? undefined : institutionId,
         };
 
         const parsed = registerSchema.safeParse(payload);
         if (!parsed.success) {
             const errs: Record<string, string> = {};
             for (const issue of parsed.error.issues) {
-                if (issue.path[0]) errs[String(issue.path[0])] = issue.message;
+                const k = String(issue.path[0]);
+                if (k && !errs[k]) errs[k] = issue.message;
             }
             setFieldErrors(errs);
-            if (errs.confirm && !errs.password) setError(errs.confirm);
-            else if (errs.institutionId) setError(errs.institutionId);
             return;
         }
 
         setPending(true);
         try {
-            const res = await sendRegisterOtpAction(payload);
+            const res = await sendRegisterOtpAction(parsed.data);
             if (!res.ok) {
-                setError(res.error);
+                setError(res.error || 'Gagal mengirim kode verifikasi OTP.');
                 if (res.fieldErrors) setFieldErrors(res.fieldErrors);
+                setPending(false);
                 return;
             }
 
+            toast.success(`Kode OTP 6-digit telah dikirim ke ${email}`);
             setStep('OTP');
             setResendTimer(60);
-            toast.success(`Kode OTP telah dikirimkan ke email ${email}`);
-        } catch {
-            setError('Terjadi kendala saat menghubungi server. Silakan coba beberapa saat lagi.');
+        } catch (err: unknown) {
+            console.error('sendRegisterOtpAction exception:', err);
+            setError('Terjadi kendala jaringan saat mengirim kode OTP.');
         } finally {
             setPending(false);
         }
     };
 
+    // Resend OTP
     const handleResendOtp = async () => {
         if (resendTimer > 0 || pending) return;
-        setPending(true);
         setError(null);
+        setPending(true);
+
+        const payload: RegisterInput = {
+            name: name.trim(),
+            email: email.trim(),
+            password,
+            confirm,
+            role,
+            institutionId: role === 'DINKES' ? undefined : institutionId,
+        };
+
         try {
-            const payload: RegisterInput = {
-                name: name.trim(),
-                email: email.trim(),
-                role,
-                institutionId: role === 'DINKES' ? null : institutionId,
-                password,
-                confirm,
-            };
             const res = await sendRegisterOtpAction(payload);
             if (!res.ok) {
-                setError(res.error);
+                setError(res.error || 'Gagal mengirim ulang OTP.');
                 return;
             }
+            toast.success('Kode OTP baru telah dikirimkan ke email Anda.');
             setResendTimer(60);
-            toast.success('Kode OTP baru telah dikirim ke email Anda.');
         } catch {
-            setError('Gagal mengirim ulang kode OTP.');
+            setError('Kendala jaringan saat meminta ulang kode OTP.');
         } finally {
             setPending(false);
         }
     };
 
-    const handleVerifyOtp = async (e: React.FormEvent) => {
+    // Step 2: Verify OTP and create user
+    const handleVerifyAndRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!otp || otp.trim().length !== 6) {
-            setError('Masukkan 6 digit kode OTP yang diterima melalui email.');
+        setError(null);
+
+        if (!otp || otp.length !== 6) {
+            setError('Masukkan 6 digit kode OTP yang dikirimkan.');
             return;
         }
 
-        setError(null);
         setPending(true);
         try {
             const payload = {
                 name: name.trim(),
                 email: email.trim(),
-                role,
-                institutionId: role === 'DINKES' ? null : institutionId,
                 password,
                 confirm,
+                role,
+                institutionId: role === 'DINKES' ? undefined : institutionId,
                 otp: otp.trim(),
             };
 
             const res = await verifyAndRegisterAction(payload);
             if (!res.ok) {
-                setError(res.error);
+                setError(res.error || 'Verifikasi OTP gagal.');
+                setPending(false);
                 return;
             }
 
+            toast.success('Pendaftaran akun berhasil!');
             setStep('SUCCESS');
-            toast.success('Pendaftaran akun berhasil diverifikasi!');
-        } catch {
-            setError('Gagal memverifikasi OTP. Coba lagi.');
+        } catch (err: unknown) {
+            console.error('verifyAndRegisterAction exception:', err);
+            setError('Terjadi kesalahan saat memverifikasi kode OTP.');
         } finally {
             setPending(false);
         }
     };
 
+    const currentStepIndex = step === 'FORM' ? 0 : step === 'OTP' ? 1 : 2;
+
     if (step === 'SUCCESS') {
         return (
-            <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 text-center space-y-4">
-                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[var(--pill-positive-bg)] text-[var(--positive)]">
-                    <CheckCircle2 className="size-6" />
+            <div className="space-y-5 py-2 text-center">
+                <AuthSteps steps={STEPS} currentIndex={2} />
+
+                <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--positive)]/30 bg-[var(--pill-positive-bg)] text-[var(--positive)] shadow-xs">
+                    <CheckCircle2 className="size-8" />
                 </div>
-                <div className="space-y-1.5">
-                    <h3 className="text-base font-semibold text-foreground">
-                        Pendaftaran Berhasil Diterima
+
+                <div className="space-y-2">
+                    <h3 className="text-[19px] font-semibold tracking-tight text-foreground">
+                        Pengajuan Akun Terkirim
                     </h3>
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Email Anda (<strong>{email}</strong>) telah diverifikasi.
-                        Administrator Dinas Kesehatan akan meninjau dan mengaktifkan akun Anda
-                        sebelum dapat digunakan untuk masuk ke sistem.
+                    <p className="mx-auto max-w-[36ch] text-[13px] leading-relaxed text-muted-foreground">
+                        Email <strong className="font-medium text-foreground">{email}</strong> telah
+                        terverifikasi. Akun Anda sedang ditinjau administrator Dinas Kesehatan Kota Cirebon.
                     </p>
                 </div>
-                <div className="pt-2">
-                    <Button
-                        type="button"
-                        onClick={() => router.push('/masuk')}
-                        className="w-full justify-between h-10 px-4"
-                    >
-                        <span>Kembali ke Halaman Masuk</span>
-                        <ArrowRight className="size-4" strokeWidth={1.5} />
-                    </Button>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--raised)]/60 p-3.5 text-left text-[12.5px] leading-relaxed text-muted-foreground">
+                    <p className="font-semibold text-foreground">Langkah Selanjutnya:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        <li>Administrator memeriksa kesesuaian data instansi.</li>
+                        <li>Notifikasi pengaktifan akun akan dikirimkan via email.</li>
+                        <li>Setelah disetujui, Anda dapat langsung masuk ke ruang kerja.</li>
+                    </ul>
                 </div>
+
+                <Button
+                    onClick={() => router.push('/masuk')}
+                    className="h-10 w-full rounded-xl bg-[var(--accent)] font-semibold text-[var(--accent-ink)] hover:opacity-95"
+                >
+                    Kembali ke Halaman Masuk
+                </Button>
             </div>
         );
     }
 
     if (step === 'OTP') {
         return (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="rounded-[var(--radius-card)] border border-[var(--pill-info-border)] bg-[var(--pill-info-bg)] p-3.5 text-[12.5px] text-[var(--pill-info-ink)] flex items-start gap-2.5">
-                    <Mail className="size-4 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="font-medium">Kode Verifikasi Dikirim</p>
-                        <p className="text-muted-foreground mt-0.5">
-                            Silakan periksa kotak masuk atau folder spam email <strong>{email}</strong>.
-                        </p>
+            <form onSubmit={handleVerifyAndRegister} className="space-y-5">
+                <AuthSteps steps={STEPS} currentIndex={1} />
+                <AuthErrorAlert message={error} />
+
+                <div className="space-y-1.5 text-center">
+                    <div className="mx-auto flex size-10 items-center justify-center rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--accent)]">
+                        <Mail className="size-5" />
                     </div>
+                    <h3 className="text-[17px] font-semibold text-foreground">
+                        Masukkan 6-Digit Kode OTP
+                    </h3>
+                    <p className="text-[12.5px] text-muted-foreground">
+                        Kode verifikasi telah dikirim ke{' '}
+                        <strong className="font-medium text-foreground">{email}</strong>
+                    </p>
                 </div>
 
-                <Field data-invalid={Boolean(error)}>
-                    <FieldLabel htmlFor="otp" className="text-[13px]">
-                        6 Digit Kode OTP
+                <Field className="space-y-2">
+                    <FieldLabel htmlFor="register-otp" className="sr-only">
+                        Kode OTP 6 Digit
                     </FieldLabel>
-                    <Input
-                        id="otp"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={6}
+                    <OtpCodeInput
+                        id="register-otp"
                         value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                        placeholder="123456"
-                        autoFocus
-                        className="h-12 text-center font-mono text-2xl tracking-[8px] font-bold"
-                        required
+                        onChange={setOtp}
+                        disabled={pending}
                     />
-                    <FieldDescription className="text-center text-[11.5px]">
-                        Kode berlaku selama 10 menit
-                    </FieldDescription>
+                    <p className="text-center text-[11.5px] text-muted-foreground">
+                        Masa berlaku kode 10 menit. Maksimal 5 kali percobaan.
+                    </p>
                 </Field>
 
-                {error && <FieldError>{error}</FieldError>}
-
-                <Button
-                    type="submit"
-                    disabled={pending || otp.length !== 6}
-                    className="h-10 w-full justify-between px-3.5 font-medium"
-                >
-                    <span>{pending ? 'Memverifikasi…' : 'Verifikasi & Selesaikan Pendaftaran'}</span>
-                    {pending ? (
-                        <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                        <ArrowRight className="size-4" strokeWidth={1.5} />
-                    )}
-                </Button>
-
-                <div className="flex items-center justify-between pt-2 text-[12.5px]">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setStep('FORM');
-                            setError(null);
-                        }}
-                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                <div className="space-y-2">
+                    <Button
+                        type="submit"
+                        disabled={pending || otp.length !== 6}
+                        className="h-10 w-full rounded-xl bg-[var(--accent)] font-semibold text-[var(--accent-ink)] hover:opacity-95"
                     >
-                        <ArrowLeft className="size-3.5" />
-                        <span>Ubah data</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={resendTimer > 0 || pending}
-                        className={cn(
-                            'font-medium transition-colors',
-                            resendTimer > 0
-                                ? 'text-muted-foreground cursor-not-allowed'
-                                : 'text-[var(--accent)] hover:underline',
+                        {pending ? (
+                            <span className="inline-flex items-center gap-2">
+                                <Loader2 className="size-4 animate-spin" />
+                                <span>Memverifikasi OTP...</span>
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-2">
+                                <span>Verifikasi & Ajukan Akun</span>
+                                <ArrowRight className="size-4" />
+                            </span>
                         )}
-                    >
-                        {resendTimer > 0
-                            ? `Kirim ulang (${resendTimer}s)`
-                            : 'Kirim ulang OTP'}
-                    </button>
+                    </Button>
+
+                    <div className="flex items-center justify-between pt-1 text-[12.5px]">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setStep('FORM');
+                                setError(null);
+                            }}
+                            disabled={pending}
+                            className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="size-3.5" />
+                            <span>Ubah Data</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleResendOtp}
+                            disabled={resendTimer > 0 || pending}
+                            className={cn(
+                                'font-medium transition-colors',
+                                resendTimer > 0 || pending
+                                    ? 'cursor-not-allowed text-muted-foreground/60'
+                                    : 'text-[var(--accent)] hover:underline',
+                            )}
+                        >
+                            {resendTimer > 0 ? `Kirim ulang (${resendTimer}s)` : 'Kirim Ulang OTP'}
+                        </button>
+                    </div>
                 </div>
             </form>
         );
     }
 
     return (
-        <form onSubmit={handleSendOtp} noValidate className="space-y-4">
-            <FieldGroup className="gap-3.5">
-                {/* 1. Pemilihan Peran (Hanya Dinkes, RS, Puskesmas) */}
-                <Field data-invalid={Boolean(fieldErrors.role)}>
-                    <FieldLabel className="text-[13px]">
-                        Pilih Peran Instansi <span className="text-[var(--negative)]">*</span>
-                    </FieldLabel>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {ROLE_OPTIONS.map((opt) => {
-                            const Icon = opt.icon;
-                            const active = role === opt.id;
-                            return (
-                                <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => handleRoleChange(opt.id)}
-                                    className={cn(
-                                        'flex flex-col items-start p-3 rounded-[var(--radius-control)] border text-left transition-all',
-                                        active
-                                            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-foreground shadow-xs'
-                                            : 'border-[var(--border)] bg-[var(--surface)] text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground',
-                                    )}
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Icon className={cn('size-4', active ? 'text-[var(--accent)]' : 'text-muted-foreground')} />
-                                        <span className="text-[13px] font-semibold text-foreground">
-                                            {opt.title}
-                                        </span>
-                                    </div>
-                                    <span className="text-[11px] leading-tight text-muted-foreground line-clamp-2">
-                                        {opt.desc}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </Field>
+        <form onSubmit={handleSendOtp} className="space-y-4">
+            <AuthSteps steps={STEPS} currentIndex={currentStepIndex} />
+            <AuthErrorAlert message={error} />
 
-                {/* 2. Pemilihan Instansi Faskes (Puskesmas atau RS) */}
-                {role !== 'DINKES' && (
-                    <Field data-invalid={Boolean(fieldErrors.institutionId)}>
-                        <FieldLabel htmlFor="institutionId" className="text-[13px]">
-                            {role === 'PUSKESMAS' ? 'Nama Puskesmas' : 'Nama Rumah Sakit'} <span className="text-[var(--negative)]">*</span>
-                        </FieldLabel>
-                        <select
-                            id="institutionId"
-                            name="institutionId"
-                            value={institutionId}
-                            onChange={(e) => setInstitutionId(e.target.value)}
-                            className="h-10 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-foreground outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-                            required
-                        >
-                            <option value="" disabled>
-                                Pilih {role === 'PUSKESMAS' ? 'Puskesmas' : 'Rumah Sakit'} Anda…
-                            </option>
-                            {filteredInstitutions.map((inst) => (
+            {/* Peran Instansi */}
+            <div className="space-y-1.5">
+                <label className="text-[12.5px] font-medium text-foreground">
+                    Peran Fasilitas Kesehatan
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                    {ROLE_OPTIONS.map((opt) => {
+                        const Icon = opt.icon;
+                        const active = role === opt.id;
+                        return (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => handleRoleChange(opt.id)}
+                                className={cn(
+                                    'group relative flex flex-col items-center gap-1.5 rounded-xl border p-2.5 text-center transition-all',
+                                    active
+                                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]/60 text-[var(--accent)] shadow-2xs'
+                                        : 'border-[var(--border)] bg-[var(--raised)]/40 text-muted-foreground hover:border-[var(--accent)]/40 hover:text-foreground',
+                                )}
+                            >
+                                <Icon
+                                    className={cn(
+                                        'size-4.5 transition-transform group-hover:scale-105',
+                                        active ? 'text-[var(--accent)]' : 'text-muted-foreground',
+                                    )}
+                                />
+                                <span className="text-[12px] font-semibold leading-tight text-foreground">
+                                    {opt.title}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+                {fieldErrors.role && <FieldError className="text-[11.5px]">{fieldErrors.role}</FieldError>}
+            </div>
+
+            {/* Pemilihan Instansi (Puskesmas / RS) */}
+            {role !== 'DINKES' && (
+                <Field className="space-y-1.5">
+                    <FieldLabel htmlFor="institution-select" className="text-[12.5px] font-medium text-foreground">
+                        Nama {role === 'PUSKESMAS' ? 'Puskesmas' : 'Rumah Sakit'}
+                    </FieldLabel>
+                    <select
+                        id="institution-select"
+                        value={institutionId}
+                        onChange={(e) => setInstitutionId(e.target.value)}
+                        disabled={pending}
+                        aria-invalid={Boolean(fieldErrors.institutionId)}
+                        className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--ground)] px-3 text-[13px] text-foreground transition-colors focus:border-[var(--accent)] focus:outline-hidden"
+                    >
+                        {filteredInstitutions.length === 0 ? (
+                            <option value="">Tidak ada instansi terdaftar</option>
+                        ) : (
+                            filteredInstitutions.map((inst) => (
                                 <option key={inst.id} value={inst.id}>
                                     {inst.name} {inst.city ? `(${inst.city})` : ''}
                                 </option>
-                            ))}
-                        </select>
-                        {fieldErrors.institutionId && (
-                            <FieldError>{fieldErrors.institutionId}</FieldError>
+                            ))
                         )}
-                    </Field>
-                )}
+                    </select>
+                    {fieldErrors.institutionId && (
+                        <FieldError className="text-[11.5px]">{fieldErrors.institutionId}</FieldError>
+                    )}
+                </Field>
+            )}
 
-                {/* 3. Nama Lengkap */}
-                <Field data-invalid={Boolean(fieldErrors.name)}>
-                    <FieldLabel htmlFor="name" className="text-[13px]">
-                        Nama Lengkap <span className="text-[var(--negative)]">*</span>
+            {/* Nama Pemohon & Email */}
+            <FieldGroup className="space-y-3">
+                <Field className="space-y-1">
+                    <FieldLabel htmlFor="name" className="text-[12.5px] font-medium text-foreground">
+                        Nama Lengkap Petugas
                     </FieldLabel>
-                    <Input
-                        id="name"
-                        name="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="dr. Ahmad Santoso"
-                        autoComplete="name"
-                        required
-                        className="h-10"
-                    />
-                    {fieldErrors.name && <FieldError>{fieldErrors.name}</FieldError>}
+                    <div className="relative">
+                        <Input
+                            id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="dr. Ahmad Fauzi / Siti Rahma, S.Kep"
+                            disabled={pending}
+                            aria-invalid={Boolean(fieldErrors.name)}
+                            className="h-10 bg-[var(--ground)] pr-10 text-[13px]"
+                        />
+                        <User className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
+                    </div>
+                    {fieldErrors.name && <FieldError className="text-[11.5px]">{fieldErrors.name}</FieldError>}
                 </Field>
 
-                {/* 4. Alamat Email */}
-                <Field data-invalid={Boolean(fieldErrors.email)}>
-                    <FieldLabel htmlFor="email" className="text-[13px]">
-                        Alamat Email Dinas / Faskes <span className="text-[var(--negative)]">*</span>
+                <Field className="space-y-1">
+                    <FieldLabel htmlFor="email" className="text-[12.5px] font-medium text-foreground">
+                        Alamat Email Dinas / Instansi
                     </FieldLabel>
-                    <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="nama@instansi.go.id"
-                        autoComplete="email"
-                        required
-                        className="h-10"
-                    />
-                    <FieldDescription className="text-[11.5px]">
-                        Kode OTP verifikasi akan dikirimkan ke email ini
-                    </FieldDescription>
-                    {fieldErrors.email && <FieldError>{fieldErrors.email}</FieldError>}
+                    <div className="relative">
+                        <Input
+                            id="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="nama@puskesmas.go.id"
+                            disabled={pending}
+                            aria-invalid={Boolean(fieldErrors.email)}
+                            className="h-10 bg-[var(--ground)] pr-10 text-[13px]"
+                        />
+                        <Mail className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
+                    </div>
+                    {fieldErrors.email && <FieldError className="text-[11.5px]">{fieldErrors.email}</FieldError>}
                 </Field>
 
-                {/* 5. Password dengan Validasi 7 Karakter + Simbol & Eye Toggle */}
-                <Field data-invalid={Boolean(fieldErrors.password)}>
-                    <FieldLabel htmlFor="password" className="text-[13px]">
-                        Kata Sandi <span className="text-[var(--negative)]">*</span>
+                {/* Password & Confirm */}
+                <Field className="space-y-1">
+                    <FieldLabel htmlFor="password" className="text-[12.5px] font-medium text-foreground">
+                        Kata Sandi Baru
                     </FieldLabel>
                     <div className="relative">
                         <Input
                             id="password"
-                            name="password"
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Minimal 7 karakter & ada simbol"
-                            autoComplete="new-password"
-                            required
-                            className="h-10 pr-10"
+                            placeholder="Minimal 7 karakter + simbol"
+                            disabled={pending}
+                            aria-invalid={Boolean(fieldErrors.password)}
+                            className="h-10 bg-[var(--ground)] pr-10 text-[13px]"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword((p) => !p)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                            tabIndex={-1}
-                            aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                            disabled={pending}
+                            aria-label={showPassword ? 'Sembunyikan sandi' : 'Lihat sandi'}
+                            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-hidden"
                         >
-                            {showPassword ? (
-                                <EyeOff className="size-4" strokeWidth={1.5} />
-                            ) : (
-                                <Eye className="size-4" strokeWidth={1.5} />
-                            )}
+                            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                     </div>
-                    <FieldDescription className="text-[11.5px]">
-                        Ketentuan: Minimal 7 karakter dan mengandung minimal 1 simbol khusus (@, #, $, !, %, *)
-                    </FieldDescription>
+                    <PasswordRequirements password={password} />
                     {fieldErrors.password && (
-                        <FieldError>{fieldErrors.password}</FieldError>
+                        <FieldError className="text-[11.5px]">{fieldErrors.password}</FieldError>
                     )}
                 </Field>
 
-                {/* 6. Konfirmasi Password */}
-                <Field data-invalid={Boolean(fieldErrors.confirm || error)}>
-                    <FieldLabel htmlFor="confirm" className="text-[13px]">
-                        Konfirmasi Kata Sandi <span className="text-[var(--negative)]">*</span>
+                <Field className="space-y-1">
+                    <FieldLabel htmlFor="confirm" className="text-[12.5px] font-medium text-foreground">
+                        Konfirmasi Kata Sandi
                     </FieldLabel>
                     <div className="relative">
                         <Input
                             id="confirm"
-                            name="confirm"
                             type={showConfirm ? 'text' : 'password'}
                             value={confirm}
                             onChange={(e) => setConfirm(e.target.value)}
-                            autoComplete="new-password"
-                            required
-                            className="h-10 pr-10"
+                            placeholder="Ulangi kata sandi"
+                            disabled={pending}
+                            aria-invalid={Boolean(fieldErrors.confirm)}
+                            className="h-10 bg-[var(--ground)] pr-10 text-[13px]"
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirm((p) => !p)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                            tabIndex={-1}
-                            aria-label={showConfirm ? 'Sembunyikan password' : 'Lihat password'}
+                            disabled={pending}
+                            aria-label={showConfirm ? 'Sembunyikan sandi' : 'Lihat sandi'}
+                            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-hidden"
                         >
-                            {showConfirm ? (
-                                <EyeOff className="size-4" strokeWidth={1.5} />
-                            ) : (
-                                <Eye className="size-4" strokeWidth={1.5} />
-                            )}
+                            {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                     </div>
                     {fieldErrors.confirm && (
-                        <FieldError>{fieldErrors.confirm}</FieldError>
+                        <FieldError className="text-[11.5px]">{fieldErrors.confirm}</FieldError>
                     )}
                 </Field>
             </FieldGroup>
 
-            {error && <FieldError>{error}</FieldError>}
-
             <Button
                 type="submit"
                 disabled={pending}
-                className="h-10 w-full justify-between px-3.5 font-medium mt-2"
+                className="mt-2 h-10 w-full rounded-xl bg-[var(--accent)] font-semibold text-[var(--accent-ink)] hover:opacity-95"
             >
-                <span>{pending ? 'Mengirim kode OTP…' : 'Lanjut: Verifikasi Kode OTP'}</span>
                 {pending ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <span className="inline-flex items-center gap-2">
+                        <Loader2 className="size-4 animate-spin" />
+                        <span>Mengirim Kode OTP...</span>
+                    </span>
                 ) : (
-                    <ArrowRight className="size-4" strokeWidth={1.5} />
+                    <span className="inline-flex items-center gap-2">
+                        <span>Lanjut ke Verifikasi OTP</span>
+                        <ArrowRight className="size-4" />
+                    </span>
                 )}
             </Button>
+
+            <AuthCardFooter>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span>Sudah memiliki akun terdaftar?</span>
+                    <Link
+                        href="/masuk"
+                        className="font-semibold text-[var(--accent)] hover:underline"
+                    >
+                        Masuk ruang kerja
+                    </Link>
+                </div>
+            </AuthCardFooter>
         </form>
     );
 }

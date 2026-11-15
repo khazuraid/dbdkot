@@ -1,11 +1,18 @@
 import Link from 'next/link';
-import { Activity } from 'lucide-react';
+import {
+    Activity,
+    ArrowLeft,
+    LockKeyhole,
+    MailCheck,
+    ShieldCheck,
+} from 'lucide-react';
+import { AuthTabNav } from '@/components/auth/auth-ui';
 
 const CHAIN = [
     {
         step: '01',
         actor: 'Rumah Sakit',
-        desc: 'Mencatat laporan kasus klinis dan mengirim ke wilayah domisili pasien.',
+        desc: 'Mencatat kasus klinis dan meneruskan laporan ke domisili pasien.',
     },
     {
         step: '02',
@@ -15,90 +22,133 @@ const CHAIN = [
     {
         step: '03',
         actor: 'Dinas Kesehatan',
-        desc: 'Memverifikasi hasil PE dan memantau pola sebaran secara real-time.',
+        desc: 'Memverifikasi hasil PE dan memantau klaster sebaran secara real-time.',
     },
 ];
 
+const SECURITY_PILLS = [
+    { icon: LockKeyhole, label: 'PII AES-256-GCM' },
+    { icon: MailCheck, label: 'Verifikasi OTP Email' },
+    { icon: ShieldCheck, label: 'Proteksi Brute-Force' },
+];
+
 /**
- * Split-screen clinical layout for authentication routes.
+ * Synchronized clinical split-screen shell for /masuk, /daftar, and /lupa-password.
  */
 export function AuthShell({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex min-h-dvh flex-col bg-[var(--ground)]">
-            <main className="mx-auto grid w-full max-w-[1040px] flex-1 grid-cols-1 items-center gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_420px] lg:gap-12">
+        <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[var(--ground)]">
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_15%_10%,var(--accent-soft),transparent_65%)] opacity-45 dark:opacity-20"
+            />
+
+            <main className="relative mx-auto grid w-full max-w-[1120px] flex-1 grid-cols-1 items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_460px] lg:gap-14 lg:py-12">
                 <section
                     aria-label="Ringkasan platform surveilans"
-                    className="hidden space-y-8 pr-4 lg:block"
+                    className="hidden space-y-8 pr-2 lg:block"
                 >
-                    <AuthMark />
+                    <div className="flex items-center justify-between gap-4">
+                        <AuthMark />
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)]/80 px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            <ArrowLeft className="size-3.5" />
+                            <span>Beranda Publik</span>
+                        </Link>
+                    </div>
 
                     <div className="space-y-3">
-                        <h1 className="max-w-[18ch] text-[34px] leading-[1.15] font-semibold tracking-[-0.03em] text-foreground">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-2.5 py-1 font-mono text-[10.5px] font-semibold tracking-wider text-[var(--accent)] uppercase">
+                            Portal Surveilans Kota Cirebon
+                        </span>
+                        <h1 className="max-w-[19ch] text-[34px] leading-[1.14] font-semibold tracking-[-0.03em] text-foreground">
                             Surveilans DBD terhubung dari bangsal hingga lapangan.
                         </h1>
-                        <p className="max-w-[46ch] text-[15px] leading-relaxed text-muted-foreground">
+                        <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-muted-foreground">
                             WALI-EPI menyatukan pelaporan kasus Rumah Sakit,
-                            penugasan Puskesmas berdasarkan kelurahan, serta
-                            verifikasi Penyelidikan Epidemiologi oleh Dinas
-                            Kesehatan.
+                            penugasan Puskesmas per kelurahan, serta verifikasi
+                            Penyelidikan Epidemiologi oleh Dinas Kesehatan.
                         </p>
                     </div>
 
-                    <ol className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-                        {CHAIN.map((item) => (
+                    <ol className="space-y-2.5 border-l-2 border-[var(--accent)]/25 pl-4">
+                        {CHAIN.map((c) => (
                             <li
-                                key={item.step}
-                                className="grid grid-cols-[36px_1fr] items-baseline gap-3 py-3.5"
+                                key={c.step}
+                                className="rounded-xl border border-[var(--border)]/80 bg-[var(--surface)]/80 px-4 py-3 backdrop-blur-xs"
                             >
-                                <span
-                                    data-numeric
-                                    className="font-mono text-[12px] font-semibold text-[var(--accent)]"
-                                >
-                                    {item.step}
-                                </span>
-                                <div>
-                                    <p className="text-[13.5px] font-semibold text-foreground">
-                                        {item.actor}
-                                    </p>
-                                    <p className="mt-0.5 text-[13px] text-muted-foreground">
-                                        {item.desc}
-                                    </p>
+                                <div className="flex items-baseline gap-2.5">
+                                    <span
+                                        data-numeric
+                                        className="font-mono text-[11px] font-semibold text-[var(--accent)] tabular-nums"
+                                    >
+                                        {c.step}
+                                    </span>
+                                    <span className="text-[13.5px] font-semibold text-foreground">
+                                        {c.actor}
+                                    </span>
                                 </div>
+                                <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                                    {c.desc}
+                                </p>
                             </li>
                         ))}
                     </ol>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {SECURITY_PILLS.map((pill) => {
+                            const Icon = pill.icon;
+                            return (
+                                <span
+                                    key={pill.label}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground"
+                                >
+                                    <Icon className="size-3.5 text-[var(--accent)]" />
+                                    {pill.label}
+                                </span>
+                            );
+                        })}
+                    </div>
                 </section>
 
-                <div className="mx-auto w-full max-w-[420px] space-y-5">
-                    <div className="lg:hidden">
+                <section className="mx-auto w-full max-w-[460px]">
+                    <div className="mb-5 flex items-center justify-between gap-3 lg:hidden">
                         <AuthMark />
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="size-3.5" />
+                            <span>Beranda</span>
+                        </Link>
                     </div>
+
+                    <AuthTabNav />
                     {children}
-                </div>
+                </section>
             </main>
+
+            <footer className="relative border-t border-[var(--rule)] bg-[var(--surface)]/50 px-4 py-3.5 text-center text-[12px] text-muted-foreground sm:px-6">
+                WALI-EPI · Platform Surveilans Demam Berdarah Dengue Lintas Fasilitas Kesehatan
+            </footer>
         </div>
     );
 }
 
 export function AuthMark() {
     return (
-        <Link
-            href="/masuk"
-            className="inline-flex items-center gap-2.5"
-            aria-label="WALI-EPI, halaman masuk"
-        >
-            <span
-                aria-hidden
-                className="grid size-8 place-items-center rounded-[8px] bg-[var(--accent)] text-[var(--accent-ink)]"
-            >
-                <Activity className="size-4" strokeWidth={2.2} />
+        <Link href="/" className="inline-flex items-center gap-2.5 group">
+            <span className="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs transition-transform group-hover:scale-[1.03]">
+                <Activity className="size-[18px]" strokeWidth={2} />
             </span>
-            <span>
-                <span className="block text-[15px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
+            <span className="flex flex-col leading-none">
+                <span className="text-[14px] font-semibold tracking-tight text-foreground">
                     WALI-EPI
                 </span>
-                <span className="block text-[11.5px] text-muted-foreground">
-                    Sistem Surveilans Demam Berdarah
+                <span className="mt-0.5 text-[11px] font-medium text-muted-foreground">
+                    Surveilans DBD
                 </span>
             </span>
         </Link>

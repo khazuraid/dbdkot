@@ -1,10 +1,14 @@
 'use server';
 
 import { and, eq, gt } from 'drizzle-orm';
-import { z } from 'zod';
 import { hashPassword } from 'better-auth/crypto';
 import { getDb } from '@/db';
 import { accounts, sessions, users, verifications } from '@/db/schema';
+import {
+    requestResetSchema,
+    resetPasswordSchema,
+    type ResetPasswordInput,
+} from '@/lib/auth-schemas';
 import { sendOtpEmail } from '@/lib/email';
 import {
     checkOtpSendRateLimit,
@@ -15,35 +19,6 @@ import {
     recordOtpVerifyAttempt,
     verifyOtpDigest,
 } from '@/lib/rate-limit';
-
-export const requestResetSchema = z.object({
-    email: z
-        .string()
-        .trim()
-        .min(1, 'Email wajib diisi')
-        .email('Format email tidak valid'),
-});
-
-export const resetPasswordSchema = z
-    .object({
-        email: z.string().trim().email('Email tidak valid'),
-        otp: z.string().trim().length(6, 'Kode OTP harus berupa 6 digit angka'),
-        password: z
-            .string()
-            .min(7, 'Password minimal 7 karakter')
-            .regex(
-                /[^a-zA-Z0-9]/,
-                'Password wajib mengandung minimal 1 simbol khusus (contoh: @, #, $, !, %, *)',
-            )
-            .max(100, 'Password maksimal 100 karakter'),
-        confirm: z.string().min(1, 'Konfirmasi password wajib diisi'),
-    })
-    .refine((data) => data.password === data.confirm, {
-        message: 'Password baru dan konfirmasi tidak cocok',
-        path: ['confirm'],
-    });
-
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 /**
  * Step 1: Send OTP to user's registered email address for password reset.
