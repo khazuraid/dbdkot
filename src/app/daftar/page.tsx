@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { connection } from 'next/server';
 import type { Metadata } from 'next';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
@@ -10,6 +12,7 @@ import {
     CardDescription,
     CardHeader,
 } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { RegisterForm } from './register-form';
 
 export const instant = false;
@@ -20,7 +23,8 @@ export const metadata: Metadata = {
 
 const REVIEW = ['Verifikasi OTP', 'Ditinjau Dinkes', 'Akun Aktif'];
 
-export default async function DaftarPage() {
+async function DaftarFormSection() {
+    await connection();
     const db = getDb();
     const instList = await db
         .select({
@@ -33,6 +37,10 @@ export default async function DaftarPage() {
         .where(eq(institutions.isActive, true))
         .orderBy(institutions.name);
 
+    return <RegisterForm institutions={instList} />;
+}
+
+export default function DaftarPage() {
     return (
         <FadeIn className="w-full">
             <Card className="gap-0 py-0">
@@ -47,7 +55,18 @@ export default async function DaftarPage() {
                 </CardHeader>
 
                 <CardContent className="px-6 py-5">
-                    <RegisterForm institutions={instList} />
+                    <Suspense
+                        fallback={
+                            <div className="space-y-4">
+                                <Skeleton className="h-9 w-full" />
+                                <Skeleton className="h-9 w-full" />
+                                <Skeleton className="h-9 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                        }
+                    >
+                        <DaftarFormSection />
+                    </Suspense>
                 </CardContent>
 
                 <div className="space-y-3 border-t border-[var(--rule)] bg-[var(--raised)]/45 px-6 py-3.5">
