@@ -9,9 +9,10 @@ import {
     Timer,
 } from 'lucide-react';
 import { getPublicSurveillanceSummary } from '@/lib/domain/reports';
+import { publicCasePoints } from '@/lib/domain/map-data';
 import { formatNumber } from '@/lib/format';
 import { LandingNav } from '@/components/landing/landing-nav';
-import { HeroInteractive } from '@/components/landing/hero-interactive';
+import { PublicCaseMap } from '@/components/landing/public-case-map';
 import { BentoFeatures } from '@/components/landing/bento-features';
 import { PreventionSection } from '@/components/landing/prevention-section';
 
@@ -107,23 +108,26 @@ const STEPS = [
     },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+    await connection();
+    const cases = await publicCasePoints();
+
     return (
         <div className="min-h-[100dvh] bg-[var(--ground)] text-foreground flex flex-col">
             {/* Floating Island Navigation */}
             <LandingNav />
 
             <main className="flex-1">
-                {/* Asymmetric Split Hero Section */}
-                <section className="relative overflow-hidden pt-12 pb-16 md:pt-20 md:pb-24">
+                {/* Asymmetric Split Hero Section with Real Public Case Map */}
+                <section className="relative overflow-hidden pt-10 pb-16 md:pt-16 md:pb-24">
                     <div className="mx-auto max-w-6xl px-4 md:px-6">
-                        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
-                            {/* Left Text Block (7 Cols) */}
-                            <div className="lg:col-span-7 space-y-6">
+                        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
+                            {/* Left Text Block (6 Cols) */}
+                            <div className="lg:col-span-6 space-y-6">
                                 {/* Eyebrow Badge */}
                                 <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/20 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-400">
                                     <Sparkles className="size-3.5 text-teal-600" />
-                                    Sistem Surveilans Terpadu Kota Bandung
+                                    Sistem Surveilans Spasial DBD
                                 </div>
 
                                 <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:leading-[1.12]">
@@ -167,9 +171,9 @@ export default function LandingPage() {
                                 </div>
                             </div>
 
-                            {/* Right Interactive Preview (5 Cols) */}
-                            <div className="lg:col-span-5">
-                                <HeroInteractive />
+                            {/* Right Live Case Distribution Map (6 Cols) */}
+                            <div className="lg:col-span-6">
+                                <PublicCaseMap cases={cases} height={440} />
                             </div>
                         </div>
 

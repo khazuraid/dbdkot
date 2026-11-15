@@ -1,6 +1,7 @@
 import {
     and,
     count,
+    desc,
     eq,
     isNotNull,
     notExists,
@@ -313,5 +314,50 @@ export async function caseGeoPoints(actor: Actor): Promise<CaseGeoPoint[]> {
         sourceType: r.sourceType,
         institutionName: r.institutionName,
         institutionType: r.institutionType,
+    }));
+}
+
+export type PublicCaseGeoPoint = {
+    id: string;
+    lat: number;
+    lng: number;
+    caseType: string;
+    kelurahan: string | null;
+    clusterId: string | null;
+    createdAt: Date;
+};
+
+/**
+ * Public-safe case distribution without patient identifiers, names, NIK, or facility details.
+ */
+export async function publicCasePoints(): Promise<PublicCaseGeoPoint[]> {
+    const rows = await getDb()
+        .select({
+            id: reportsRS.id,
+            lat: reportsRS.latitude,
+            lng: reportsRS.longitude,
+            caseType: reportsRS.caseType,
+            kelurahan: reportsRS.kelurahan,
+            clusterId: reportsRS.clusterId,
+            createdAt: reportsRS.createdAt,
+        })
+        .from(reportsRS)
+        .where(
+            and(
+                isNotNull(reportsRS.latitude),
+                isNotNull(reportsRS.longitude),
+            ),
+        )
+        .orderBy(desc(reportsRS.createdAt))
+        .limit(300);
+
+    return rows.map((r) => ({
+        id: r.id,
+        lat: Number(r.lat),
+        lng: Number(r.lng),
+        caseType: r.caseType,
+        kelurahan: r.kelurahan,
+        clusterId: r.clusterId,
+        createdAt: r.createdAt,
     }));
 }
