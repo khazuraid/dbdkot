@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { peHouseholdSurveys } from '@/db/schema';
 import { getReport } from '@/lib/domain/report-detail';
+import { peDetail } from '@/lib/domain/pe';
 import { requireActor } from '@/lib/session';
 
 export async function GET(
@@ -18,7 +19,13 @@ export async function GET(
     }
 
     const { id } = await context.params;
-    const report = await getReport(actor, id);
+    let report = await getReport(actor, id);
+    if (!report) {
+        const pe = await peDetail(actor, id);
+        if (pe) {
+            report = await getReport(actor, pe.reportRSId);
+        }
+    }
     if (!report) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -147,11 +154,11 @@ export async function GET(
         wsHouses.addRow({
             no: idx + 1,
             address: h.address,
-            houseCount: h.houseCount,
-            population: h.population,
-            larvaStatus: h.larvaCount > 0 ? 'Positif (+)' : 'Negatif (-)',
-            larvaCount: h.larvaCount,
-            larvaType: h.larvaCount > 0 ? (h.larvaType ?? 'Aedes') : '-',
+            houseCount: h.houseCount ?? 0,
+            population: h.population ?? 0,
+            larvaStatus: (h.larvaCount ?? 0) > 0 ? 'Positif (+)' : 'Negatif (-)',
+            larvaCount: h.larvaCount ?? 0,
+            larvaType: (h.larvaCount ?? 0) > 0 ? (h.larvaType ?? 'Aedes') : '-',
             abateUsed: h.abateUsed ? 'Ya' : 'Tidak',
         });
     });

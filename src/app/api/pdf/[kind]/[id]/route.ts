@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { peHouseholdSurveys } from '@/db/schema';
 import { getReport } from '@/lib/domain/report-detail';
+import { peDetail } from '@/lib/domain/pe';
 import {
     PeLampiranDocument,
     PeLengkapDocument,
@@ -25,7 +26,13 @@ export async function GET(
     }
 
     const { kind, id } = await context.params;
-    const report = await getReport(actor, id);
+    let report = await getReport(actor, id);
+    if (!report) {
+        const pe = await peDetail(actor, id);
+        if (pe) {
+            report = await getReport(actor, pe.reportRSId);
+        }
+    }
     if (!report) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }

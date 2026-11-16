@@ -1342,7 +1342,7 @@ function renderSuratCamatLurahPage(report: ReportDetail) {
             </View>
 
             <View style={styles.pageFooter} fixed>
-                <Text>Pemberitahuan Camat &amp; Lurah · {report.reportNumber}</Text>
+                <Text>Pemberitahuan Camat & Lurah · {report.reportNumber}</Text>
                 <Text
                     render={({ pageNumber, totalPages }) =>
                         `Halaman ${pageNumber} dari ${totalPages}`

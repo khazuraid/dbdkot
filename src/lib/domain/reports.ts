@@ -71,7 +71,7 @@ function baseConditions(actor: Actor, filters: ReportListFilters): SQL[] {
     }
 
     if (filters.caseType) {
-        conditions.push(sql`${reportsRS.caseType} = ${filters.caseType}`);
+        conditions.push(sql`${reportsRS.caseType}::text = ${filters.caseType}`);
     }
 
     if (filters.gender) {
