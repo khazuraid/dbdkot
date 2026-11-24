@@ -17,7 +17,6 @@ import {
     generateOtpCode,
     hashOtp,
     recordOtpVerifyAttempt,
-    verifyOtpDigest,
 } from '@/lib/rate-limit';
 
 /**
@@ -52,6 +51,9 @@ export async function sendResetPasswordOtpAction(rawEmail: string) {
         .limit(1);
 
     if (!user) {
+        // Equalize timing to avoid email enumeration via latency oracle
+        hashOtp(`reset-otp:${email}`, generateOtpCode());
+        await new Promise((r) => setTimeout(r, 150 + Math.floor(Math.random() * 100)));
         return { ok: true as const };
     }
 
@@ -105,32 +107,41 @@ export async function verifyAndResetPasswordAction(input: ResetPasswordInput) {
     const db = getDb();
     const identifier = `reset-otp:${normalizedEmail}`;
 
-    // Verify OTP
-    const [record] = await db
-        .select({
-            id: verifications.id,
-            value: verifications.value,
-        })
-        .from(verifications)
+    // Atomically consume matching unexpired OTP so concurrent requests cannot race
+    const expectedDigest = hashOtp(identifier, otp);
+    const [consumed] = await db
+        .delete(verifications)
         .where(
             and(
                 eq(verifications.identifier, identifier),
+                eq(verifications.value, expectedDigest),
                 gt(verifications.expiresAt, new Date()),
             ),
         )
-        .limit(1);
+        .returning({ id: verifications.id });
 
-    if (!record) {
-        return {
-            ok: false as const,
-            error: 'Kode OTP tidak valid atau sudah kadaluarsa. Silakan minta kode baru.',
-        };
-    }
+    if (!consumed) {
+        const [existingOtp] = await db
+            .select({ id: verifications.id })
+            .from(verifications)
+            .where(
+                and(
+                    eq(verifications.identifier, identifier),
+                    gt(verifications.expiresAt, new Date()),
+                ),
+            )
+            .limit(1);
 
-    if (!verifyOtpDigest(record.value, identifier, otp)) {
+        if (!existingOtp) {
+            return {
+                ok: false as const,
+                error: 'Kode OTP tidak valid atau sudah kadaluarsa. Silakan minta kode baru.',
+            };
+        }
+
         const attempt = await recordOtpVerifyAttempt(identifier);
         if (attempt.exhausted) {
-            await db.delete(verifications).where(eq(verifications.id, record.id));
+            await db.delete(verifications).where(eq(verifications.id, existingOtp.id));
             return {
                 ok: false as const,
                 error: 'Terlalu banyak percobaan OTP gagal. Silakan minta kode OTP baru.',
@@ -150,7 +161,7 @@ export async function verifyAndResetPasswordAction(input: ResetPasswordInput) {
         .limit(1);
 
     if (!user) {
-        return { ok: false as const, error: 'Pengguna tidak ditemukan' };
+        return { ok: false as const, error: 'Kode OTP tidak valid atau sudah kadaluarsa. Silakan minta kode baru.' };
     }
 
     await clearOtpVerifyAttempts(identifier);
@@ -172,30 +183,29 @@ export async function verifyAndResetPasswordAction(input: ResetPasswordInput) {
         )
         .limit(1);
 
-    if (existingAccount) {
-        await db
-            .update(accounts)
-            .set({
+    await db.transaction(async (tx) => {
+        if (existingAccount) {
+            await tx
+                .update(accounts)
+                .set({
+                    password: passwordHash,
+                    updatedAt: now,
+                })
+                .where(eq(accounts.id, existingAccount.id));
+        } else {
+            await tx.insert(accounts).values({
+                userId: user.id,
+                providerId: 'credential',
+                accountId: user.id,
                 password: passwordHash,
+                createdAt: now,
                 updatedAt: now,
-            })
-            .where(eq(accounts.id, existingAccount.id));
-    } else {
-        await db.insert(accounts).values({
-            userId: user.id,
-            providerId: 'credential',
-            accountId: user.id,
-            password: passwordHash,
-            createdAt: now,
-            updatedAt: now,
-        });
-    }
+            });
+        }
 
-    // Revoke old sessions for security
-    await db.delete(sessions).where(eq(sessions.userId, user.id));
-
-    // Delete verified OTP
-    await db.delete(verifications).where(eq(verifications.id, record.id));
+        // Revoke old sessions for security
+        await tx.delete(sessions).where(eq(sessions.userId, user.id));
+    });
 
     return { ok: true as const };
 }

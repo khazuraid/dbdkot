@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, Mail } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, UserRound } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 import { loginSchema } from '@/lib/auth-schemas';
 import { Button } from '@/components/ui/button';
@@ -16,17 +16,26 @@ import {
 } from '@/components/ui/field';
 import { AuthCardFooter, AuthErrorAlert } from '@/components/auth/auth-ui';
 
-export function LoginForm({ initialError }: { initialError?: string }) {
+export function LoginForm({
+    initialError,
+    institutionName = 'Dinas Kesehatan',
+}: {
+    initialError?: string;
+    institutionName?: string;
+}) {
     const router = useRouter();
     const [pending, setPending] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(() => {
         if (initialError === 'disabled') {
-            return 'Akun ini telah dinonaktifkan oleh Administrator. Hubungi Dinas Kesehatan Kota Cirebon.';
+            return `Akun ini telah dinonaktifkan oleh Administrator. Hubungi ${institutionName}.`;
         }
         return null;
     });
-    const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+    const [fieldErrors, setFieldErrors] = useState<{
+        identifier?: string;
+        password?: string;
+    }>({});
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -34,14 +43,14 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         setFieldErrors({});
 
         const data = new FormData(event.currentTarget);
-        const email = String(data.get('email') || '').trim();
+        const identifier = String(data.get('identifier') || '').trim();
         const password = String(data.get('password') || '');
 
-        const parsed = loginSchema.safeParse({ email, password });
+        const parsed = loginSchema.safeParse({ identifier, password });
         if (!parsed.success) {
-            const nextErrors: { email?: string; password?: string } = {};
+            const nextErrors: { identifier?: string; password?: string } = {};
             for (const issue of parsed.error.issues) {
-                const key = issue.path[0] as 'email' | 'password';
+                const key = issue.path[0] as 'identifier' | 'password';
                 if (!nextErrors[key]) nextErrors[key] = issue.message;
             }
             setFieldErrors(nextErrors);
@@ -50,10 +59,16 @@ export function LoginForm({ initialError }: { initialError?: string }) {
 
         setPending(true);
         try {
-            const res = await authClient.signIn.email({
-                email: parsed.data.email,
-                password: parsed.data.password,
-            });
+            const isEmail = parsed.data.identifier.includes('@');
+            const res = isEmail
+                ? await authClient.signIn.email({
+                      email: parsed.data.identifier.toLowerCase(),
+                      password: parsed.data.password,
+                  })
+                : await authClient.signIn.username({
+                      username: parsed.data.identifier.toLowerCase(),
+                      password: parsed.data.password,
+                  });
 
             if (res.error) {
                 const status = res.error.status;
@@ -61,7 +76,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
 
                 if (status === 403 || code === 'FORBIDDEN') {
                     setError(
-                        'Akun belum dapat digunakan (menunggu verifikasi admin atau dinonaktifkan). Hubungi Dinas Kesehatan Kota Cirebon.',
+                        `Akun belum dapat digunakan (menunggu verifikasi admin atau dinonaktifkan). Hubungi ${institutionName}.`,
                     );
                 } else if (status === 429 || code === 'TOO_MANY_REQUESTS') {
                     setError(
@@ -71,7 +86,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
                 } else {
                     setError(
                         res.error.message ||
-                            'Kombinasi email atau kata sandi tidak cocok. Silakan periksa kembali.',
+                            'Kombinasi email/username atau kata sandi tidak cocok. Silakan periksa kembali.',
                     );
                 }
                 setPending(false);
@@ -93,24 +108,33 @@ export function LoginForm({ initialError }: { initialError?: string }) {
 
             <FieldGroup className="space-y-3.5">
                 <Field className="space-y-1.5">
-                    <FieldLabel htmlFor="email" className="text-[13px] font-medium text-foreground">
-                        Alamat Email Dinas / Instansi
+                    <FieldLabel
+                        htmlFor="identifier"
+                        className="text-[13px] font-medium text-foreground"
+                    >
+                        Email atau Username
                     </FieldLabel>
                     <div className="relative">
                         <Input
-                            id="email"
-                            name="email"
-                            type="email"
+                            id="identifier"
+                            name="identifier"
+                            type="text"
                             autoComplete="username"
+                            autoCapitalize="none"
+                            spellCheck={false}
                             autoFocus
-                            placeholder="nama@puskesmas.go.id"
+                            placeholder="nama@instansi.go.id atau username"
                             disabled={pending}
-                            aria-invalid={Boolean(fieldErrors.email)}
+                            aria-invalid={Boolean(fieldErrors.identifier)}
                             className="h-10 bg-[var(--ground)] pr-10 text-[13.5px]"
                         />
-                        <Mail className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
+                        <UserRound className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
                     </div>
-                    {fieldErrors.email && <FieldError className="text-[12px]">{fieldErrors.email}</FieldError>}
+                    {fieldErrors.identifier && (
+                        <FieldError className="text-[12px]">
+                            {fieldErrors.identifier}
+                        </FieldError>
+                    )}
                 </Field>
 
                 <Field className="space-y-1.5">

@@ -38,10 +38,15 @@ export async function requireActor(): Promise<Actor> {
         role?: Role;
         institutionId?: string | null;
         isActive?: boolean;
+        status?: 'PENDING' | 'APPROVED' | 'REJECTED';
     };
 
     if (user.isActive === false) {
         redirect('/masuk?error=disabled');
+    }
+
+    if (user.status && user.status !== 'APPROVED') {
+        redirect('/masuk?error=pending');
     }
 
     return {

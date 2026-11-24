@@ -13,6 +13,7 @@ import {
 import type { Actor } from '@/lib/session';
 import { audit } from '@/lib/audit';
 import { assignReportByKelurahan } from './assignment';
+import { insertNotifications } from './notify';
 import { transitionReport } from './report-detail';
 
 /**
@@ -163,23 +164,34 @@ export async function reassignReport(
             };
         }
 
-        // A manual reassignment only makes sense on a report that is still
-        // unassigned; checking here, before the coverage edit, keeps the
-        // conflict from leaving a stored side effect behind.
         const [state] = await db
-            .select({ status: reportsRS.status })
+            .select({
+                status: reportsRS.status,
+                reportNumber: reportsRS.reportNumber,
+                assignedPuskesmasId: reportsRS.assignedPuskesmasId,
+            })
             .from(reportsRS)
             .where(eq(reportsRS.id, reportId))
             .limit(1);
-        if (state && state.status !== 'SUBMITTED') {
+
+        const reassignableStatuses = [
+            'SUBMITTED',
+            'PUSKESMAS_REJECTED',
+            'CROSS_BORDER_PENDING',
+        ] as const;
+
+        if (
+            !state ||
+            !(reassignableStatuses as readonly string[]).includes(state.status)
+        ) {
             return {
                 ok: false,
                 error: 'CONFLICT',
-                message: 'Laporan sudah ditugaskan.',
+                message: 'Laporan sudah ditugaskan atau dalam proses PE.',
             };
         }
 
-        if (report.kelurahan) {
+        if (report.kelurahan && state.status === 'SUBMITTED') {
             const already = (target.kelurahanList ?? []).some(
                 (k) => k.toLowerCase() === report.kelurahan!.toLowerCase(),
             );
@@ -194,6 +206,78 @@ export async function reassignReport(
                     })
                     .where(eq(institutions.id, puskesmasId));
             }
+        }
+
+        if (state.status !== 'SUBMITTED') {
+            const [officer] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.institutionId, puskesmasId),
+                        eq(users.role, 'PUSKESMAS'),
+                        eq(users.isActive, true),
+                    ),
+                )
+                .limit(1);
+
+            const now = new Date();
+            const [updated] = await db
+                .update(reportsRS)
+                .set({
+                    assignedPuskesmasId: puskesmasId,
+                    assignedToId: officer?.id ?? null,
+                    assignedAt: now,
+                    status: 'ASSIGNED',
+                    rejectionReason: null,
+                    rejectedBy: null,
+                    puskesmasReviewedAt: null,
+                    updatedById: actor.userId,
+                    updatedAt: now,
+                })
+                .where(
+                    and(
+                        eq(reportsRS.id, reportId),
+                        eq(reportsRS.status, state.status),
+                    ),
+                )
+                .returning({ id: reportsRS.id });
+
+            if (!updated) {
+                return {
+                    ok: false,
+                    error: 'CONFLICT',
+                    message: 'Status laporan sudah berubah.',
+                };
+            }
+
+            await Promise.all([
+                audit({
+                    actor,
+                    action: 'UPDATE',
+                    entityType: 'REPORT_RS',
+                    entityId: reportId,
+                    changes: {
+                        status: { from: state.status, to: 'ASSIGNED' },
+                        assignedPuskesmasId: {
+                            from: state.assignedPuskesmasId,
+                            to: puskesmasId,
+                        },
+                    },
+                }),
+                insertNotifications(
+                    { kind: 'INSTITUTION', institutionId: puskesmasId },
+                    {
+                        title: 'Disposisi ulang kasus dari Dinkes',
+                        message: `Laporan ${state.reportNumber} ditugaskan ke Puskesmas Anda untuk Penyelidikan Epidemiologi.`,
+                        type: 'ASSIGNMENT',
+                        entityType: 'REPORT_RS',
+                        entityId: reportId,
+                    },
+                ),
+            ]);
+
+            return { ok: true, puskesmasId };
         }
     }
 
@@ -247,7 +331,9 @@ export async function decideVerification(
                 ? 'Laporan tidak ditemukan.'
                 : result.reason === 'FORBIDDEN'
                   ? 'Tidak berwenang.'
-                  : 'Status laporan sudah berubah. Muat ulang halaman.',
+                  : result.reason === 'NOTE_REQUIRED'
+                    ? 'Alasan penolakan wajib diisi minimal 5 karakter.'
+                    : 'Status laporan sudah berubah. Muat ulang halaman.',
     };
 }
 
@@ -305,19 +391,43 @@ export type SettingInput = {
 export async function saveSetting(
     actor: Actor,
     input: SettingInput,
-): Promise<ActionResult<'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT'>> {
+): Promise<
+    ActionResult<'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'VALIDATION'>
+> {
     if (actor.role !== 'ADMIN') {
         return { ok: false, error: 'FORBIDDEN', message: 'Hanya admin.' };
+    }
+
+    const { isSecretSettingKey, isValidUuid, MASKED_SECRET } =
+        await import('@/lib/security');
+    const { encryptSettingValue } = await import('@/lib/security-server');
+
+    if (input.id && !isValidUuid(input.id)) {
+        return {
+            ok: false,
+            error: 'VALIDATION',
+            message: 'ID pengaturan tidak valid.',
+        };
+    }
+
+    const secret = isSecretSettingKey(input.key);
+    if (secret && input.value.trim() === MASKED_SECRET) {
+        return {
+            ok: false,
+            error: 'VALIDATION',
+            message:
+                'Nilai rahasia disamarkan. Masukkan nilai baru jika ingin mengganti.',
+        };
     }
 
     const db = getDb();
     const values = {
         key: input.key,
-        value: input.value,
+        value: secret ? encryptSettingValue(input.value) : input.value,
         type: input.type,
         category: input.category || null,
         description: input.description || null,
-        isPublic: input.isPublic,
+        isPublic: secret ? false : input.isPublic,
     };
 
     try {
@@ -328,16 +438,41 @@ export async function saveSetting(
                 .where(eq(systemSettings.id, input.id))
                 .returning({ id: systemSettings.id });
 
-            return rows.length
-                ? { ok: true }
-                : {
-                      ok: false,
-                      error: 'NOT_FOUND',
-                      message: 'Pengaturan tidak ditemukan.',
-                  };
+            if (!rows.length) {
+                return {
+                    ok: false,
+                    error: 'NOT_FOUND',
+                    message: 'Pengaturan tidak ditemukan.',
+                };
+            }
+
+            await audit({
+                actor,
+                action: 'UPDATE',
+                entityType: 'USER',
+                entityId: rows[0].id,
+                changes: {
+                    settingKey: { from: null, to: input.key },
+                    isPublic: { from: null, to: values.isPublic },
+                },
+            });
+            return { ok: true };
         }
 
-        await db.insert(systemSettings).values(values);
+        const [created] = await db
+            .insert(systemSettings)
+            .values(values)
+            .returning({ id: systemSettings.id });
+        await audit({
+            actor,
+            action: 'CREATE',
+            entityType: 'USER',
+            entityId: created?.id ?? actor.userId,
+            changes: {
+                settingKey: { from: null, to: input.key },
+                isPublic: { from: null, to: values.isPublic },
+            },
+        });
         return { ok: true };
     } catch (error) {
         if (
@@ -363,18 +498,37 @@ export async function deleteSetting(
         return { ok: false, error: 'FORBIDDEN', message: 'Hanya admin.' };
     }
 
+    const { isValidUuid } = await import('@/lib/security');
+    if (!isValidUuid(id)) {
+        return {
+            ok: false,
+            error: 'NOT_FOUND',
+            message: 'Pengaturan tidak ditemukan.',
+        };
+    }
+
     const rows = await getDb()
         .delete(systemSettings)
         .where(eq(systemSettings.id, id))
-        .returning({ id: systemSettings.id });
+        .returning({ id: systemSettings.id, key: systemSettings.key });
 
-    return rows.length
-        ? { ok: true }
-        : {
-              ok: false,
-              error: 'NOT_FOUND',
-              message: 'Pengaturan tidak ditemukan.',
-          };
+    if (!rows.length) {
+        return {
+            ok: false,
+            error: 'NOT_FOUND',
+            message: 'Pengaturan tidak ditemukan.',
+        };
+    }
+
+    await audit({
+        actor,
+        action: 'DELETE',
+        entityType: 'USER',
+        entityId: rows[0].id,
+        changes: { settingKey: { from: rows[0].key, to: null } },
+    });
+
+    return { ok: true };
 }
 
 /* ── pesan ─────────────────────────────────────────────────────────────── */

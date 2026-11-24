@@ -5,6 +5,9 @@ import { getDb } from '@/db';
 import { peHouseholdSurveys } from '@/db/schema';
 import { getReport } from '@/lib/domain/report-detail';
 import { peDetail } from '@/lib/domain/pe';
+import { audit } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
+import { isValidUuid, sanitizeWorkbookStrings } from '@/lib/security';
 import { requireActor } from '@/lib/session';
 
 export async function GET(
@@ -18,7 +21,18 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rate = await consumeRateLimit(`export:pe:${actor.userId}`, 60, 20);
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak permintaan ekspor. Coba sebentar lagi.' },
+            { status: 429, headers: { 'Retry-After': String(rate.retryAfter ?? 60) } },
+        );
+    }
+
     const { id } = await context.params;
+    if (!isValidUuid(id)) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     let report = await getReport(actor, id);
     if (!report) {
         const pe = await peDetail(actor, id);
@@ -163,6 +177,17 @@ export async function GET(
         });
     });
 
+    await audit({
+        actor,
+        action: 'READ_PII',
+        entityType: 'REPORT_PE',
+        entityId: report.pe?.id ?? report.id,
+        changes: {
+            export: { from: null, to: 'pe-excel' },
+        },
+    });
+
+    sanitizeWorkbookStrings(wb);
     const buffer = await wb.xlsx.writeBuffer();
     const filename = `Data-PE-${report.reportNumber}.xlsx`;
 

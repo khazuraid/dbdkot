@@ -324,6 +324,11 @@ export default async function PenggunaPage({
                                         <div className="min-w-0">
                                             <p className="truncate font-medium text-foreground">
                                                 {u.name}
+                                                {u.username && (
+                                                    <span className="ml-1.5 font-mono text-[11.5px] font-normal text-muted-foreground">
+                                                        @{u.username}
+                                                    </span>
+                                                )}
                                             </p>
                                             <p
                                                 className="truncate font-mono text-[11.5px] text-muted-foreground"
@@ -397,6 +402,7 @@ export default async function PenggunaPage({
                                             account={{
                                                 id: u.id,
                                                 name: u.name,
+                                                username: u.username,
                                                 email: u.email,
                                                 role: u.role as Role,
                                                 status: u.status,

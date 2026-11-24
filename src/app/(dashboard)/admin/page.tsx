@@ -16,7 +16,13 @@ import {
 } from 'lucide-react';
 import { requireRole } from '@/lib/session';
 import { getDb } from '@/db';
-import { institutions, kelurahan, users, auditLogs, attachments } from '@/db/schema';
+import {
+    institutions,
+    kelurahan,
+    users,
+    auditLogs,
+    attachments,
+} from '@/db/schema';
 import { count } from 'drizzle-orm';
 import {
     PageBody,
@@ -37,19 +43,20 @@ export default async function AdminHubPage() {
     const isAdmin = actor.role === 'ADMIN';
 
     // Query stats
-    const [[instCount], [kelCount], [userCount], [logCount], [fileCount]] = await Promise.all([
-        db.select({ value: count() }).from(institutions),
-        db.select({ value: count() }).from(kelurahan),
-        isAdmin
-            ? db.select({ value: count() }).from(users)
-            : Promise.resolve([{ value: 0 }]),
-        isAdmin
-            ? db.select({ value: count() }).from(auditLogs)
-            : Promise.resolve([{ value: 0 }]),
-        isAdmin
-            ? db.select({ value: count() }).from(attachments)
-            : Promise.resolve([{ value: 0 }]),
-    ]);
+    const [[instCount], [kelCount], [userCount], [logCount], [fileCount]] =
+        await Promise.all([
+            db.select({ value: count() }).from(institutions),
+            db.select({ value: count() }).from(kelurahan),
+            isAdmin
+                ? db.select({ value: count() }).from(users)
+                : Promise.resolve([{ value: 0 }]),
+            isAdmin
+                ? db.select({ value: count() }).from(auditLogs)
+                : Promise.resolve([{ value: 0 }]),
+            isAdmin
+                ? db.select({ value: count() }).from(attachments)
+                : Promise.resolve([{ value: 0 }]),
+        ]);
 
     const adminModules = [
         {
@@ -142,7 +149,7 @@ export default async function AdminHubPage() {
         <PageBody>
             <PageHeader
                 title="Pusat Administrasi & Master Data"
-                context={`Panel kendali master data, hak akses sistem, dan parameter surveilans epidemiologi — ${actor.role === 'ADMIN' ? 'Administrator Sistem' : 'Dinas Kesehatan Kota Cirebon'}`}
+                context={`Panel kendali master data, hak akses sistem, dan parameter surveilans epidemiologi — ${actor.role === 'ADMIN' ? 'Administrator Sistem' : 'Dinas Kesehatan'}`}
             />
 
             <PageContent>
@@ -165,7 +172,11 @@ export default async function AdminHubPage() {
                         label="Pengguna Sistem"
                         value={isAdmin ? userCount.value : '—'}
                         signal={isAdmin ? 'neutral' : 'neutral'}
-                        hint={isAdmin ? 'Total akun pengguna' : 'Hak akses terbatas'}
+                        hint={
+                            isAdmin
+                                ? 'Total akun pengguna'
+                                : 'Hak akses terbatas'
+                        }
                         icon={Users}
                     />
                     <Stat
@@ -178,7 +189,7 @@ export default async function AdminHubPage() {
                 </StatRow>
 
                 <Panel title="Modul Administrasi & Kontrol Akses">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                    <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
                         {adminModules.map((mod) => {
                             const Icon = mod.icon;
                             return (
@@ -188,11 +199,11 @@ export default async function AdminHubPage() {
                                         'group relative flex flex-col justify-between rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 transition-all',
                                         mod.allowed
                                             ? 'hover:border-[var(--accent)] hover:shadow-sm'
-                                            : 'opacity-70 bg-[var(--muted)]/20',
+                                            : 'bg-[var(--muted)]/20 opacity-70',
                                     )}
                                 >
                                     <div>
-                                        <div className="flex items-center justify-between gap-2 mb-3">
+                                        <div className="mb-3 flex items-center justify-between gap-2">
                                             <div
                                                 className={cn(
                                                     'flex size-10 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)]',
@@ -213,7 +224,7 @@ export default async function AdminHubPage() {
                                             <Badge
                                                 variant="outline"
                                                 className={cn(
-                                                    'text-[11px] font-mono',
+                                                    'font-mono text-[11px]',
                                                     !mod.allowed &&
                                                         'border-amber-500/30 text-amber-600',
                                                 )}
@@ -222,15 +233,15 @@ export default async function AdminHubPage() {
                                             </Badge>
                                         </div>
 
-                                        <h3 className="text-base font-semibold text-foreground group-hover:text-[var(--accent)] transition-colors">
+                                        <h3 className="text-base font-semibold text-foreground transition-colors group-hover:text-[var(--accent)]">
                                             {mod.title}
                                         </h3>
-                                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                                             {mod.description}
                                         </p>
                                     </div>
 
-                                    <div className="mt-5 pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs">
+                                    <div className="mt-5 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs">
                                         <span className="font-mono font-medium text-muted-foreground">
                                             {mod.stat}
                                         </span>

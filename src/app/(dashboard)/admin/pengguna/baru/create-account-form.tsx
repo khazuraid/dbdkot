@@ -43,6 +43,7 @@ function generatePassword(length = 12) {
 
 function useCreateAccountForm(onSuccess: () => void) {
     const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<Role>('PUSKESMAS');
     const [institutionId, setInstitutionId] = useState('');
@@ -63,6 +64,8 @@ function useCreateAccountForm(onSuccess: () => void) {
     return {
         name,
         setName,
+        username,
+        setUsername,
         email,
         setEmail,
         role,
@@ -119,9 +122,20 @@ function CreateAccountFields({
                     onChange={(e) => form.setEmail(e.target.value)}
                     autoComplete="off"
                     required
-                    hint="Dipakai untuk masuk; harus unik."
+                    hint="Dipakai untuk masuk & verifikasi; harus unik."
                 />
             </div>
+
+            <Field
+                id={fieldId('username')}
+                name="username"
+                label="Username (opsional)"
+                placeholder="petugas.pkm01"
+                value={form.username}
+                onChange={(e) => form.setUsername(e.target.value)}
+                autoComplete="off"
+                hint="Boleh dipakai masuk selain email (3–30 karakter: huruf kecil, angka, titik, _, -)."
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">

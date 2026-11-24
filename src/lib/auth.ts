@@ -2,6 +2,7 @@ import { betterAuth, APIError } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
+import { username } from 'better-auth/plugins';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { account, session, user, users, verification } from '@/db/schema';
@@ -31,7 +32,7 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
-        minPasswordLength: 7,
+        minPasswordLength: 8,
         requireEmailVerification: false,
     },
     // Rejects cross-site POSTs with a valid-looking Origin; the cookie is
@@ -39,7 +40,9 @@ export const auth = betterAuth({
     trustedOrigins: [
         process.env.BETTER_AUTH_URL,
         process.env.NEXT_PUBLIC_APP_URL,
-        'http://localhost:3000',
+        ...(process.env.NODE_ENV !== 'production'
+            ? ['http://localhost:3000']
+            : []),
     ].filter((v): v is string => Boolean(v)),
     rateLimit: {
         enabled: true,
@@ -50,6 +53,7 @@ export const auth = betterAuth({
             // Credential stuffing: IP-level burst cap paired with per-account
             // lockout in `hooks` below so shared clinic NATs aren't disrupted.
             '/sign-in/email': { window: 60, max: 10 },
+            '/sign-in/username': { window: 60, max: 10 },
             '/sign-up/email': { window: 60, max: 5 },
         },
     },
@@ -92,7 +96,10 @@ export const auth = betterAuth({
         // better-auth must generate a UUID, not its default 32-char string.
         database: { generateId: 'uuid' },
         ipAddress: {
-            ipAddressHeaders: ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for'],
+            ipAddressHeaders:
+                process.env.TRUST_PROXY === 'true'
+                    ? ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for']
+                    : ['x-real-ip'],
         },
     },
     hooks: {
@@ -104,42 +111,62 @@ export const auth = betterAuth({
                 });
             }
 
-            if (ctx.path === '/sign-in/email') {
-                const rawEmail = (ctx.body as { email?: unknown } | undefined)
-                    ?.email;
-                const email =
-                    typeof rawEmail === 'string'
-                        ? rawEmail.toLowerCase().trim()
-                        : '';
-                if (email) {
-                    const lock = await isLoginLocked(email);
-                    if (lock.locked) {
-                        const mins = Math.max(
-                            1,
-                            Math.ceil(lock.retryAfterSeconds / 60),
-                        );
-                        throw new APIError('TOO_MANY_REQUESTS', {
-                            code: 'TOO_MANY_REQUESTS',
-                            message: `Terlalu banyak percobaan masuk gagal. Coba lagi dalam ${mins} menit.`,
-                        });
-                    }
+            const signInKey =
+                ctx.path === '/sign-in/email'
+                    ? typeof (ctx.body as { email?: unknown } | undefined)
+                          ?.email === 'string'
+                        ? (
+                              (ctx.body as { email: string }).email
+                          )
+                              .toLowerCase()
+                              .trim()
+                        : ''
+                    : ctx.path === '/sign-in/username'
+                      ? typeof (
+                            ctx.body as { username?: unknown } | undefined
+                        )?.username === 'string'
+                          ? `u:${(ctx.body as { username: string }).username.toLowerCase().trim()}`
+                          : ''
+                      : '';
+
+            if (signInKey) {
+                const lock = await isLoginLocked(signInKey);
+                if (lock.locked) {
+                    const mins = Math.max(
+                        1,
+                        Math.ceil(lock.retryAfterSeconds / 60),
+                    );
+                    throw new APIError('TOO_MANY_REQUESTS', {
+                        code: 'TOO_MANY_REQUESTS',
+                        message: `Terlalu banyak percobaan masuk gagal. Coba lagi dalam ${mins} menit.`,
+                    });
                 }
             }
         }),
         after: createAuthMiddleware(async (ctx) => {
-            if (ctx.path !== '/sign-in/email') return;
-
-            const rawEmail = (ctx.body as { email?: unknown } | undefined)?.email;
-            const email =
-                typeof rawEmail === 'string'
-                    ? rawEmail.toLowerCase().trim()
-                    : '';
-            if (!email) return;
+            const signInKey =
+                ctx.path === '/sign-in/email'
+                    ? typeof (ctx.body as { email?: unknown } | undefined)
+                          ?.email === 'string'
+                        ? (
+                              (ctx.body as { email: string }).email
+                          )
+                              .toLowerCase()
+                              .trim()
+                        : ''
+                    : ctx.path === '/sign-in/username'
+                      ? typeof (
+                            ctx.body as { username?: unknown } | undefined
+                        )?.username === 'string'
+                          ? `u:${(ctx.body as { username: string }).username.toLowerCase().trim()}`
+                          : ''
+                      : '';
+            if (!signInKey) return;
 
             const returned = ctx.context.returned;
             if (isAPIError(returned)) {
                 if (returned.statusCode !== 429) {
-                    const result = await recordLoginFailure(email);
+                    const result = await recordLoginFailure(signInKey);
                     if (result.locked) {
                         const mins = Math.max(
                             1,
@@ -155,7 +182,7 @@ export const auth = betterAuth({
             }
 
             if (returned) {
-                await clearLoginFailures(email);
+                await clearLoginFailures(signInKey);
             }
         }),
     },
@@ -217,7 +244,14 @@ export const auth = betterAuth({
             },
         },
     },
-    plugins: [nextCookies()],
+    plugins: [
+        username({
+            minUsernameLength: 3,
+            maxUsernameLength: 30,
+            usernameValidator: (val) => /^[a-z0-9._-]+$/.test(val),
+        }),
+        nextCookies(),
+    ],
 });
 
 export type Session = typeof auth.$Infer.Session;

@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/db';
 import { institutions } from '@/db/schema';
 import type { Role } from '@/lib/roles';
+import { getPortalBranding } from '@/lib/branding';
 import { Sidebar } from '@/components/shell/sidebar';
 import { MobileNav } from '@/components/shell/mobile-nav';
 import { CommandPalette } from '@/components/shell/command-palette';
@@ -34,26 +35,37 @@ export default async function DashboardLayout({
         role?: Role;
         institutionId?: string | null;
         isActive?: boolean;
+        status?: 'PENDING' | 'APPROVED' | 'REJECTED';
     };
 
     if (user.isActive === false) {
         redirect('/masuk?error=disabled');
     }
 
-    let institution: string | null = null;
-
-    if (user.institutionId) {
-        const [row] = await getDb()
-            .select({ name: institutions.name })
-            .from(institutions)
-            .where(eq(institutions.id, user.institutionId))
-            .limit(1);
-        institution = row?.name ?? null;
+    if (user.status && user.status !== 'APPROVED') {
+        redirect('/masuk?error=pending');
     }
+
+    const [institutionRow, branding] = await Promise.all([
+        user.institutionId
+            ? getDb()
+                  .select({ name: institutions.name })
+                  .from(institutions)
+                  .where(eq(institutions.id, user.institutionId))
+                  .limit(1)
+            : Promise.resolve([]),
+        getPortalBranding(),
+    ]);
+    const institution: string | null = institutionRow[0]?.name ?? null;
 
     const role = (user.role ?? 'PUSKESMAS') as Role;
     const name = user.name ?? 'Pengguna';
     const email = user.email ?? '';
+    const shellBranding = {
+        title: branding.title,
+        tagline: branding.tagline,
+        logoUrl: branding.logoUrl,
+    };
 
     return (
         <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:fixed md:inset-0 md:h-dvh md:max-h-dvh md:overflow-hidden md:flex-row md:gap-3 md:p-3">
@@ -66,6 +78,7 @@ export default async function DashboardLayout({
                 name={name}
                 email={email}
                 institution={institution}
+                branding={shellBranding}
             />
 
             <aside className="hidden shrink-0 md:flex md:h-full md:flex-col md:overflow-hidden">
@@ -74,6 +87,7 @@ export default async function DashboardLayout({
                     name={name}
                     email={email}
                     institution={institution}
+                    branding={shellBranding}
                 />
             </aside>
 

@@ -169,11 +169,16 @@ export function buildStoragePath(reportId: string, fileName: string): string {
  * anything with a traversal segment.
  */
 export function assertInsideUploadRoot(path: string): string {
+    if (!path || path.includes('\0')) {
+        throw new Error('Attachment path escapes the upload root');
+    }
+
     const normalized = path.replace(/\\/g, '/');
+    const segments = normalized.split('/');
 
     if (
         normalized.startsWith('/') ||
-        normalized.includes('../') ||
+        segments.some((s) => s === '..' || s === '.' || s === '') ||
         !normalized.startsWith('attachments/')
     ) {
         throw new Error('Attachment path escapes the upload root');

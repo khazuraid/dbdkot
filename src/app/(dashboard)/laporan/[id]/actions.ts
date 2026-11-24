@@ -22,10 +22,15 @@ const inputSchema = z.object({
         'REJECT_BY_DINKES',
         'MARK_CLOSED',
     ]),
+    note: z.string().trim().max(1000).optional(),
 });
 
-export async function reportAction(id: string, transition: Transition) {
-    const parsed = inputSchema.safeParse({ id, transition });
+export async function reportAction(
+    id: string,
+    transition: Transition,
+    note?: string,
+) {
+    const parsed = inputSchema.safeParse({ id, transition, note });
     if (!parsed.success) {
         return { ok: false as const, error: 'Permintaan tidak valid.' };
     }
@@ -35,6 +40,7 @@ export async function reportAction(id: string, transition: Transition) {
         actor,
         parsed.data.id,
         parsed.data.transition,
+        parsed.data.note,
     );
 
     if (result.ok) {

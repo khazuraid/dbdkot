@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import {
     and,
     count,
     desc,
     eq,
     isNotNull,
+    ne,
     notExists,
     sql,
     type SQL,
@@ -328,7 +330,10 @@ export type PublicCaseGeoPoint = {
 };
 
 /**
- * Public-safe case distribution without patient identifiers, names, NIK, or facility details.
+ * Public-safe case distribution without patient identifiers, names, NIK, exact
+ * home coordinates, or real database IDs. Coordinates are snapped to a ~350 m
+ * grid with a deterministic per-case offset so home addresses cannot be
+ * reverse-geocoded from the public landing page.
  */
 export async function publicCasePoints(): Promise<PublicCaseGeoPoint[]> {
     const rows = await getDb()
@@ -346,18 +351,40 @@ export async function publicCasePoints(): Promise<PublicCaseGeoPoint[]> {
             and(
                 isNotNull(reportsRS.latitude),
                 isNotNull(reportsRS.longitude),
+                ne(reportsRS.status, 'DRAFT'),
+                ne(reportsRS.status, 'REJECTED'),
             ),
         )
         .orderBy(desc(reportsRS.createdAt))
         .limit(300);
 
-    return rows.map((r) => ({
-        id: r.id,
-        lat: Number(r.lat),
-        lng: Number(r.lng),
-        caseType: r.caseType,
-        kelurahan: r.kelurahan,
-        clusterId: r.clusterId,
-        createdAt: r.createdAt,
-    }));
+    // ~330m grid step (0.003 deg) + deterministic ±110m jitter from opaque hash
+    const GRID = 0.003;
+    return rows.map((r) => {
+        const digest = createHash('sha256')
+            .update(`public-map:${r.id}`)
+            .digest();
+        const jLat = ((digest.readUInt16BE(0) / 0xffff) - 0.5) * 0.002;
+        const jLng = ((digest.readUInt16BE(2) / 0xffff) - 0.5) * 0.002;
+        const coarsenedLat = Math.round(Number(r.lat) / GRID) * GRID + jLat;
+        const coarsenedLng = Math.round(Number(r.lng) / GRID) * GRID + jLng;
+        const dayOnly = new Date(
+            Date.UTC(
+                r.createdAt.getUTCFullYear(),
+                r.createdAt.getUTCMonth(),
+                r.createdAt.getUTCDate(),
+            ),
+        );
+        return {
+            id: `pub-${digest.subarray(4, 12).toString('hex')}`,
+            lat: Number(coarsenedLat.toFixed(4)),
+            lng: Number(coarsenedLng.toFixed(4)),
+            caseType: r.caseType,
+            kelurahan: r.kelurahan,
+            clusterId: r.clusterId
+                ? `cl-${createHash('sha256').update(r.clusterId).digest('hex').slice(0, 8)}`
+                : null,
+            createdAt: dayOnly,
+        };
+    });
 }

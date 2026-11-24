@@ -170,6 +170,8 @@ export const users = pgTable(
         id: id(),
         email: text('email').notNull().unique(),
         emailVerified: boolean('email_verified').notNull().default(false),
+        username: text('username').unique(),
+        displayUsername: text('display_username'),
         name: text('name').notNull(),
         image: text('image'),
         role: userRole('role').notNull().default('PUSKESMAS'),

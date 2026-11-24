@@ -1,7 +1,8 @@
 import { Worker, type Job } from 'bullmq';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import ExcelJS from 'exceljs';
+import { sanitizeExcelCell } from '@/lib/security';
 import { QUEUE_NAMES, redisConnection } from '@/lib/queue/connection';
 import type {
     AssignJob,
@@ -488,7 +489,11 @@ async function writeWorkbook(
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     for (const row of rows) {
-        sheet.addRow(row).commit();
+        const safeRow: ExportRow = {};
+        for (const [k, v] of Object.entries(row)) {
+            safeRow[k] = typeof v === 'string' ? sanitizeExcelCell(v) : v;
+        }
+        sheet.addRow(safeRow).commit();
     }
 
     if (total > rows.length) {
@@ -565,6 +570,29 @@ async function scheduleRecurring() {
     );
 }
 
+async function cleanupStaleExports(maxAgeMs = 24 * 60 * 60 * 1000) {
+    const dir = join(process.cwd(), 'uploads', 'exports');
+    let entries: string[];
+    try {
+        entries = await readdir(dir);
+    } catch {
+        return;
+    }
+    const cutoff = Date.now() - maxAgeMs;
+    for (const entry of entries) {
+        if (!entry.endsWith('.xlsx')) continue;
+        const full = join(dir, entry);
+        try {
+            const info = await stat(full);
+            if (info.isFile() && info.mtimeMs < cutoff) {
+                await unlink(full);
+            }
+        } catch {
+            // ignore races or vanished files
+        }
+    }
+}
+
 async function main() {
     const workers = [
         startWorker(QUEUE_NAMES.assign, (job) =>
@@ -581,6 +609,12 @@ async function main() {
     ];
 
     await scheduleRecurring();
+    void cleanupStaleExports();
+    const exportCleanupTimer = setInterval(
+        () => void cleanupStaleExports(),
+        6 * 60 * 60 * 1000,
+    );
+    exportCleanupTimer.unref();
 
     console.log(
         JSON.stringify({

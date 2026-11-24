@@ -267,12 +267,25 @@ export async function clearLoginFailures(email: string): Promise<void> {
 export async function getClientIpFromHeaders(): Promise<string> {
     try {
         const h = await headers();
-        const cf = h.get('cf-connecting-ip')?.trim();
-        if (cf) return cf;
+        // Only trust forwarding headers when explicitly behind a configured reverse proxy.
+        if (process.env.TRUST_PROXY === 'true') {
+            const cf = h.get('cf-connecting-ip')?.trim();
+            if (cf) return cf;
+            const real = h.get('x-real-ip')?.trim();
+            if (real) return real;
+            // Rightmost entry is appended by the trusted proxy; leftmost is client-spoofable.
+            const xff = h.get('x-forwarded-for');
+            if (xff) {
+                const hops = xff
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                const last = hops[hops.length - 1];
+                if (last) return last;
+            }
+        }
         const real = h.get('x-real-ip')?.trim();
         if (real) return real;
-        const forwarded = h.get('x-forwarded-for')?.split(',')[0]?.trim();
-        if (forwarded) return forwarded;
     } catch {
         // Outside request context
     }
@@ -286,7 +299,10 @@ export function generateOtpCode(): string {
 }
 
 export function hashOtp(identifier: string, otp: string): string {
-    const secret = process.env.BETTER_AUTH_SECRET || 'wali-epi-otp-fallback';
+    const secret = process.env.BETTER_AUTH_SECRET?.trim();
+    if (!secret) {
+        throw new Error('BETTER_AUTH_SECRET is required for OTP hashing');
+    }
     return createHmac('sha256', secret)
         .update(`${identifier}:${otp}`)
         .digest('hex');

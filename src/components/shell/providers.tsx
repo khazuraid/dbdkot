@@ -9,7 +9,13 @@ import { useState } from 'react';
 /**
  * Client-side providers for the application shell.
  */
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+    children,
+    nonce,
+}: {
+    children: React.ReactNode;
+    nonce?: string;
+}) {
     const [client] = useState(
         () =>
             new QueryClient({
@@ -30,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 defaultTheme="light"
                 enableSystem
                 disableTransitionOnChange
+                nonce={nonce}
             >
                 <QueryClientProvider client={client}>
                     <MotionConfig reducedMotion="user">

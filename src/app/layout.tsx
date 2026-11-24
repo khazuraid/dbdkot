@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { Providers } from '@/components/shell/providers';
+import { getPortalBranding } from '@/lib/branding';
 import './globals.css';
 
 const geistSans = Geist({
@@ -16,17 +18,32 @@ const geistMono = Geist_Mono({
     display: 'swap',
 });
 
-export const metadata: Metadata = {
-    title: 'WALI-EPI: Surveilans DBD',
-    description:
-        'Sistem surveilans dan penyelidikan epidemiologi Demam Berdarah Dengue lintas fasilitas kesehatan.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const branding = await getPortalBranding();
+    return {
+        title: {
+            default: `${branding.title}: ${branding.tagline}`,
+            template: `%s · ${branding.title}`,
+        },
+        description:
+            branding.footerText ||
+            'Sistem surveilans dan penyelidikan epidemiologi Demam Berdarah Dengue lintas fasilitas kesehatan.',
+        ...(branding.faviconUrl
+            ? { icons: { icon: branding.faviconUrl } }
+            : {}),
+    };
+}
 
-export default function RootLayout({
+// Per-request CSP nonce (src/proxy.ts) requires dynamic rendering on all routes.
+export const instant = false;
+
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const nonce = (await headers()).get('x-nonce') ?? undefined;
+
     return (
         <html
             lang="id"
@@ -34,7 +51,7 @@ export default function RootLayout({
             className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
         >
             <body className="flex min-h-full flex-col">
-                <Providers>{children}</Providers>
+                <Providers nonce={nonce}>{children}</Providers>
                 <Toaster
                     position="bottom-right"
                     closeButton

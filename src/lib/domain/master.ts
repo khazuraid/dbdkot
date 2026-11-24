@@ -12,6 +12,7 @@ import type { BoundaryGeoJson } from '@/lib/geo/boundary-schema';
 import { getDb } from '@/db';
 import { assets, institutions, kelurahan, users } from '@/db/schema';
 import { audit } from '@/lib/audit';
+import { escapeLike } from '@/lib/security';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { Role } from '@/lib/roles';
 import type {
@@ -97,9 +98,10 @@ export async function listInstitutionsPaged(
     const search = q.q?.trim();
     const conditions: SQL[] = [];
     if (search) {
+        const pattern = `%${escapeLike(search)}%`;
         const searchCond = or(
-            ilike(institutions.name, `%${search}%`),
-            ilike(institutions.city, `%${search}%`),
+            ilike(institutions.name, pattern),
+            ilike(institutions.city, pattern),
         );
         if (searchCond) conditions.push(searchCond);
     }
@@ -237,7 +239,7 @@ export async function createInstitution(
             .from(institutions)
             .where(
                 and(
-                    ilike(institutions.name, cleanName),
+                    ilike(institutions.name, escapeLike(cleanName)),
                     eq(institutions.isActive, true),
                 ),
             )
@@ -355,7 +357,7 @@ export async function updateInstitution(
             .from(institutions)
             .where(
                 and(
-                    ilike(institutions.name, cleanName),
+                    ilike(institutions.name, escapeLike(cleanName)),
                     ne(institutions.id, id),
                     eq(institutions.isActive, true),
                 ),
@@ -581,11 +583,12 @@ export async function listKelurahanPaged(q: ListQuery = {}) {
     const db = getDb();
     const { size, page, offset } = pageOf(q, 50);
     const search = q.q?.trim();
-    const where: SQL | undefined = search
+    const searchPattern = search ? `%${escapeLike(search)}%` : null;
+    const where: SQL | undefined = searchPattern
         ? or(
-              ilike(kelurahan.name, `%${search}%`),
-              ilike(kelurahan.kecamatan, `%${search}%`),
-              ilike(kelurahan.kota, `%${search}%`),
+              ilike(kelurahan.name, searchPattern),
+              ilike(kelurahan.kecamatan, searchPattern),
+              ilike(kelurahan.kota, searchPattern),
           )
         : undefined;
 
@@ -943,9 +946,10 @@ export async function listAssetsPaged(actor: Actor, q: ListQuery = {}) {
     const conditions: SQL[] = [];
     if (scoped) conditions.push(eq(assets.institutionId, scoped));
     if (search) {
+        const pattern = `%${escapeLike(search)}%`;
         const match = or(
-            ilike(assets.name, `%${search}%`),
-            ilike(assets.code, `%${search}%`),
+            ilike(assets.name, pattern),
+            ilike(assets.code, pattern),
         );
         if (match) conditions.push(match);
     }

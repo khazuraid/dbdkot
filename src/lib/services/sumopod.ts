@@ -10,6 +10,8 @@
 import { getDb } from '@/db';
 import { kelurahan, systemSettings } from '@/db/schema';
 import { and, eq, ilike, or, sql } from 'drizzle-orm';
+import { escapeLike, isValidWilayahCode } from '@/lib/security';
+import { decryptSettingValue, safeFetch } from '@/lib/security-server';
 
 export type SumopodProvince = {
     kode: string;
@@ -77,7 +79,8 @@ export async function getSumopodConfig() {
                 (r.key === 'SUMOPOD_API_KEY' || r.key === 'REGIONAL_API_KEY') &&
                 r.value
             ) {
-                apiKey = r.value.trim();
+                const decrypted = decryptSettingValue(r.value);
+                if (decrypted) apiKey = decrypted;
             }
             if (
                 (r.key === 'SUMOPOD_BASE_URL' ||
@@ -113,7 +116,7 @@ async function fetchFromSumopod<T>(
 
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
-            const response = await fetch(url.toString(), {
+            const response = await safeFetch(url.toString(), {
                 method: 'GET',
                 headers: {
                     'x-api-key': apiKey,
@@ -185,11 +188,13 @@ export async function getProvinces(q?: string): Promise<SumopodProvince[]> {
  * Mengambil daftar kota/kabupaten berdasarkan kode provinsi (cth: "32" untuk Jawa Barat).
  */
 export async function getCities(provinceCode: string, q?: string): Promise<SumopodRegencyCity[]> {
-    const cacheKey = `cities:${provinceCode}:${q ?? ''}`;
+    if (!isValidWilayahCode(provinceCode)) return [];
+    const safeCode = encodeURIComponent(provinceCode.trim());
+    const cacheKey = `cities:${safeCode}:${q ?? ''}`;
     const cached = getFromCache<SumopodRegencyCity[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await fetchFromSumopod<SumopodRegencyCity[]>(`/api/v1/wilayah/provinsi/${provinceCode}/kota`, {
+    const data = await fetchFromSumopod<SumopodRegencyCity[]>(`/api/v1/wilayah/provinsi/${safeCode}/kota`, {
         ...(q ? { q } : {}),
         perPage: '100',
     });
@@ -217,11 +222,13 @@ export async function getCities(provinceCode: string, q?: string): Promise<Sumop
  * Mengambil daftar kecamatan berdasarkan kode kota/kabupaten (cth: "3273" untuk Kota Bandung).
  */
 export async function getDistricts(cityCode: string, q?: string): Promise<SumopodDistrict[]> {
-    const cacheKey = `districts:${cityCode}:${q ?? ''}`;
+    if (!isValidWilayahCode(cityCode)) return [];
+    const safeCode = encodeURIComponent(cityCode.trim());
+    const cacheKey = `districts:${safeCode}:${q ?? ''}`;
     const cached = getFromCache<SumopodDistrict[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await fetchFromSumopod<SumopodDistrict[]>(`/api/v1/wilayah/kota/${cityCode}/kecamatan`, {
+    const data = await fetchFromSumopod<SumopodDistrict[]>(`/api/v1/wilayah/kota/${safeCode}/kecamatan`, {
         ...(q ? { q } : {}),
         perPage: '100',
     });
@@ -237,7 +244,7 @@ export async function getDistricts(cityCode: string, q?: string): Promise<Sumopo
         const results = await db
             .select({ kecamatan: kelurahan.kecamatan })
             .from(kelurahan)
-            .where(q ? ilike(kelurahan.kecamatan, `%${q}%`) : sql`true`)
+            .where(q ? ilike(kelurahan.kecamatan, `%${escapeLike(q)}%`) : sql`true`)
             .groupBy(kelurahan.kecamatan)
             .orderBy(kelurahan.kecamatan);
 
@@ -255,14 +262,18 @@ export async function getDistricts(cityCode: string, q?: string): Promise<Sumopo
  * Mengambil daftar kelurahan/desa berdasarkan kode kecamatan.
  */
 export async function getVillages(districtCode: string, districtName?: string, q?: string): Promise<SumopodVillage[]> {
-    const cacheKey = `villages:${districtCode}:${q ?? ''}`;
+    if (districtCode && !isValidWilayahCode(districtCode)) return [];
+    const safeCode = encodeURIComponent(districtCode.trim());
+    const cacheKey = `villages:${safeCode}:${q ?? ''}`;
     const cached = getFromCache<SumopodVillage[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await fetchFromSumopod<SumopodVillage[]>(`/api/v1/wilayah/kecamatan/${districtCode}/kelurahan`, {
-        ...(q ? { q } : {}),
-        perPage: '100',
-    });
+    const data = districtCode
+        ? await fetchFromSumopod<SumopodVillage[]>(`/api/v1/wilayah/kecamatan/${safeCode}/kelurahan`, {
+              ...(q ? { q } : {}),
+              perPage: '100',
+          })
+        : null;
 
     if (data && Array.isArray(data) && data.length > 0) {
         setToCache(cacheKey, data);
@@ -274,10 +285,10 @@ export async function getVillages(districtCode: string, districtName?: string, q
         const db = getDb();
         const conditions = [];
         if (districtName) {
-            conditions.push(ilike(kelurahan.kecamatan, districtName));
+            conditions.push(ilike(kelurahan.kecamatan, escapeLike(districtName)));
         }
         if (q) {
-            conditions.push(ilike(kelurahan.name, `%${q}%`));
+            conditions.push(ilike(kelurahan.name, `%${escapeLike(q)}%`));
         }
 
         const results = await db
@@ -370,8 +381,8 @@ export async function syncAllKelurahanKotaCirebon(): Promise<SumopodSyncResult> 
                 .from(kelurahan)
                 .where(
                     and(
-                        ilike(kelurahan.name, trimmedName),
-                        ilike(kelurahan.kecamatan, trimmedDistrict),
+                        ilike(kelurahan.name, escapeLike(trimmedName)),
+                        ilike(kelurahan.kecamatan, escapeLike(trimmedDistrict)),
                     ),
                 )
                 .limit(1);

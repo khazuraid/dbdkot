@@ -57,7 +57,7 @@ const PublicCaseMapInner = dynamic(
                 aria-label="Memuat peta sebaran kasus"
             >
                 <div className="grid size-10 place-items-center rounded-full bg-teal-500/10 text-teal-600">
-                    <MapPin className="size-5 animate-bounce" />
+                    <MapPin className="size-5" />
                 </div>
                 <p className="text-xs font-medium text-muted-foreground">
                     Memuat peta sebaran kasus...

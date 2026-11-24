@@ -7,6 +7,7 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { AuthTabNav } from '@/components/auth/auth-ui';
+import { getPortalBranding, type PortalBranding } from '@/lib/branding';
 
 const CHAIN = [
     {
@@ -35,7 +36,9 @@ const SECURITY_PILLS = [
 /**
  * Synchronized clinical split-screen shell for /masuk, /daftar, and /lupa-password.
  */
-export function AuthShell({ children }: { children: React.ReactNode }) {
+export async function AuthShell({ children }: { children: React.ReactNode }) {
+    const branding = await getPortalBranding();
+
     return (
         <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[var(--ground)]">
             <div
@@ -49,7 +52,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
                     className="hidden space-y-8 pr-2 lg:block"
                 >
                     <div className="flex items-center justify-between gap-4">
-                        <AuthMark />
+                        <AuthMark branding={branding} />
                         <Link
                             href="/"
                             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)]/80 px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -61,15 +64,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
                     <div className="space-y-3">
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-2.5 py-1 font-mono text-[10.5px] font-semibold tracking-wider text-[var(--accent)] uppercase">
-                            Portal Surveilans Kota Cirebon
+                            Portal Surveilans · {branding.institutionName}
                         </span>
                         <h1 className="max-w-[19ch] text-[34px] leading-[1.14] font-semibold tracking-[-0.03em] text-foreground">
                             Surveilans DBD terhubung dari bangsal hingga lapangan.
                         </h1>
                         <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-muted-foreground">
-                            WALI-EPI menyatukan pelaporan kasus Rumah Sakit,
+                            {branding.title} menyatukan pelaporan kasus Rumah Sakit,
                             penugasan Puskesmas per kelurahan, serta verifikasi
-                            Penyelidikan Epidemiologi oleh Dinas Kesehatan.
+                            Penyelidikan Epidemiologi oleh {branding.institutionName}.
                         </p>
                     </div>
 
@@ -115,7 +118,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
                 <section className="mx-auto w-full max-w-[460px]">
                     <div className="mb-5 flex items-center justify-between gap-3 lg:hidden">
-                        <AuthMark />
+                        <AuthMark branding={branding} />
                         <Link
                             href="/"
                             className="inline-flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
@@ -131,24 +134,40 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             </main>
 
             <footer className="relative border-t border-[var(--rule)] bg-[var(--surface)]/50 px-4 py-3.5 text-center text-[12px] text-muted-foreground sm:px-6">
-                WALI-EPI · Platform Surveilans Demam Berdarah Dengue Lintas Fasilitas Kesehatan
+                {branding.title} · {branding.footerText}
             </footer>
         </div>
     );
 }
 
-export function AuthMark() {
+export function AuthMark({
+    branding,
+}: {
+    branding?: Pick<PortalBranding, 'title' | 'tagline' | 'logoUrl'>;
+}) {
+    const title = branding?.title || 'WALI-EPI';
+    const tagline = branding?.tagline || 'Surveilans DBD';
+    const logoUrl = branding?.logoUrl ?? null;
     return (
         <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <span className="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs transition-transform group-hover:scale-[1.03]">
-                <Activity className="size-[18px]" strokeWidth={2} />
+            <span className="grid size-9 place-items-center overflow-hidden rounded-xl bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs transition-transform group-hover:scale-[1.03]">
+                {logoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                        src={logoUrl}
+                        alt={title}
+                        className="size-9 object-contain"
+                    />
+                ) : (
+                    <Activity className="size-[18px]" strokeWidth={2} />
+                )}
             </span>
             <span className="flex flex-col leading-none">
                 <span className="text-[14px] font-semibold tracking-tight text-foreground">
-                    WALI-EPI
+                    {title}
                 </span>
                 <span className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                    Surveilans DBD
+                    {tagline}
                 </span>
             </span>
         </Link>

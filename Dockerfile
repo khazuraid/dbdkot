@@ -72,7 +72,7 @@ COPY --from=build --chown=nextjs:nodejs /app/package.json ./package.json
 # Attachments are written to disk (see api/attachments/route.ts), so the
 # directory must exist and be writable by the unprivileged user. compose.yaml
 # mounts a volume here; without it the files die with the container.
-RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
+RUN mkdir -p /app/uploads/attachments /app/uploads/exports && chown -R nextjs:nodejs /app/uploads
 VOLUME /app/uploads
 
 USER nextjs

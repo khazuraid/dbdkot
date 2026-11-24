@@ -2,6 +2,7 @@ import { and, count, eq, ilike, ne, or, sql, type SQL } from 'drizzle-orm';
 import { APIError } from 'better-auth';
 import { hashPassword } from 'better-auth/crypto';
 import { getDb } from '@/db';
+import { escapeLike } from '@/lib/security';
 import {
     accounts,
     assetRequests,
@@ -102,6 +103,20 @@ export async function createAccount(
     let createdId: string | null = null;
 
     try {
+        if (input.username) {
+            const [taken] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.username, input.username))
+                .limit(1);
+            if (taken) {
+                return {
+                    ok: false,
+                    error: 'Username ini sudah digunakan. Pilih username lain.',
+                };
+            }
+        }
+
         const created = await auth.api
             .signUpEmail({
                 body: {
@@ -140,6 +155,8 @@ export async function createAccount(
         await db
             .update(users)
             .set({
+                username: input.username ?? null,
+                displayUsername: input.username ?? null,
                 role: input.role,
                 institutionId:
                     needsInstitution(input.role) && input.institutionId
@@ -428,11 +445,32 @@ export async function updateAccount(
         }
     }
 
+    if (input.username) {
+        const [taken] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(
+                and(
+                    eq(users.username, input.username),
+                    ne(users.id, input.userId),
+                ),
+            )
+            .limit(1);
+        if (taken) {
+            return {
+                ok: false,
+                error: 'Username ini sudah digunakan oleh akun lain.',
+            };
+        }
+    }
+
     try {
         await db
             .update(users)
             .set({
                 name: input.name,
+                username: input.username ?? null,
+                displayUsername: input.username ?? null,
                 email: input.email,
                 role: nextRole,
                 institutionId: nextInstitutionId,
@@ -688,9 +726,11 @@ export async function listManagedAccounts(
     const conditions: SQL[] = [];
     const search = opts.q?.trim();
     if (search) {
+        const pattern = `%${escapeLike(search)}%`;
         const searchCond = or(
-            ilike(users.name, `%${search}%`),
-            ilike(users.email, `%${search}%`),
+            ilike(users.name, pattern),
+            ilike(users.email, pattern),
+            ilike(users.username, pattern),
         );
         if (searchCond) conditions.push(searchCond);
     }
@@ -713,6 +753,7 @@ export async function listManagedAccounts(
             .select({
                 id: users.id,
                 name: users.name,
+                username: users.username,
                 email: users.email,
                 role: users.role,
                 status: users.status,

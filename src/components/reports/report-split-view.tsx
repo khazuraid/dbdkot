@@ -163,11 +163,21 @@ export function ReportSplitView({
                                                 {selectedDetail.reportNumber}
                                             </p>
                                             <span className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--raised)] px-2 py-0.5 text-[10.5px] font-semibold text-foreground">
-                                                {CASE_TYPE_LABEL[selectedDetail.caseType] ?? selectedDetail.caseType}
+                                                {CASE_TYPE_LABEL[
+                                                    selectedDetail.caseType
+                                                ] ?? selectedDetail.caseType}
                                             </span>
                                         </div>
                                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                            {selectedDetail.patient.name} ({selectedDetail.patient.age} th, {selectedDetail.patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'}) · {selectedDetail.kelurahan ?? '-'}, {selectedDetail.kecamatan ?? '-'}
+                                            {selectedDetail.patient.name} (
+                                            {selectedDetail.patient.age} th,{' '}
+                                            {selectedDetail.patient.gender ===
+                                            'L'
+                                                ? 'Laki-laki'
+                                                : 'Perempuan'}
+                                            ) ·{' '}
+                                            {selectedDetail.kelurahan ?? '-'},{' '}
+                                            {selectedDetail.kecamatan ?? '-'}
                                         </p>
                                     </div>
                                     <Button
@@ -259,7 +269,9 @@ function InspectorContent({
                                 Tindakan Puskesmas Diperlukan
                             </p>
                             <p className="text-[11.5px] text-muted-foreground">
-                                Laporan kasus masuk dalam wilayah kerja Anda. Segera konfirmasi penerimaan tugas sebelum SLA 24 jam terlampaui.
+                                Laporan kasus masuk dalam wilayah kerja Anda.
+                                Segera konfirmasi penerimaan tugas sebelum SLA
+                                24 jam terlampaui.
                             </p>
                         </div>
                     </div>
@@ -288,7 +300,8 @@ function InspectorContent({
                                 Pelaksanaan PE Lapangan (SLA 72 Jam)
                             </p>
                             <p className="text-[11.5px] text-muted-foreground">
-                                Tugas telah diterima. Lakukan pemeriksaan jentik di 20 rumah radius 100m dari rumah pasien.
+                                Tugas telah diterima. Lakukan pemeriksaan jentik
+                                di 20 rumah radius 100m dari rumah pasien.
                             </p>
                         </div>
                     </div>
@@ -317,7 +330,9 @@ function InspectorContent({
                                 Verifikasi Penyelidikan Epidemiologi
                             </p>
                             <p className="text-[11.5px] text-muted-foreground">
-                                Puskesmas telah menyelesaikan investigasi lapangan. Periksa hasil ABJ dan verifikasi rekomendasi fogging fokus.
+                                Puskesmas telah menyelesaikan investigasi
+                                lapangan. Periksa hasil ABJ dan verifikasi
+                                rekomendasi fogging fokus.
                             </p>
                         </div>
                     </div>
@@ -354,24 +369,36 @@ function InspectorContent({
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 pt-1">
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Nama Lengkap</span>
-                        <p className="font-medium text-foreground">{detail.patient.name}</p>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Nama Lengkap
+                        </span>
+                        <p className="font-medium text-foreground">
+                            {detail.patient.name}
+                        </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">NIK Pasien</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            NIK Pasien
+                        </span>
                         <p className="font-mono text-[12px] text-foreground tabular-nums select-all">
                             {detail.patient.nik}
                         </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Usia & Kelamin</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Usia & Kelamin
+                        </span>
                         <p className="text-foreground">
                             {detail.patient.age} tahun ·{' '}
-                            {detail.patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+                            {detail.patient.gender === 'L'
+                                ? 'Laki-laki'
+                                : 'Perempuan'}
                         </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Nomor Telepon/WA</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Nomor Telepon/WA
+                        </span>
                         {cleanPhone ? (
                             <a
                                 href={`https://wa.me/${cleanPhone}`}
@@ -388,10 +415,15 @@ function InspectorContent({
                         )}
                     </div>
                     <div className="col-span-2">
-                        <span className="text-[11.5px] text-muted-foreground">Alamat Domisili</span>
-                        <p className="text-foreground">{detail.patient.address}</p>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Alamat Domisili
+                        </span>
+                        <p className="text-foreground">
+                            {detail.patient.address}
+                        </p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            Kel. {detail.kelurahan ?? '-'}, Kec. {detail.kecamatan ?? '-'}, {detail.kota ?? 'Kota Cirebon'}
+                            Kel. {detail.kelurahan ?? '-'}, Kec.{' '}
+                            {detail.kecamatan ?? '-'}, {detail.kota ?? '-'}
                         </p>
                     </div>
                 </div>
@@ -410,7 +442,9 @@ function InspectorContent({
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 pt-1">
                     <div className="rounded-md border border-[var(--border)] bg-[var(--raised)]/35 p-2">
-                        <span className="text-[11px] text-muted-foreground">Trombosit Terendah</span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Trombosit Terendah
+                        </span>
                         <p
                             className={cn(
                                 'font-mono text-[13px] font-bold tabular-nums',
@@ -419,7 +453,9 @@ function InspectorContent({
                                     : 'text-foreground',
                             )}
                         >
-                            {detail.plateletCount ? `${formatNumber(detail.plateletCount)} /μL` : '-'}
+                            {detail.plateletCount
+                                ? `${formatNumber(detail.plateletCount)} /μL`
+                                : '-'}
                         </p>
                         {isCriticalPlatelet && (
                             <span className="text-[10px] font-medium text-[var(--negative)]">
@@ -428,20 +464,29 @@ function InspectorContent({
                         )}
                     </div>
                     <div className="rounded-md border border-[var(--border)] bg-[var(--raised)]/35 p-2">
-                        <span className="text-[11px] text-muted-foreground">Hematokrit</span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Hematokrit
+                        </span>
                         <p className="font-mono text-[13px] font-bold text-foreground tabular-nums">
                             {detail.hematocrit ? `${detail.hematocrit}%` : '-'}
                         </p>
-                        <span className="text-[10px] text-muted-foreground">Indikator hemokonsentrasi</span>
+                        <span className="text-[10px] text-muted-foreground">
+                            Indikator hemokonsentrasi
+                        </span>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Hasil Serologi</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Hasil Serologi
+                        </span>
                         <p className="font-mono text-[12px] text-foreground">
-                            NS1: {detail.dengueBlot ?? '-'} · IgM: {detail.igm ?? '-'} · IgG: {detail.igg ?? '-'}
+                            NS1: {detail.dengueBlot ?? '-'} · IgM:{' '}
+                            {detail.igm ?? '-'} · IgG: {detail.igg ?? '-'}
                         </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Tanggal Masuk Rawat</span>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Tanggal Masuk Rawat
+                        </span>
                         <p className="text-foreground">
                             {formatDate(detail.admissionDate)}
                             {detail.symptomOnsetDate && (
@@ -452,12 +497,20 @@ function InspectorContent({
                         </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Faskes Pelapor (RS)</span>
-                        <p className="font-medium text-foreground">{detail.institutionName ?? '-'}</p>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Faskes Pelapor (RS)
+                        </span>
+                        <p className="font-medium text-foreground">
+                            {detail.institutionName ?? '-'}
+                        </p>
                     </div>
                     <div>
-                        <span className="text-[11.5px] text-muted-foreground">Puskesmas Wilayah</span>
-                        <p className="font-medium text-foreground">{detail.assignedPuskesmasName ?? 'Belum ditugaskan'}</p>
+                        <span className="text-[11.5px] text-muted-foreground">
+                            Puskesmas Wilayah
+                        </span>
+                        <p className="font-medium text-foreground">
+                            {detail.assignedPuskesmasName ?? 'Belum ditugaskan'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -471,7 +524,8 @@ function InspectorContent({
                     </span>
                     {detail.latitude !== null && detail.longitude !== null && (
                         <span className="font-mono text-[10.5px] text-muted-foreground tabular-nums">
-                            {detail.latitude.toFixed(5)}, {detail.longitude.toFixed(5)}
+                            {detail.latitude.toFixed(5)},{' '}
+                            {detail.longitude.toFixed(5)}
                         </span>
                     )}
                 </div>
@@ -488,7 +542,10 @@ function InspectorContent({
                 ) : (
                     <div className="rounded-md border border-dashed border-[var(--border)] bg-[var(--raised)]/30 p-2.5 text-center text-[11.5px] text-muted-foreground">
                         <p>Geotag dilewati saat pembuatan laporan.</p>
-                        <p className="text-[10.5px]">Titik koordinat GPS akan diambil saat petugas melakukan PE di rumah pasien.</p>
+                        <p className="text-[10.5px]">
+                            Titik koordinat GPS akan diambil saat petugas
+                            melakukan PE di rumah pasien.
+                        </p>
                     </div>
                 )}
             </div>
@@ -503,7 +560,8 @@ function InspectorContent({
                         </span>
                         <StatusText
                             tone={
-                                detail.pe.transmissionRisk === 'POSITIF_PENULARAN'
+                                detail.pe.transmissionRisk ===
+                                'POSITIF_PENULARAN'
                                     ? 'bad'
                                     : 'good'
                             }
@@ -513,9 +571,11 @@ function InspectorContent({
                                 : 'Negatif Penularan'}
                         </StatusText>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                    <div className="grid grid-cols-3 gap-2 pt-1 text-center">
                         <div className="rounded-md border border-[var(--border)] bg-[var(--raised)]/35 p-2">
-                            <span className="text-[10.5px] text-muted-foreground">ABJ</span>
+                            <span className="text-[10.5px] text-muted-foreground">
+                                ABJ
+                            </span>
                             <p
                                 className={cn(
                                     'font-mono text-[13px] font-bold tabular-nums',
@@ -526,26 +586,38 @@ function InspectorContent({
                             >
                                 {detail.pe.abj ?? '-'}%
                             </p>
-                            <span className="text-[9.5px] text-muted-foreground">Target &ge;95%</span>
+                            <span className="text-[9.5px] text-muted-foreground">
+                                Target &ge;95%
+                            </span>
                         </div>
                         <div className="rounded-md border border-[var(--border)] bg-[var(--raised)]/35 p-2">
-                            <span className="text-[10.5px] text-muted-foreground">House Index</span>
+                            <span className="text-[10.5px] text-muted-foreground">
+                                House Index
+                            </span>
                             <p className="font-mono text-[13px] font-bold text-foreground tabular-nums">
                                 {detail.pe.houseIndex ?? '-'}%
                             </p>
-                            <span className="text-[9.5px] text-muted-foreground">Rumah (+) jentik</span>
+                            <span className="text-[9.5px] text-muted-foreground">
+                                Rumah (+) jentik
+                            </span>
                         </div>
                         <div className="rounded-md border border-[var(--border)] bg-[var(--raised)]/35 p-2">
-                            <span className="text-[10.5px] text-muted-foreground">Container Index</span>
+                            <span className="text-[10.5px] text-muted-foreground">
+                                Container Index
+                            </span>
                             <p className="font-mono text-[13px] font-bold text-foreground tabular-nums">
                                 {detail.pe.containerIndex ?? '-'}%
                             </p>
-                            <span className="text-[9.5px] text-muted-foreground">Wadah (+) jentik</span>
+                            <span className="text-[9.5px] text-muted-foreground">
+                                Wadah (+) jentik
+                            </span>
                         </div>
                     </div>
                     <div className="space-y-1 pt-1 text-[11.5px]">
                         <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">Rekomendasi Fogging Fokus:</span>
+                            <span className="text-muted-foreground">
+                                Rekomendasi Fogging Fokus:
+                            </span>
                             <span
                                 className={cn(
                                     'font-semibold',
@@ -560,7 +632,11 @@ function InspectorContent({
                             </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                            Penyelidikan oleh: <strong className="text-foreground">{detail.pe.officerName}</strong> pada {formatDate(detail.pe.peDate)}
+                            Penyelidikan oleh:{' '}
+                            <strong className="text-foreground">
+                                {detail.pe.officerName}
+                            </strong>{' '}
+                            pada {formatDate(detail.pe.peDate)}
                         </p>
                     </div>
                 </div>

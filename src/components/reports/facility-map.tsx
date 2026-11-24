@@ -26,6 +26,7 @@ import type {
 } from '@/lib/domain/map-data';
 import { computeBoundaryBounds } from '@/lib/geo/boundary-schema';
 import { formatNumber } from '@/lib/format';
+import { escapeHtml } from '@/lib/security';
 import { cn } from '@/lib/utils';
 
 const TYPE_META: Record<
@@ -199,11 +200,11 @@ export default function FacilityMap({
                     );
                     geo.bindTooltip(
                         `<div style="font-size:12px;">
-                            <strong>Kel. ${z.name}</strong><br/>
-                            <span style="color:#64748b;">${z.kecamatan}, ${z.kota}</span><br/>
-                            <span><strong>${formatNumber(z.reportCount)}</strong> laporan${
+                            <strong>Kel. ${escapeHtml(z.name)}</strong><br/>
+                            <span style="color:#64748b;">${escapeHtml(z.kecamatan)}, ${escapeHtml(z.kota)}</span><br/>
+                            <span><strong>${escapeHtml(formatNumber(z.reportCount))}</strong> laporan${
                                 z.puskesmasNames.length > 0
-                                    ? ` · ${z.puskesmasNames.join(', ')}`
+                                    ? ` · ${escapeHtml(z.puskesmasNames.join(', '))}`
                                     : ''
                             }</span>
                         </div>`,
@@ -233,8 +234,8 @@ export default function FacilityMap({
                 });
                 marker.bindTooltip(
                     `<div style="font-size:12px;">
-                        <strong>${p.name}</strong><br/>
-                        <span style="color:#64748b;">${meta.label}</span> · <strong>${formatNumber(p.n)}</strong> laporan
+                        <strong>${escapeHtml(p.name)}</strong><br/>
+                        <span style="color:#64748b;">${escapeHtml(meta.label)}</span> · <strong>${escapeHtml(formatNumber(p.n))}</strong> laporan
                     </div>`,
                     { direction: 'top' },
                 );
@@ -294,9 +295,9 @@ export default function FacilityMap({
 
                 marker.bindTooltip(
                     `<div style="font-size:11.5px;line-height:1.35;padding:1px 3px;">
-                        <strong style="font-family:monospace;">${c.reportNumber}</strong> (${c.caseType ?? 'Kasus'})<br/>
-                        <span style="color:#64748b;">Sumber: ${sourceLabel}</span><br/>
-                        <span style="color:#64748b;">Kel. ${c.kelurahan ?? '-'}</span>
+                        <strong style="font-family:monospace;">${escapeHtml(c.reportNumber)}</strong> (${escapeHtml(c.caseType ?? 'Kasus')})<br/>
+                        <span style="color:#64748b;">Sumber: ${escapeHtml(sourceLabel)}</span><br/>
+                        <span style="color:#64748b;">Kel. ${escapeHtml(c.kelurahan ?? '-')}</span>
                         ${isClustered ? '<br/><span style="color:#e11d48;font-weight:600;">Klaster 100m</span>' : ''}
                     </div>`,
                     { direction: 'top' },

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { requireActor, scopeToInstitution } from '@/lib/session';
 import { getReport } from '@/lib/domain/report-detail';
 import { listAttachments, listPeAttachments } from '@/lib/domain/attachments';
@@ -9,14 +9,17 @@ import { getDb } from '@/db';
 import { attachments } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { audit } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
+import { isValidUuid } from '@/lib/security';
 import {
+    assertInsideUploadRoot,
     attachmentUploadSchema,
     buildStoragePath,
     isAllowedExtension,
     validateMagicBytes,
 } from '@/lib/attachments';
 
-const UPLOAD_ROOT = join(process.cwd(), 'uploads');
+const UPLOAD_ROOT = resolve(process.cwd(), 'uploads');
 
 /**
  * One attachment's bytes, for the download link the report page renders.
@@ -78,7 +81,24 @@ async function serve(request: Request) {
         }
     }
 
-    const absolute = join(UPLOAD_ROOT, row.filePath);
+    let safeRel: string;
+    try {
+        safeRel = assertInsideUploadRoot(row.filePath);
+    } catch {
+        return NextResponse.json(
+            { error: 'Berkas tidak ditemukan.' },
+            { status: 404 },
+        );
+    }
+
+    const absolute = resolve(UPLOAD_ROOT, safeRel);
+    if (!absolute.startsWith(`${UPLOAD_ROOT}/`)) {
+        return NextResponse.json(
+            { error: 'Berkas tidak ditemukan.' },
+            { status: 404 },
+        );
+    }
+
     let bytes: Uint8Array;
     try {
         bytes = new Uint8Array(await readFile(absolute));
@@ -113,7 +133,7 @@ async function serve(request: Request) {
             'Content-Security-Policy': isInline && (isImage || isPdf)
                 ? "default-src 'self'; img-src 'self' data: blob:; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'"
                 : "default-src 'none'; sandbox",
-            'Cache-Control': isInline ? 'private, max-age=3600' : 'private, no-store',
+            'Cache-Control': 'private, no-store',
         },
     });
 }
@@ -159,8 +179,19 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const actor = await requireActor();
-    scopeToInstitution(actor);
+    const actor = await requireActor().catch(() => null);
+    if (!actor) {
+        return NextResponse.json({ error: 'Tidak masuk.' }, { status: 401 });
+    }
+    const instId = scopeToInstitution(actor);
+
+    const rate = await consumeRateLimit(`upload:att:${actor.userId}`, 60, 30);
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak unggahan. Coba sebentar lagi.' },
+            { status: 429, headers: { 'Retry-After': String(rate.retryAfter ?? 60) } },
+        );
+    }
 
     const form = await request.formData();
     const file = form.get('file');
@@ -181,13 +212,35 @@ export async function POST(request: Request) {
         );
     }
 
+    if (
+        (reportRSId && !isValidUuid(reportRSId)) ||
+        (reportPEId && !isValidUuid(reportPEId))
+    ) {
+        return NextResponse.json(
+            { error: 'Identitas laporan tidak valid.' },
+            { status: 400 },
+        );
+    }
+
     let targetReportRSId = reportRSId;
     if (reportPEId) {
+        if (actor.role === 'RUMAH_SAKIT') {
+            return NextResponse.json(
+                { error: 'Tidak memiliki izin mengunggah lampiran PE.' },
+                { status: 403 },
+            );
+        }
         const pe = await peDetail(actor, reportPEId);
         if (!pe) {
             return NextResponse.json(
                 { error: 'Laporan PE tidak ditemukan.' },
                 { status: 404 },
+            );
+        }
+        if (actor.role === 'PUSKESMAS' && pe.pe.status === 'VERIFIED') {
+            return NextResponse.json(
+                { error: 'Laporan PE yang sudah diverifikasi tidak dapat ditambah lampiran.' },
+                { status: 403 },
             );
         }
         if (!targetReportRSId) targetReportRSId = pe.reportRSId;
@@ -197,6 +250,16 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: 'Laporan tidak ditemukan.' },
                 { status: 404 },
+            );
+        }
+        // Only the originating facility, assigned Puskesmas, Dinkes, or Admin may attach files
+        if (
+            actor.role === 'RUMAH_SAKIT' &&
+            report.institutionId !== instId
+        ) {
+            return NextResponse.json(
+                { error: 'Tidak memiliki izin mengunggah lampiran pada laporan ini.' },
+                { status: 403 },
             );
         }
     }
@@ -228,8 +291,10 @@ export async function POST(request: Request) {
     }
 
     const folderPrefix = reportPEId ? `pe_${reportPEId}` : targetReportRSId!;
-    const storagePath = buildStoragePath(folderPrefix, file.name);
-    const absolute = join(UPLOAD_ROOT, storagePath);
+    const storagePath = assertInsideUploadRoot(
+        buildStoragePath(folderPrefix, file.name),
+    );
+    const absolute = resolve(UPLOAD_ROOT, storagePath);
 
     await mkdir(dirname(absolute), { recursive: true });
     try {
@@ -244,18 +309,25 @@ export async function POST(request: Request) {
         throw error;
     }
 
-    const [row] = await getDb()
-        .insert(attachments)
-        .values({
-            reportRSId: targetReportRSId,
-            reportPEId: reportPEId,
-            fileName: file.name,
-            filePath: storagePath,
-            fileType: magic.mime,
-            fileSize: rawBytes.byteLength,
-            uploadedBy: actor.userId,
-        })
-        .returning({ id: attachments.id });
+    let row: { id: string };
+    try {
+        [row] = await getDb()
+            .insert(attachments)
+            .values({
+                reportRSId: targetReportRSId,
+                reportPEId: reportPEId,
+                fileName: file.name,
+                filePath: storagePath,
+                fileType: magic.mime,
+                fileSize: rawBytes.byteLength,
+                uploadedBy: actor.userId,
+            })
+            .returning({ id: attachments.id });
+    } catch (err) {
+        // Avoid orphaned files on disk when DB insert fails
+        await unlink(absolute).catch(() => {});
+        throw err;
+    }
 
     await audit({
         actor,

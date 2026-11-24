@@ -10,6 +10,7 @@ import {
 } from '@/db/schema';
 import { decryptPii, encryptPii, hashPii } from '@/lib/crypto';
 import { audit } from '@/lib/audit';
+import { isValidUuid, maskPhone } from '@/lib/security';
 import {
     enqueueAssign,
     enqueueClusterDetector,
@@ -21,6 +22,8 @@ import { insertNotifications } from './notify';
 import { assignReportByKelurahan } from './assignment';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { ReportStatus } from './reports';
+import { validateTransitionNote, type Transition } from './report-labels';
+export { validateTransitionNote, type Transition };
 import type { CreateReportInput } from './form-contracts';
 
 export type ReportDetail = {
@@ -134,6 +137,7 @@ export async function getReport(
     id: string,
 ): Promise<ReportDetail | null> {
     const db = getDb();
+    if (!isValidUuid(id)) return null;
     const institutionId = scopeToInstitution(actor);
 
     const rows = await db
@@ -302,26 +306,28 @@ export async function getReport(
             ? {
                   ...peRow,
                   formData:
-                      (peRow.formData as Record<string, unknown> | null) ?? null,
+                      (peRow.formData as Record<string, unknown> | null) ??
+                      null,
               }
             : null,
         clusterSiblings,
         foggingCycles: cycles.sort((a, b) => a.cycleNumber - b.cycleNumber),
-        waDispatches: waLogs,
+        waDispatches:
+            actor.role === 'ADMIN' || actor.role === 'DINKES'
+                ? waLogs
+                : waLogs.map((w) => ({
+                      ...w,
+                      recipientPhone: maskPhone(w.recipientPhone),
+                  })),
     };
 }
 
-export type Transition =
-    | 'ACCEPT'
-    | 'START_PE'
-    | 'REJECT'
-    | 'VERIFY'
-    | 'REJECT_BY_DINKES'
-    | 'MARK_CLOSED';
-
 export type TransitionResult =
     | { ok: true; status: ReportStatus }
-    | { ok: false; reason: 'FORBIDDEN' | 'NOT_FOUND' | 'ILLEGAL_STATE' };
+    | {
+          ok: false;
+          reason: 'FORBIDDEN' | 'NOT_FOUND' | 'ILLEGAL_STATE' | 'NOTE_REQUIRED';
+      };
 
 const ALLOWED: Record<
     Transition,
@@ -371,6 +377,11 @@ export async function transitionReport(
         return { ok: false, reason: 'FORBIDDEN' };
     }
 
+    const noteCheck = validateTransitionNote(transition, note);
+    if (!noteCheck.ok) {
+        return { ok: false, reason: noteCheck.reason };
+    }
+
     const current = await getReport(actor, id);
 
     if (!current) {
@@ -404,7 +415,7 @@ export async function transitionReport(
                 : {}),
             ...(transition === 'REJECT' || transition === 'REJECT_BY_DINKES'
                 ? {
-                      rejectionReason: note ?? null,
+                      rejectionReason: noteCheck.note,
                       rejectedBy: actor.userId,
                       puskesmasReviewedAt: now,
                   }
@@ -437,16 +448,31 @@ export async function transitionReport(
     }
 
     if (transition === 'REJECT') {
-        await insertNotifications(
-            { kind: 'INSTITUTION', institutionId: current.institutionId },
-            {
-                title: 'Laporan ditolak puskesmas',
-                message: `Laporan ${current.reportNumber} ditolak. Lihat alasan dan kirim ulang bila perlu.`,
-                type: 'REJECTED',
-                entityType: 'REPORT_RS',
-                entityId: id,
-            },
-        );
+        const rejectReasonText = noteCheck.note
+            ? ` Alasan: ${noteCheck.note}`
+            : '';
+        await Promise.all([
+            insertNotifications(
+                { kind: 'INSTITUTION', institutionId: current.institutionId },
+                {
+                    title: 'Laporan ditolak puskesmas',
+                    message: `Laporan ${current.reportNumber} ditolak.${rejectReasonText}`,
+                    type: 'REJECTED',
+                    entityType: 'REPORT_RS',
+                    entityId: id,
+                },
+            ),
+            insertNotifications(
+                { kind: 'ROLE', role: 'DINKES' },
+                {
+                    title: 'Kasus ditolak Puskesmas — perlu disposisi ulang',
+                    message: `Laporan ${current.reportNumber} dikembalikan oleh Puskesmas.${rejectReasonText}`,
+                    type: 'REJECTED',
+                    entityType: 'REPORT_RS',
+                    entityId: id,
+                },
+            ),
+        ]);
     }
 
     if (transition === 'REJECT_BY_DINKES') {
@@ -542,6 +568,9 @@ export async function disposeCrossBorder(
     if (actor.role !== 'DINKES') {
         return { ok: false, reason: 'FORBIDDEN' };
     }
+    if (!isValidUuid(id)) {
+        return { ok: false, reason: 'NOT_FOUND' };
+    }
 
     const db = getDb();
     const now = new Date();
@@ -582,10 +611,21 @@ export async function disposeCrossBorder(
     return { ok: true, status: updated.status };
 }
 
+const FACILITY_MUTABLE_STATUSES = new Set<ReportStatus>([
+    'DRAFT',
+    'SUBMITTED',
+    'ASSIGNED',
+    'REJECTED',
+    'PUSKESMAS_REJECTED',
+]);
+
 export async function deleteReport(
     actor: Actor,
     id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (!isValidUuid(id)) {
+        return { ok: false, error: 'ID laporan tidak valid.' };
+    }
     const db = getDb();
     const [row] = await db
         .select({
@@ -602,15 +642,22 @@ export async function deleteReport(
         return { ok: false, error: 'Laporan tidak ditemukan.' };
     }
 
+    const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
-        actor.role === 'ADMIN' ||
-        actor.role === 'DINKES' ||
+        isPrivileged ||
         (actor.institutionId && actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
         return {
             ok: false,
             error: 'Anda tidak memiliki hak untuk menghapus laporan faskes lain.',
+        };
+    }
+
+    if (!isPrivileged && !FACILITY_MUTABLE_STATUSES.has(row.status)) {
+        return {
+            ok: false,
+            error: 'Laporan yang sudah diproses PE, terverifikasi, atau ditutup tidak dapat dihapus oleh faskes.',
         };
     }
 
@@ -636,6 +683,9 @@ export async function submitDraftReport(
     actor: Actor,
     id: string,
 ): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
+    if (!isValidUuid(id)) {
+        return { ok: false, error: 'ID laporan tidak valid.' };
+    }
     const db = getDb();
     const [row] = await db
         .select()
@@ -681,7 +731,8 @@ export async function submitDraftReport(
 
     const isCrossBorder = totalKelurahan > 0 && localMatches === 0;
     const isPuskesmasPoli =
-        actor.role === 'PUSKESMAS' || row.sourceType === 'PUSKESMAS_POLI';
+        actor.role === 'PUSKESMAS' ||
+        (actor.role === 'ADMIN' && row.sourceType === 'PUSKESMAS_POLI');
 
     const targetStatus = isCrossBorder
         ? ('CROSS_BORDER_PENDING' as const)
@@ -791,7 +842,10 @@ export async function submitDraftReport(
             });
         }
     } catch (error) {
-        console.error('[laporan] gagal enqueue ke Redis', { reportId: id, error });
+        console.error('[laporan] gagal enqueue ke Redis', {
+            reportId: id,
+            error,
+        });
     }
 
     return { ok: true, status: targetStatus };
@@ -802,6 +856,9 @@ export async function updateReport(
     id: string,
     input: Partial<CreateReportInput>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (!isValidUuid(id)) {
+        return { ok: false, error: 'ID laporan tidak valid.' };
+    }
     const db = getDb();
     const [row] = await db
         .select()
@@ -813,9 +870,9 @@ export async function updateReport(
         return { ok: false, error: 'Laporan tidak ditemukan.' };
     }
 
+    const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
-        actor.role === 'ADMIN' ||
-        actor.role === 'DINKES' ||
+        isPrivileged ||
         (actor.institutionId && actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
@@ -825,19 +882,30 @@ export async function updateReport(
         };
     }
 
+    if (!isPrivileged && !FACILITY_MUTABLE_STATUSES.has(row.status)) {
+        return {
+            ok: false,
+            error: 'Laporan yang sudah diproses PE, terverifikasi, atau ditutup tidak dapat diubah oleh faskes.',
+        };
+    }
+
     const updates: Record<string, unknown> = {
         updatedById: actor.userId,
         updatedAt: new Date(),
     };
 
-    if (input.patientName) updates.patientNameEncrypted = encryptPii(input.patientName);
+    if (input.patientName)
+        updates.patientNameEncrypted = encryptPii(input.patientName);
     if (input.patientNik) {
         updates.patientNikEncrypted = encryptPii(input.patientNik);
         updates.patientNikHash = hashPii(input.patientNik);
     }
-    if (input.patientAddress) updates.patientAddressEncrypted = encryptPii(input.patientAddress);
+    if (input.patientAddress)
+        updates.patientAddressEncrypted = encryptPii(input.patientAddress);
     if (input.phoneNumber !== undefined) {
-        updates.phoneNumberEncrypted = input.phoneNumber ? encryptPii(input.phoneNumber) : null;
+        updates.phoneNumberEncrypted = input.phoneNumber
+            ? encryptPii(input.phoneNumber)
+            : null;
     }
     if (input.patientAge !== undefined) updates.patientAge = input.patientAge;
     if (input.patientGender) updates.patientGender = input.patientGender;
@@ -851,16 +919,24 @@ export async function updateReport(
     if (input.latitude !== undefined) updates.latitude = input.latitude;
     if (input.longitude !== undefined) updates.longitude = input.longitude;
     if (input.admissionDate) updates.admissionDate = input.admissionDate;
-    if (input.symptomOnsetDate !== undefined) updates.symptomOnsetDate = input.symptomOnsetDate ?? null;
-    if (input.diagnosisDate !== undefined) updates.diagnosisDate = input.diagnosisDate ?? null;
-    if (input.plateletCount !== undefined) updates.plateletCount = input.plateletCount ?? null;
+    if (input.symptomOnsetDate !== undefined)
+        updates.symptomOnsetDate = input.symptomOnsetDate ?? null;
+    if (input.diagnosisDate !== undefined)
+        updates.diagnosisDate = input.diagnosisDate ?? null;
+    if (input.plateletCount !== undefined)
+        updates.plateletCount = input.plateletCount ?? null;
     if (input.hematocrit !== undefined) {
-        updates.hematocrit = input.hematocrit !== null && input.hematocrit !== undefined ? String(input.hematocrit) : null;
+        updates.hematocrit =
+            input.hematocrit !== null && input.hematocrit !== undefined
+                ? String(input.hematocrit)
+                : null;
     }
-    if (input.ns1Result !== undefined) updates.dengueBlot = input.ns1Result ?? null;
+    if (input.ns1Result !== undefined)
+        updates.dengueBlot = input.ns1Result ?? null;
     if (input.igmResult !== undefined) updates.igm = input.igmResult ?? null;
     if (input.iggResult !== undefined) updates.igg = input.iggResult ?? null;
-    if (input.diagnosis !== undefined) updates.diagnosis = input.diagnosis ?? null;
+    if (input.diagnosis !== undefined)
+        updates.diagnosis = input.diagnosis ?? null;
 
     // Handle status toggling: kirim (terkirim) vs draf
     if (input.isDraft === true) {

@@ -35,10 +35,7 @@ import { Panel } from '@/components/shell/page';
 import { ROLE_LABEL } from '@/lib/nav';
 import type { Role } from '@/lib/roles';
 import { cn } from '@/lib/utils';
-import {
-    changeUserPasswordAction,
-    updateUserProfileAction,
-} from './actions';
+import { changeUserPasswordAction, updateUserProfileAction } from './actions';
 import {
     CreateSettingButton,
     SettingRowActions,
@@ -69,14 +66,11 @@ const profileClientSchema = z.object({
     whatsappPhone: z
         .string()
         .trim()
-        .refine(
-            (val) => {
-                if (!val) return true;
-                const cleaned = val.replace(/[\s-]/g, '');
-                return /^(\+?62|0|8)[0-9]{7,14}$/.test(cleaned);
-            },
-            'Nomor HP/WhatsApp tidak valid (contoh: 081234567890 atau 6281234567890)',
-        )
+        .refine((val) => {
+            if (!val) return true;
+            const cleaned = val.replace(/[\s-]/g, '');
+            return /^(\+?62|0|8)[0-9]{7,14}$/.test(cleaned);
+        }, 'Nomor HP/WhatsApp tidak valid (contoh: 081234567890 atau 6281234567890)')
         .optional(),
     whatsappOptIn: z.boolean(),
 });
@@ -86,9 +80,15 @@ const passwordClientSchema = z
         currentPassword: z.string().min(1, 'Kata sandi saat ini wajib diisi'),
         newPassword: z
             .string()
-            .min(10, 'Kata sandi baru minimal 10 karakter')
+            .min(8, 'Kata sandi baru minimal 8 karakter')
+            .regex(
+                /[^a-zA-Z0-9]/,
+                'Kata sandi baru wajib mengandung minimal 1 simbol (contoh: @, #, $, !, %, &)',
+            )
             .max(100, 'Kata sandi baru maksimal 100 karakter'),
-        confirmPassword: z.string().min(1, 'Konfirmasi kata sandi baru wajib diisi'),
+        confirmPassword: z
+            .string()
+            .min(1, 'Konfirmasi kata sandi baru wajib diisi'),
     })
     .refine((data) => data.newPassword === data.confirmPassword, {
         message: 'Konfirmasi kata sandi baru tidak cocok',
@@ -116,14 +116,18 @@ export function SettingsClient({
     const [name, setName] = useState(user.name);
     const [phone, setPhone] = useState(user.whatsappPhone);
     const [optIn, setOptIn] = useState(user.whatsappOptIn);
-    const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
+    const [profileErrors, setProfileErrors] = useState<Record<string, string>>(
+        {},
+    );
     const [savingProfile, startProfileTransition] = useTransition();
 
     // Password state & Zod errors
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
+    const [passwordErrors, setPasswordErrors] = useState<
+        Record<string, string>
+    >({});
     const [showPassword, setShowPassword] = useState(false);
     const [savingPassword, startPasswordTransition] = useTransition();
 
@@ -148,7 +152,10 @@ export function SettingsClient({
                 if (issue.path[0]) errs[String(issue.path[0])] = issue.message;
             }
             setProfileErrors(errs);
-            toast.error(parsed.error.issues[0]?.message ?? 'Format data profil tidak valid.');
+            toast.error(
+                parsed.error.issues[0]?.message ??
+                    'Format data profil tidak valid.',
+            );
             return;
         }
 
@@ -178,7 +185,10 @@ export function SettingsClient({
                 if (issue.path[0]) errs[String(issue.path[0])] = issue.message;
             }
             setPasswordErrors(errs);
-            toast.error(parsed.error.issues[0]?.message ?? 'Format kata sandi tidak valid.');
+            toast.error(
+                parsed.error.issues[0]?.message ??
+                    'Format kata sandi tidak valid.',
+            );
             return;
         }
 
@@ -213,10 +223,13 @@ export function SettingsClient({
 
     return (
         <div className="space-y-6">
-            <Tabs defaultValue="profil" className="w-full flex flex-col space-y-6">
+            <Tabs
+                defaultValue="profil"
+                className="flex w-full flex-col space-y-6"
+            >
                 {/* Horizontal Tab Navigation */}
                 <div className="border-b border-[var(--border)]">
-                    <TabsList variant="line" className="h-11 gap-4 -mb-px">
+                    <TabsList variant="line" className="-mb-px h-11 gap-4">
                         <TabsTrigger
                             value="profil"
                             className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
@@ -277,9 +290,9 @@ export function SettingsClient({
                 <TabsContent value="profil" className="space-y-6 pt-4">
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                         {/* Profile Summary Card */}
-                        <Panel padded className="lg:col-span-1 space-y-4">
+                        <Panel padded className="space-y-4 lg:col-span-1">
                             <div className="flex flex-col items-center text-center">
-                                <div className="grid size-20 place-items-center rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)] font-bold text-2xl shadow-xs">
+                                <div className="grid size-20 place-items-center rounded-2xl bg-[var(--accent)]/15 text-2xl font-bold text-[var(--accent)] shadow-xs">
                                     {initials}
                                 </div>
                                 <h3 className="mt-3 text-base font-semibold text-foreground">
@@ -290,21 +303,25 @@ export function SettingsClient({
                                 </p>
                                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--raised)] px-2.5 py-1 text-[11.5px] font-medium">
                                     <span className="size-2 rounded-full bg-[var(--positive)]" />
-                                    <span>{ROLE_LABEL[user.role] ?? user.role}</span>
+                                    <span>
+                                        {ROLE_LABEL[user.role] ?? user.role}
+                                    </span>
                                 </div>
                             </div>
 
-                            <div className="border-t border-[var(--rule)] pt-4 space-y-2.5 text-[12.5px]">
+                            <div className="space-y-2.5 border-t border-[var(--rule)] pt-4 text-[12.5px]">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span>Instansi:</span>
                                     <span className="font-medium text-foreground">
-                                        {user.institution ?? 'Dinas Kesehatan Kota Cirebon'}
+                                        {user.institution ?? 'Dinas Kesehatan'}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span>Status Akun:</span>
                                     <span className="font-semibold text-[var(--positive)]">
-                                        {user.status === 'APPROVED' ? 'Terverifikasi' : user.status}
+                                        {user.status === 'APPROVED'
+                                            ? 'Terverifikasi'
+                                            : user.status}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-muted-foreground">
@@ -323,19 +340,32 @@ export function SettingsClient({
                             subtitle="Perbarui nama lengkap dan nomor kontak WhatsApp untuk koordinasi kedaruratan DBD"
                             className="lg:col-span-2"
                         >
-                            <form onSubmit={handleSaveProfile} className="space-y-4">
+                            <form
+                                onSubmit={handleSaveProfile}
+                                className="space-y-4"
+                            >
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label htmlFor="prof-name">Nama Lengkap</Label>
+                                        <Label htmlFor="prof-name">
+                                            Nama Lengkap
+                                        </Label>
                                         <Input
                                             id="prof-name"
                                             value={name}
                                             onChange={(e) => {
                                                 setName(e.target.value);
-                                                if (profileErrors.name) setProfileErrors((prev) => ({ ...prev, name: '' }));
+                                                if (profileErrors.name)
+                                                    setProfileErrors(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            name: '',
+                                                        }),
+                                                    );
                                             }}
                                             placeholder="Nama lengkap petugas"
-                                            aria-invalid={Boolean(profileErrors.name)}
+                                            aria-invalid={Boolean(
+                                                profileErrors.name,
+                                            )}
                                             className="mt-1.5"
                                             required
                                         />
@@ -346,51 +376,70 @@ export function SettingsClient({
                                         )}
                                     </div>
                                     <div>
-                                        <Label htmlFor="prof-email">Alamat Email (Akun)</Label>
+                                        <Label htmlFor="prof-email">
+                                            Alamat Email (Akun)
+                                        </Label>
                                         <div className="relative mt-1.5">
                                             <Input
                                                 id="prof-email"
                                                 value={user.email}
                                                 disabled
-                                                className="bg-[var(--raised)] text-muted-foreground pr-8 cursor-not-allowed"
+                                                className="cursor-not-allowed bg-[var(--raised)] pr-8 text-muted-foreground"
                                             />
                                             <Lock className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
                                         </div>
                                         <p className="mt-1 text-[11px] text-muted-foreground">
-                                            Email dikunci demi kepatuhan audit sistem
+                                            Email dikunci demi kepatuhan audit
+                                            sistem
                                         </p>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label htmlFor="prof-role">Peran & Tanggung Jawab</Label>
+                                        <Label htmlFor="prof-role">
+                                            Peran & Tanggung Jawab
+                                        </Label>
                                         <Input
                                             id="prof-role"
-                                            value={ROLE_LABEL[user.role] ?? user.role}
+                                            value={
+                                                ROLE_LABEL[user.role] ??
+                                                user.role
+                                            }
                                             disabled
-                                            className="mt-1.5 bg-[var(--raised)] text-muted-foreground cursor-not-allowed"
+                                            className="mt-1.5 cursor-not-allowed bg-[var(--raised)] text-muted-foreground"
                                         />
                                     </div>
                                     <div>
-                                        <Label htmlFor="prof-inst">Fasilitas / Instansi</Label>
+                                        <Label htmlFor="prof-inst">
+                                            Fasilitas / Instansi
+                                        </Label>
                                         <Input
                                             id="prof-inst"
-                                            value={user.institution ?? 'Dinas Kesehatan'}
+                                            value={
+                                                user.institution ??
+                                                'Dinas Kesehatan'
+                                            }
                                             disabled
-                                            className="mt-1.5 bg-[var(--raised)] text-muted-foreground cursor-not-allowed"
+                                            className="mt-1.5 cursor-not-allowed bg-[var(--raised)] text-muted-foreground"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="border-t border-[var(--rule)] pt-4 space-y-3">
+                                <div className="space-y-3 border-t border-[var(--rule)] pt-4">
                                     <div className="space-y-1.5">
-                                        <Label htmlFor="prof-wa" className="text-[13px] font-medium">
+                                        <Label
+                                            htmlFor="prof-wa"
+                                            className="text-[13px] font-medium"
+                                        >
                                             Nomor WhatsApp Petugas
                                         </Label>
                                         <div className="relative">
                                             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                                                <Phone className="size-4 text-[var(--accent)]" aria-hidden />
+                                                <Phone
+                                                    className="size-4 text-[var(--accent)]"
+                                                    aria-hidden
+                                                />
                                             </div>
                                             <Input
                                                 id="prof-wa"
@@ -399,12 +448,22 @@ export function SettingsClient({
                                                 value={phone}
                                                 onChange={(e) => {
                                                     setPhone(e.target.value);
-                                                    if (profileErrors.whatsappPhone) {
-                                                        setProfileErrors((prev) => ({ ...prev, whatsappPhone: '' }));
+                                                    if (
+                                                        profileErrors.whatsappPhone
+                                                    ) {
+                                                        setProfileErrors(
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                whatsappPhone:
+                                                                    '',
+                                                            }),
+                                                        );
                                                     }
                                                 }}
                                                 placeholder="Contoh: 0812-3456-7890 atau +6281234567890"
-                                                aria-invalid={Boolean(profileErrors.whatsappPhone)}
+                                                aria-invalid={Boolean(
+                                                    profileErrors.whatsappPhone,
+                                                )}
                                                 className={cn(
                                                     'pl-9 font-mono text-[13px]',
                                                     profileErrors.whatsappPhone &&
@@ -418,18 +477,28 @@ export function SettingsClient({
                                             </p>
                                         ) : (
                                             <p className="text-[11.5px] text-muted-foreground">
-                                                Format Indonesia (08... atau +62...). Nomor ini menerima ringkasan penugasan PE dan peringatan SLA kritis dari sistem.
+                                                Format Indonesia (08... atau
+                                                +62...). Nomor ini menerima
+                                                ringkasan penugasan PE dan
+                                                peringatan SLA kritis dari
+                                                sistem.
                                             </p>
                                         )}
                                     </div>
 
                                     <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--raised)]/40 p-3">
                                         <div className="space-y-0.5">
-                                            <Label htmlFor="prof-optin" className="text-[13px] font-medium text-foreground cursor-pointer">
-                                                Aktifkan Notifikasi WhatsApp Otomatis
+                                            <Label
+                                                htmlFor="prof-optin"
+                                                className="cursor-pointer text-[13px] font-medium text-foreground"
+                                            >
+                                                Aktifkan Notifikasi WhatsApp
+                                                Otomatis
                                             </Label>
                                             <p className="text-[11.5px] text-muted-foreground">
-                                                Kirim pesan instan saat ada laporan masuk atau batas waktu SLA mendekati kedaluwarsa.
+                                                Kirim pesan instan saat ada
+                                                laporan masuk atau batas waktu
+                                                SLA mendekati kedaluwarsa.
                                             </p>
                                         </div>
                                         <Switch
@@ -440,14 +509,16 @@ export function SettingsClient({
                                     </div>
                                 </div>
 
-                                <div className="pt-2 flex justify-end">
+                                <div className="flex justify-end pt-2">
                                     <Button
                                         type="submit"
                                         disabled={savingProfile}
                                         className="gap-2 font-medium"
                                     >
                                         <Save className="size-4" />
-                                        {savingProfile ? 'Menyimpan Profil…' : 'Simpan Perubahan Profil'}
+                                        {savingProfile
+                                            ? 'Menyimpan Profil…'
+                                            : 'Simpan Perubahan Profil'}
                                     </Button>
                                 </div>
                             </form>
@@ -464,26 +535,49 @@ export function SettingsClient({
                             subtitle="Pastikan kata sandi baru Anda minimal 10 karakter dan sulit ditebak"
                             className="lg:col-span-2"
                         >
-                            <form onSubmit={handleChangePassword} className="space-y-4">
+                            <form
+                                onSubmit={handleChangePassword}
+                                className="space-y-4"
+                            >
                                 <div>
-                                    <Label htmlFor="pwd-current">Kata Sandi Saat Ini</Label>
+                                    <Label htmlFor="pwd-current">
+                                        Kata Sandi Saat Ini
+                                    </Label>
                                     <div className="relative mt-1.5">
                                         <Input
                                             id="pwd-current"
-                                            type={showPassword ? 'text' : 'password'}
+                                            type={
+                                                showPassword
+                                                    ? 'text'
+                                                    : 'password'
+                                            }
                                             value={currentPassword}
                                             onChange={(e) => {
-                                                setCurrentPassword(e.target.value);
-                                                if (passwordErrors.currentPassword) setPasswordErrors((prev) => ({ ...prev, currentPassword: '' }));
+                                                setCurrentPassword(
+                                                    e.target.value,
+                                                );
+                                                if (
+                                                    passwordErrors.currentPassword
+                                                )
+                                                    setPasswordErrors(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            currentPassword: '',
+                                                        }),
+                                                    );
                                             }}
                                             placeholder="Masukkan kata sandi lama Anda"
-                                            aria-invalid={Boolean(passwordErrors.currentPassword)}
+                                            aria-invalid={Boolean(
+                                                passwordErrors.currentPassword,
+                                            )}
                                             required
                                             className="pr-10"
                                         />
                                         <button
                                             type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
+                                            onClick={() =>
+                                                setShowPassword(!showPassword)
+                                            }
                                             className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                         >
                                             {showPassword ? (
@@ -502,17 +596,31 @@ export function SettingsClient({
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label htmlFor="pwd-new">Kata Sandi Baru</Label>
+                                        <Label htmlFor="pwd-new">
+                                            Kata Sandi Baru
+                                        </Label>
                                         <Input
                                             id="pwd-new"
-                                            type={showPassword ? 'text' : 'password'}
+                                            type={
+                                                showPassword
+                                                    ? 'text'
+                                                    : 'password'
+                                            }
                                             value={newPassword}
                                             onChange={(e) => {
                                                 setNewPassword(e.target.value);
-                                                if (passwordErrors.newPassword) setPasswordErrors((prev) => ({ ...prev, newPassword: '' }));
+                                                if (passwordErrors.newPassword)
+                                                    setPasswordErrors(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            newPassword: '',
+                                                        }),
+                                                    );
                                             }}
                                             placeholder="Minimal 10 karakter"
-                                            aria-invalid={Boolean(passwordErrors.newPassword)}
+                                            aria-invalid={Boolean(
+                                                passwordErrors.newPassword,
+                                            )}
                                             required
                                             className="mt-1.5"
                                         />
@@ -523,17 +631,35 @@ export function SettingsClient({
                                         )}
                                     </div>
                                     <div>
-                                        <Label htmlFor="pwd-confirm">Konfirmasi Kata Sandi Baru</Label>
+                                        <Label htmlFor="pwd-confirm">
+                                            Konfirmasi Kata Sandi Baru
+                                        </Label>
                                         <Input
                                             id="pwd-confirm"
-                                            type={showPassword ? 'text' : 'password'}
+                                            type={
+                                                showPassword
+                                                    ? 'text'
+                                                    : 'password'
+                                            }
                                             value={confirmPassword}
                                             onChange={(e) => {
-                                                setConfirmPassword(e.target.value);
-                                                if (passwordErrors.confirmPassword) setPasswordErrors((prev) => ({ ...prev, confirmPassword: '' }));
+                                                setConfirmPassword(
+                                                    e.target.value,
+                                                );
+                                                if (
+                                                    passwordErrors.confirmPassword
+                                                )
+                                                    setPasswordErrors(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            confirmPassword: '',
+                                                        }),
+                                                    );
                                             }}
                                             placeholder="Ulangi kata sandi baru"
-                                            aria-invalid={Boolean(passwordErrors.confirmPassword)}
+                                            aria-invalid={Boolean(
+                                                passwordErrors.confirmPassword,
+                                            )}
                                             required
                                             className="mt-1.5"
                                         />
@@ -545,25 +671,36 @@ export function SettingsClient({
                                     </div>
                                 </div>
 
-                                <div className="rounded-lg border border-[var(--border)] bg-[var(--raised)]/40 p-3 text-[12px] text-muted-foreground space-y-1">
+                                <div className="space-y-1 rounded-lg border border-[var(--border)] bg-[var(--raised)]/40 p-3 text-[12px] text-muted-foreground">
                                     <p className="font-medium text-foreground">
                                         Ketentuan Kata Sandi yang Baik:
                                     </p>
                                     <ul className="list-inside list-disc space-y-0.5">
-                                        <li>Minimal 10 karakter sesuai standar sistem Better-Auth</li>
-                                        <li>Kombinasikan huruf besar, huruf kecil, angka, dan simbol khusus</li>
-                                        <li>Hindari penggunaan nama lengkap atau tanggal lahir</li>
+                                        <li>
+                                            Minimal 10 karakter sesuai standar
+                                            sistem Better-Auth
+                                        </li>
+                                        <li>
+                                            Kombinasikan huruf besar, huruf
+                                            kecil, angka, dan simbol khusus
+                                        </li>
+                                        <li>
+                                            Hindari penggunaan nama lengkap atau
+                                            tanggal lahir
+                                        </li>
                                     </ul>
                                 </div>
 
-                                <div className="pt-2 flex justify-end">
+                                <div className="flex justify-end pt-2">
                                     <Button
                                         type="submit"
                                         disabled={savingPassword}
                                         className="gap-2 font-medium"
                                     >
                                         <KeyRound className="size-4" />
-                                        {savingPassword ? 'Memperbarui Kata Sandi…' : 'Perbarui Kata Sandi'}
+                                        {savingPassword
+                                            ? 'Memperbarui Kata Sandi…'
+                                            : 'Perbarui Kata Sandi'}
                                     </Button>
                                 </div>
                             </form>
@@ -579,25 +716,34 @@ export function SettingsClient({
                                             <p className="font-semibold text-foreground">
                                                 AES-256-GCM Terpasang
                                             </p>
-                                            <p className="mt-0.5 text-[11.5px] text-muted-foreground leading-relaxed">
-                                                Seluruh data NIK, nama pasien, dan rekam medis klinis dienkripsi saat disimpan di basis data.
+                                            <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+                                                Seluruh data NIK, nama pasien,
+                                                dan rekam medis klinis
+                                                dienkripsi saat disimpan di
+                                                basis data.
                                             </p>
                                         </div>
                                     </div>
                                     <p className="leading-relaxed">
-                                        Kunci enkripsi dikelola secara independen di lingkungan server tertutup untuk menjamin kerahasiaan pasien sesuai UU Perlindungan Data Pribadi (UU PDP).
+                                        Kunci enkripsi dikelola secara
+                                        independen di lingkungan server tertutup
+                                        untuk menjamin kerahasiaan pasien sesuai
+                                        UU Perlindungan Data Pribadi (UU PDP).
                                     </p>
                                 </div>
                             </Panel>
 
                             <Panel padded title="Sesi & Audit Akses">
                                 <div className="space-y-2.5 text-[12.5px]">
-                                    <div className="flex items-center gap-2 text-foreground font-medium">
+                                    <div className="flex items-center gap-2 font-medium text-foreground">
                                         <Laptop className="size-4 text-[var(--accent)]" />
                                         <span>Perangkat Saat Ini</span>
                                     </div>
                                     <p className="text-[11.5px] text-muted-foreground">
-                                        Akses aktif melalui peramban terautentikasi. Semua riwayat penambahan atau modifikasi data tercatat di Audit Log sistem.
+                                        Akses aktif melalui peramban
+                                        terautentikasi. Semua riwayat penambahan
+                                        atau modifikasi data tercatat di Audit
+                                        Log sistem.
                                     </p>
                                 </div>
                             </Panel>
@@ -642,25 +788,29 @@ export function SettingsClient({
                                             type="button"
                                             onClick={() => {
                                                 setTheme(item.value);
-                                                toast.success(`Tema diubah ke ${item.label}`);
+                                                toast.success(
+                                                    `Tema diubah ke ${item.label}`,
+                                                );
                                             }}
                                             className={cn(
                                                 'flex flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border p-4 text-center transition-all select-none',
                                                 active
-                                                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)] shadow-xs'
+                                                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-xs ring-2 ring-[var(--accent)]'
                                                     : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--raised)]/50',
                                             )}
                                         >
                                             <item.icon
                                                 className={cn(
                                                     'size-5',
-                                                    active ? 'text-[var(--accent)]' : 'text-muted-foreground',
+                                                    active
+                                                        ? 'text-[var(--accent)]'
+                                                        : 'text-muted-foreground',
                                                 )}
                                             />
                                             <span className="text-[13px] font-semibold text-foreground">
                                                 {item.label}
                                             </span>
-                                            <span className="text-[11px] text-muted-foreground leading-tight">
+                                            <span className="text-[11px] leading-tight text-muted-foreground">
                                                 {item.desc}
                                             </span>
                                         </button>
@@ -682,7 +832,9 @@ export function SettingsClient({
                                             Laporan Kasus Masuk Baru
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
-                                            Pemberitahuan instan saat ada faskes yang menginput kasus DBD baru di wilayah kerja Anda.
+                                            Pemberitahuan instan saat ada faskes
+                                            yang menginput kasus DBD baru di
+                                            wilayah kerja Anda.
                                         </p>
                                     </div>
                                     <Switch
@@ -694,10 +846,13 @@ export function SettingsClient({
                                 <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3.5">
                                     <div className="space-y-0.5">
                                         <p className="text-[13px] font-medium text-foreground">
-                                            Peringatan Batas SLA Kritis (24j / 72j)
+                                            Peringatan Batas SLA Kritis (24j /
+                                            72j)
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
-                                            Peringatan darurat saat kasus belum direspon mendekati batas waktu SLA operasional.
+                                            Peringatan darurat saat kasus belum
+                                            direspon mendekati batas waktu SLA
+                                            operasional.
                                         </p>
                                     </div>
                                     <Switch
@@ -712,7 +867,8 @@ export function SettingsClient({
                                             Tugas Penyelidikan Epidemiologi (PE)
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
-                                            Instruksi investigasi lapangan dan jadwal fogging fokus siklus 1 & 2.
+                                            Instruksi investigasi lapangan dan
+                                            jadwal fogging fokus siklus 1 & 2.
                                         </p>
                                     </div>
                                     <Switch
@@ -761,62 +917,65 @@ export function SettingsClient({
                         {/* SLA Standard Reference Cards */}
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-                                <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
+                                <div className="mb-1 flex items-center gap-2 text-[var(--accent)]">
                                     <Clock className="size-4" />
-                                    <span className="text-[12px] font-semibold uppercase tracking-wider">
+                                    <span className="text-[12px] font-semibold tracking-wider uppercase">
                                         SLA Respon Puskesmas
                                     </span>
                                 </div>
                                 <p className="text-xl font-bold text-foreground">
                                     ≤ 24 Jam
                                 </p>
-                                <p className="text-[11.5px] text-muted-foreground mt-1">
-                                    Waktu maksimal respon puskesmas setelah KDRS diterima
+                                <p className="mt-1 text-[11.5px] text-muted-foreground">
+                                    Waktu maksimal respon puskesmas setelah KDRS
+                                    diterima
                                 </p>
                             </div>
 
                             <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-                                <div className="flex items-center gap-2 text-[var(--positive)] mb-1">
+                                <div className="mb-1 flex items-center gap-2 text-[var(--positive)]">
                                     <ShieldCheck className="size-4" />
-                                    <span className="text-[12px] font-semibold uppercase tracking-wider">
+                                    <span className="text-[12px] font-semibold tracking-wider uppercase">
                                         SLA Verifikasi Dinkes
                                     </span>
                                 </div>
                                 <p className="text-xl font-bold text-foreground">
                                     ≤ 72 Jam
                                 </p>
-                                <p className="text-[11.5px] text-muted-foreground mt-1">
-                                    Verifikasi berkas laporan PE lengkap oleh tim surveilans
+                                <p className="mt-1 text-[11.5px] text-muted-foreground">
+                                    Verifikasi berkas laporan PE lengkap oleh
+                                    tim surveilans
                                 </p>
                             </div>
 
                             <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-                                <div className="flex items-center gap-2 text-[var(--warning)] mb-1">
+                                <div className="mb-1 flex items-center gap-2 text-[var(--warning)]">
                                     <ShieldAlert className="size-4" />
-                                    <span className="text-[12px] font-semibold uppercase tracking-wider">
+                                    <span className="text-[12px] font-semibold tracking-wider uppercase">
                                         Trombosit Kritis
                                     </span>
                                 </div>
                                 <p className="text-xl font-bold text-foreground">
                                     &lt; 100.000 /µL
                                 </p>
-                                <p className="text-[11.5px] text-muted-foreground mt-1">
+                                <p className="mt-1 text-[11.5px] text-muted-foreground">
                                     Ambang batas kriteria trombositopenia DBD
                                 </p>
                             </div>
 
                             <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
-                                <div className="flex items-center gap-2 text-[var(--info)] mb-1">
+                                <div className="mb-1 flex items-center gap-2 text-[var(--info)]">
                                     <Building2 className="size-4" />
-                                    <span className="text-[12px] font-semibold uppercase tracking-wider">
+                                    <span className="text-[12px] font-semibold tracking-wider uppercase">
                                         Target Bebas Jentik
                                     </span>
                                 </div>
                                 <p className="text-xl font-bold text-foreground">
                                     ABJ ≥ 95%
                                 </p>
-                                <p className="text-[11.5px] text-muted-foreground mt-1">
-                                    Target standar Angka Bebas Jentik tingkat kelurahan
+                                <p className="mt-1 text-[11.5px] text-muted-foreground">
+                                    Target standar Angka Bebas Jentik tingkat
+                                    kelurahan
                                 </p>
                             </div>
                         </div>
@@ -829,14 +988,20 @@ export function SettingsClient({
                                         Parameter Konfigurasi Basis Data
                                     </h3>
                                     <p className="text-[12.5px] text-muted-foreground">
-                                        Menampilkan {systemSettings.length} dari {totalSettings} pengaturan sistem aktif.
+                                        Menampilkan {systemSettings.length} dari{' '}
+                                        {totalSettings} pengaturan sistem aktif.
                                     </p>
                                 </div>
-                                {isAdmin && <CreateSettingButton categories={categories} />}
+                                {isAdmin && (
+                                    <CreateSettingButton
+                                        categories={categories}
+                                    />
+                                )}
                             </div>
 
                             {categories.map((category) => {
-                                const items = groupedSettings.get(category) ?? [];
+                                const items =
+                                    groupedSettings.get(category) ?? [];
                                 if (items.length === 0) return null;
 
                                 return (
@@ -849,10 +1014,32 @@ export function SettingsClient({
                                             <table className="ledger min-w-[700px]">
                                                 <thead>
                                                     <tr>
-                                                        <th scope="col" className="w-[30%]">Kunci Parameter</th>
-                                                        <th scope="col" className="w-[30%]">Nilai Saat Ini</th>
-                                                        <th scope="col" className="w-[25%]">Deskripsi</th>
-                                                        {isAdmin && <th scope="col" className="w-[15%] text-right">Aksi</th>}
+                                                        <th
+                                                            scope="col"
+                                                            className="w-[30%]"
+                                                        >
+                                                            Kunci Parameter
+                                                        </th>
+                                                        <th
+                                                            scope="col"
+                                                            className="w-[30%]"
+                                                        >
+                                                            Nilai Saat Ini
+                                                        </th>
+                                                        <th
+                                                            scope="col"
+                                                            className="w-[25%]"
+                                                        >
+                                                            Deskripsi
+                                                        </th>
+                                                        {isAdmin && (
+                                                            <th
+                                                                scope="col"
+                                                                className="w-[15%] text-right"
+                                                            >
+                                                                Aksi
+                                                            </th>
+                                                        )}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -860,23 +1047,32 @@ export function SettingsClient({
                                                         <tr key={setting.id}>
                                                             <td>
                                                                 <span className="font-mono text-[12.5px] font-medium text-foreground">
-                                                                    {setting.key}
+                                                                    {
+                                                                        setting.key
+                                                                    }
                                                                 </span>
                                                                 <span className="ml-2 rounded bg-[var(--raised)] px-1.5 py-0.5 text-[10.5px] text-muted-foreground uppercase">
-                                                                    {setting.type}
+                                                                    {
+                                                                        setting.type
+                                                                    }
                                                                 </span>
                                                             </td>
                                                             <td className="font-mono text-[12.5px] text-foreground">
                                                                 {setting.value}
                                                             </td>
                                                             <td className="text-[12px] text-muted-foreground">
-                                                                {setting.description ?? '—'}
+                                                                {setting.description ??
+                                                                    '—'}
                                                             </td>
                                                             {isAdmin && (
                                                                 <td className="text-right">
                                                                     <SettingRowActions
-                                                                        row={setting}
-                                                                        categories={categories}
+                                                                        row={
+                                                                            setting
+                                                                        }
+                                                                        categories={
+                                                                            categories
+                                                                        }
                                                                     />
                                                                 </td>
                                                             )}

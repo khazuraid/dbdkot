@@ -29,6 +29,7 @@ import {
     InputGroupAddon,
     InputGroupInput,
 } from '@/components/ui/input-group';
+import { escapeHtml } from '@/lib/security';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_CENTER: [number, number] = [-6.72, 108.55];
@@ -278,11 +279,11 @@ export default function KelurahanZoneMap({
 
             const tooltipContent = `
                 <div class="space-y-0.5 text-left text-xs">
-                    <span class="font-semibold text-foreground">Kel. ${z.name}</span><br/>
-                    <span class="text-[11.5px] text-muted-foreground">${z.kecamatan}, ${z.kota}</span><br/>
+                    <span class="font-semibold text-foreground">Kel. ${escapeHtml(z.name)}</span><br/>
+                    <span class="text-[11.5px] text-muted-foreground">${escapeHtml(z.kecamatan)}, ${escapeHtml(z.kota)}</span><br/>
                     <span class="text-[11px] text-muted-foreground">${
                         z.puskesmasNames.length > 0
-                            ? `Puskesmas: ${z.puskesmasNames.join(', ')}`
+                            ? `Puskesmas: ${escapeHtml(z.puskesmasNames.join(', '))}`
                             : 'Belum ada puskesmas pengampu'
                     }</span>
                 </div>
@@ -307,7 +308,7 @@ export default function KelurahanZoneMap({
             );
             const candTooltip = `
                 <div class="space-y-0.5 text-left text-xs">
-                    <span class="font-semibold text-[#b91c1c]">${activeCandidate.displayName}</span><br/>
+                    <span class="font-semibold text-[#b91c1c]">${escapeHtml(activeCandidate.displayName)}</span><br/>
                     <span class="text-[11px] text-muted-foreground">Kandidat zonasi belum tersimpan</span>
                 </div>
             `;

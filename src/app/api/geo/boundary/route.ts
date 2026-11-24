@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireActor } from '@/lib/session';
+import { consumeRateLimit } from '@/lib/rate-limit';
 import { searchBoundaryCandidates } from '@/lib/geo/boundary';
 
 /**
@@ -8,12 +9,24 @@ import { searchBoundaryCandidates } from '@/lib/geo/boundary';
  * server as an open geocoder proxy.
  */
 export async function GET(request: Request) {
+    let actor;
     try {
-        await requireActor();
+        actor = await requireActor();
     } catch {
         return NextResponse.json(
             { error: 'Sesi berakhir. Masuk ulang.' },
             { status: 401 },
+        );
+    }
+
+    const limit = await consumeRateLimit(`api:geo:boundary:${actor.userId}`, 60, 20);
+    if (!limit.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak pencarian batas wilayah. Coba sebentar lagi.' },
+            {
+                status: 429,
+                headers: { 'Retry-After': String(limit.retryAfter ?? 60) },
+            },
         );
     }
 

@@ -1,9 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Building2, Menu, Search, Wifi, WifiOff, X } from 'lucide-react';
+import {
+    Activity,
+    Building2,
+    Menu,
+    Search,
+    Wifi,
+    WifiOff,
+    X,
+} from 'lucide-react';
 import { NAV, ROLE_LABEL } from '@/lib/nav';
 import { NAV_ICON } from '@/lib/nav-icons';
 import type { Role } from '@/lib/roles';
@@ -29,12 +43,16 @@ export function MobileNav({
     name,
     email,
     institution,
+    branding,
 }: {
     role: Role;
     name: string;
     email: string;
     institution: string | null;
+    branding?: { title: string; tagline: string; logoUrl: string | null };
 }) {
+    const brandTitle = branding?.title || 'WALI-EPI';
+    const brandLogo = branding?.logoUrl ?? null;
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
     const online = useSyncExternalStore(
@@ -80,12 +98,24 @@ export function MobileNav({
                     >
                         <span
                             aria-hidden
-                            className="grid size-7 shrink-0 place-items-center rounded-[7px] bg-[var(--accent)] text-[var(--accent-ink)]"
+                            className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-[7px] bg-[var(--accent)] text-[var(--accent-ink)]"
                         >
-                            <Activity className="size-3.5" strokeWidth={2.2} />
+                            {brandLogo ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={brandLogo}
+                                    alt={brandTitle}
+                                    className="size-7 object-contain"
+                                />
+                            ) : (
+                                <Activity
+                                    className="size-3.5"
+                                    strokeWidth={2.2}
+                                />
+                            )}
                         </span>
                         <span className="truncate text-[14px] font-semibold tracking-[-0.01em] text-foreground">
-                            WALI-EPI
+                            {brandTitle}
                         </span>
                     </Link>
                 </div>
@@ -142,15 +172,24 @@ export function MobileNav({
                             <div className="flex items-center gap-2">
                                 <span
                                     aria-hidden
-                                    className="grid size-7 place-items-center rounded-[7px] bg-[var(--accent)] text-[var(--accent-ink)]"
+                                    className="grid size-7 place-items-center overflow-hidden rounded-[7px] bg-[var(--accent)] text-[var(--accent-ink)]"
                                 >
-                                    <Activity
-                                        className="size-3.5"
-                                        strokeWidth={2.2}
-                                    />
+                                    {brandLogo ? (
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        <img
+                                            src={brandLogo}
+                                            alt={brandTitle}
+                                            className="size-7 object-contain"
+                                        />
+                                    ) : (
+                                        <Activity
+                                            className="size-3.5"
+                                            strokeWidth={2.2}
+                                        />
+                                    )}
                                 </span>
                                 <span className="text-[14px] font-semibold text-foreground">
-                                    WALI-EPI
+                                    {brandTitle}
                                 </span>
                             </div>
                             <Button
@@ -176,12 +215,12 @@ export function MobileNav({
                                 <p className="truncate text-[12px] font-medium text-foreground">
                                     {institution ??
                                         (role === 'DINKES'
-                                            ? 'Dinas Kesehatan Kota Cirebon'
+                                            ? 'Dinas Kesehatan'
                                             : role === 'ADMIN'
                                               ? 'Pusat Administrator'
                                               : 'Fasilitas Kesehatan')}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                     <span className="inline-block size-1.5 rounded-full bg-[var(--accent)]" />
                                     {ROLE_LABEL[role] ?? role}
                                 </p>

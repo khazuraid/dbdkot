@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-23T09:15:00.000Z",
+  "title": "Design System: WALI-EPI Clinical Field Ledger",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Deep Teal",
+        "canonical": "#0d9488",
+        "dark": "#14b8a6",
+        "tonalRamp": ["#ccfbf1", "#e6f7f5", "#14b8a6", "#0d9488", "#134e4a", "#042f2e"]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Mineral Alabaster / Zinc Ground",
+        "canonical": "#fafafa",
+        "dark": "#09090b",
+        "tonalRamp": ["#ffffff", "#fafafa", "#f4f4f5", "#e4e4e7", "#d4d4d8", "#18181b", "#111114", "#09090b"]
+      },
+      "viz-1": {
+        "role": "dataviz",
+        "displayName": "Clinical Sky",
+        "canonical": "#0284c7",
+        "dark": "#38bdf8"
+      },
+      "viz-2": {
+        "role": "dataviz",
+        "displayName": "Alert Rose",
+        "canonical": "#e11d48",
+        "dark": "#f43f5e"
+      },
+      "viz-3": {
+        "role": "dataviz",
+        "displayName": "Verified Emerald",
+        "canonical": "#059669",
+        "dark": "#10b981"
+      },
+      "viz-4": {
+        "role": "dataviz",
+        "displayName": "SLA Amber",
+        "canonical": "#d97706",
+        "dark": "#f59e0b"
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Page Title", "purpose": "Sticky PageHeader headings (20px mobile, 24px md+)." },
+      "kpi": { "displayName": "KPI Metric", "purpose": "Dashboard summary figures with tabular numerals." },
+      "section": { "displayName": "Section Heading", "purpose": "Panel and card headers." },
+      "body": { "displayName": "Body & Ledger", "purpose": "Default UI copy, form controls, and table cells." },
+      "label": { "displayName": "Label & Pill", "purpose": "Eyebrows, table headers, and status pills." },
+      "mono": { "displayName": "Clinical Mono", "purpose": "NIK, case IDs, coordinates, and SLA timers." }
+    },
+    "shadows": [
+      {
+        "name": "elev-soft",
+        "value": "0 1px 2px rgb(9 9 11 / 0.04), 0 6px 20px -12px rgb(9 9 11 / 0.08)",
+        "purpose": "Subtle elevation for cards and .surface panels."
+      },
+      {
+        "name": "elev-pop",
+        "value": "0 2px 6px rgb(9 9 11 / 0.06), 0 20px 44px -16px rgb(9 9 11 / 0.16)",
+        "purpose": "Floating popovers, toasts, and skip-link."
+      }
+    ],
+    "motion": [
+      {
+        "name": "color-transition",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Interactive hover, focus, and border state transitions."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary clinical action button (submit report, verify PE, save settings).",
+      "html": "<button class=\"ds-btn-primary\">Simpan Laporan</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-height, 38px); padding: 0 14px; border-radius: var(--radius-control, 8px); border: 1px solid transparent; background: var(--accent, #0d9488); color: var(--accent-ink, #ffffff); font-size: 13.5px; font-weight: 500; cursor: pointer; transition: opacity 150ms ease, transform 100ms ease; } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #0d9488); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary neutral action button on surface cards and toolbars.",
+      "html": "<button class=\"ds-btn-outline\">Filter Wilayah</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-height, 38px); padding: 0 14px; border-radius: var(--radius-control, 8px); border: 1px solid var(--control, #d4d4d8); background: var(--surface, #ffffff); color: var(--text, #09090b); font-size: 13.5px; font-weight: 500; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-outline:hover { background: var(--raised, #f4f4f5); } .ds-btn-outline:focus-visible { outline: 2px solid var(--accent, #0d9488); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Standard form input for NIK, patient identity, and rejection notes.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Masukkan NIK 16 digit\" />",
+      "css": ".ds-input { width: 100%; height: var(--control-height, 38px); padding: 4px 12px; border-radius: var(--radius-control, 8px); border: 1px solid var(--control, #d4d4d8); background: var(--surface, #ffffff); color: var(--text, #09090b); font-size: 13.5px; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color: var(--faint, #71717a); } .ds-input:focus-visible { border-color: var(--accent, #0d9488); box-shadow: 0 0 0 2px rgb(13 148 136 / 0.25); }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Semantic triage status pill with leading dot indicator.",
+      "html": "<span class=\"ds-pill-warn\"><span class=\"ds-pill-dot\"></span>Menunggu PE</span>",
+      "css": ".ds-pill-warn { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: var(--radius-pill, 999px); border: 1px solid var(--pill-warning-border, #fde68a); background: var(--pill-warning-bg, #fffbeb); color: var(--pill-warning-ink, #92400e); font-size: 11.5px; font-weight: 500; white-space: nowrap; } .ds-pill-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; opacity: 0.8; }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Primary architectural container for KPIs, forms, and case panels.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Ringkasan Kasus</div><div class=\"ds-card-body\">14 kasus aktif dalam SLA 24 jam.</div></div>",
+      "css": ".ds-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: var(--radius-card, 14px); border: 1px solid var(--border, #e4e4e7); background: var(--surface, #ffffff); color: var(--text, #09090b); box-shadow: var(--elev-soft); } .ds-card-title { font-size: 14px; font-weight: 600; } .ds-card-body { font-size: 13.5px; color: var(--muted, #52525b); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Clinical Field Ledger — calm mineral-alabaster precision with deep teal action clarity across mobile field work and desktop triage.",
+    "rules": [
+      "Use CSS custom properties from src/app/globals.css as the single source of truth.",
+      "Enforce tabular-nums on all clinical counts, NIKs, dates, and SLA timers.",
+      "Keep mobile web workflows fully accessible and ergonomic below 768px."
+    ],
+    "dos": [
+      "Use Deep Teal (--accent) strictly for primary actions, active nav, and focus rings.",
+      "Read region name, institution name, and logo dynamically from portal settings."
+    ],
+    "donts": [
+      "Do not follow legacy design-system/wali-epi/MASTER.md tokens.",
+      "Do not use decorative gradients, pie charts, or animate-bounce."
+    ]
+  }
+}

@@ -579,6 +579,7 @@ function generatePassword(length = 12) {
 export type EditableAccount = {
     id: string;
     name: string;
+    username?: string | null;
     email: string;
     role: Role;
     status: string;
@@ -620,7 +621,7 @@ export function EditAccountButton({
             <Dialog open={open} onOpenChange={setOpen}>
                 {open && (
                     <EditAccountDialogBody
-                        key={`${account.id}-${account.name}-${account.email}-${account.role}-${account.institutionId ?? ''}`}
+                        key={`${account.id}-${account.name}-${account.username ?? ''}-${account.email}-${account.role}-${account.institutionId ?? ''}`}
                         account={account}
                         institutions={institutions}
                         self={self}
@@ -647,6 +648,7 @@ function EditAccountDialogBody({
     onSaved: () => void;
 }) {
     const [name, setName] = useState(account.name);
+    const [username, setUsername] = useState(account.username ?? '');
     const [email, setEmail] = useState(account.email);
     const [role, setRole] = useState<Role>(account.role);
     const [institutionId, setInstitutionId] = useState(
@@ -752,6 +754,23 @@ function EditAccountDialogBody({
                                 autoComplete="off"
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label
+                            htmlFor={fieldId('username')}
+                            className="text-[12.5px] font-medium text-foreground"
+                        >
+                            Username (opsional)
+                        </Label>
+                        <Input
+                            id={fieldId('username')}
+                            name="username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="petugas.pkm01"
+                            autoComplete="off"
+                        />
                     </div>
 
                     {canEditRole ? (

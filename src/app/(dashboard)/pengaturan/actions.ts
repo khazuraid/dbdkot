@@ -6,8 +6,19 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 import { getDb } from '@/db';
 import { systemSettings, users } from '@/db/schema';
+import { audit } from '@/lib/audit';
 import { requireActor, requireRole } from '@/lib/session';
 import { auth } from '@/lib/auth';
+import {
+    isSafeBrandingUrl,
+    isSecretSettingKey,
+    MASKED_SECRET,
+} from '@/lib/security';
+import {
+    assertSafeExternalUrl,
+    encryptSettingValue,
+    safeFetch,
+} from '@/lib/security-server';
 
 const profileUpdateSchema = z.object({
     name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(100),
@@ -55,17 +66,32 @@ export async function updateUserProfileAction(input: {
     return { ok: true as const };
 }
 
+const whatsappProfileSchema = profileUpdateSchema.pick({
+    whatsappPhone: true,
+    whatsappOptIn: true,
+});
+
 export async function saveWhatsAppProfileAction(input: {
     whatsappPhone: string;
     whatsappOptIn: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+    const parsed = whatsappProfileSchema.safeParse(input);
+    if (!parsed.success) {
+        return {
+            ok: false,
+            error:
+                parsed.error.issues[0]?.message ??
+                'Format nomor WhatsApp tidak valid.',
+        };
+    }
+
     try {
         const actor = await requireActor();
         await getDb()
             .update(users)
             .set({
-                whatsappPhone: input.whatsappPhone.trim() || null,
-                whatsappOptIn: input.whatsappOptIn,
+                whatsappPhone: parsed.data.whatsappPhone || null,
+                whatsappOptIn: parsed.data.whatsappOptIn,
                 updatedAt: new Date(),
             })
             .where(eq(users.id, actor.userId));
@@ -88,7 +114,11 @@ const changePasswordSchema = z
         currentPassword: z.string().min(1, 'Kata sandi saat ini wajib diisi'),
         newPassword: z
             .string()
-            .min(10, 'Kata sandi baru minimal 10 karakter')
+            .min(8, 'Kata sandi baru minimal 8 karakter')
+            .regex(
+                /[^a-zA-Z0-9]/,
+                'Kata sandi baru wajib mengandung minimal 1 simbol (contoh: @, #, $, !, %, &)',
+            )
             .max(100),
         confirmPassword: z.string().min(1, 'Konfirmasi kata sandi wajib diisi'),
     })
@@ -112,14 +142,23 @@ export async function changeUserPasswordAction(input: {
         };
     }
 
+    const actor = await requireActor();
+
     try {
         await auth.api.changePassword({
             body: {
                 currentPassword: parsed.data.currentPassword,
                 newPassword: parsed.data.newPassword,
-                revokeOtherSessions: false,
+                revokeOtherSessions: true,
             },
             headers: await headers(),
+        });
+        await audit({
+            actor,
+            action: 'UPDATE',
+            entityType: 'USER',
+            entityId: actor.userId,
+            changes: { password: { from: 'redacted', to: 'updated' } },
         });
         return { ok: true as const };
     } catch (err: unknown) {
@@ -160,7 +199,7 @@ const regionalConfigSchema = z.object({
 });
 
 export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
-    await requireRole('ADMIN');
+    const actor = await requireRole('ADMIN');
 
     const parsed = regionalConfigSchema.safeParse(input);
     if (!parsed.success) {
@@ -170,9 +209,21 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
         };
     }
 
+    try {
+        await assertSafeExternalUrl(parsed.data.baseUrl);
+    } catch (err: unknown) {
+        return {
+            ok: false as const,
+            error:
+                err instanceof Error
+                    ? err.message
+                    : 'Base URL API Wilayah tidak aman.',
+        };
+    }
+
     const db = getDb();
     const now = new Date();
-    const preserveApiKey = parsed.data.apiKey === '••••••••';
+    const preserveApiKey = parsed.data.apiKey === MASKED_SECRET;
 
     const keysToUpsert: Array<{
         key: string;
@@ -241,28 +292,46 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
     ];
 
     for (const item of keysToUpsert) {
+        const secret = isSecretSettingKey(item.key);
+        const storedValue = secret
+            ? encryptSettingValue(item.value)
+            : item.value;
         await db
             .insert(systemSettings)
             .values({
                 key: item.key,
-                value: item.value,
+                value: storedValue,
                 type: item.type,
                 category: 'REGIONAL_API',
                 description: item.description,
-                isPublic: true,
+                isPublic: !secret,
                 createdAt: now,
                 updatedAt: now,
             })
             .onConflictDoUpdate({
                 target: systemSettings.key,
                 set: {
-                    value: item.value,
+                    value: storedValue,
                     category: 'REGIONAL_API',
                     description: item.description,
+                    isPublic: !secret,
                     updatedAt: now,
                 },
             });
     }
+
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: actor.userId,
+        changes: {
+            regionalApiSettings: {
+                from: null,
+                to: { provider: parsed.data.provider, baseUrl: parsed.data.baseUrl },
+            },
+        },
+    });
 
     revalidatePath('/pengaturan');
     revalidatePath('/admin/kelurahan');
@@ -283,7 +352,7 @@ export async function testRegionalApiConnectionAction(url: string) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-        const res = await fetch(parsed.data, {
+        const res = await safeFetch(parsed.data, {
             method: 'GET',
             signal: controller.signal,
             headers: {
@@ -334,15 +403,29 @@ const brandingSchema = z.object({
     appTitle: z.string().trim().min(2, 'Judul aplikasi minimal 2 karakter').max(100),
     appTagline: z.string().trim().min(3, 'Tagline minimal 3 karakter').max(200),
     institutionName: z.string().trim().min(3, 'Nama instansi minimal 3 karakter').max(150),
-    logoUrl: z.string().trim().optional(),
-    faviconUrl: z.string().trim().optional(),
+    logoUrl: z
+        .string()
+        .trim()
+        .refine(
+            (v) => isSafeBrandingUrl(v),
+            'URL logo hanya boleh path lokal (/...) atau HTTPS yang valid.',
+        )
+        .optional(),
+    faviconUrl: z
+        .string()
+        .trim()
+        .refine(
+            (v) => isSafeBrandingUrl(v),
+            'URL favicon hanya boleh path lokal (/...) atau HTTPS yang valid.',
+        )
+        .optional(),
     footerText: z.string().trim().min(3, 'Teks footer minimal 3 karakter').max(200),
     emergencyHotline: z.string().trim().min(3, 'Nomor darurat wajib diisi').max(50),
     supportEmail: z.string().trim().email('Email dukungan tidak valid'),
 });
 
 export async function saveBrandingSettingsAction(input: BrandingConfig) {
-    await requireRole('ADMIN');
+    const actor = await requireRole('ADMIN');
 
     const parsed = brandingSchema.safeParse(input);
     if (!parsed.success) {
@@ -422,6 +505,14 @@ export async function saveBrandingSettingsAction(input: BrandingConfig) {
             });
     }
 
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: actor.userId,
+        changes: { brandingSettings: { from: null, to: parsed.data.appTitle } },
+    });
+
     revalidatePath('/pengaturan');
     revalidatePath('/(dashboard)', 'layout');
     revalidatePath('/');
@@ -439,7 +530,7 @@ const smtpSettingsSchema = z.object({
 });
 
 export async function saveSmtpSettingsAction(formData: FormData) {
-    await requireRole('ADMIN');
+    const actor = await requireRole('ADMIN');
 
     const parsed = smtpSettingsSchema.safeParse({
         host: formData.get('host'),
@@ -486,7 +577,13 @@ export async function saveSmtpSettingsAction(formData: FormData) {
         { key: 'SMTP_USER', value: parsed.data.user, description: 'Username autentikasi SMTP' },
         ...(isMaskedOrBlank
             ? []
-            : [{ key: 'SMTP_PASS', value: finalPass, description: 'Password autentikasi SMTP' }]),
+            : [
+                  {
+                      key: 'SMTP_PASS',
+                      value: encryptSettingValue(finalPass),
+                      description: 'Password autentikasi SMTP',
+                  },
+              ]),
         { key: 'SMTP_FROM_EMAIL', value: parsed.data.fromEmail, description: 'Alamat email pengirim default' },
         { key: 'SMTP_FROM_NAME', value: parsed.data.fromName, description: 'Nama tampilan pengirim email' },
     ];
@@ -514,6 +611,19 @@ export async function saveSmtpSettingsAction(formData: FormData) {
                 },
             });
     }
+
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: actor.userId,
+        changes: {
+            smtpSettings: {
+                from: null,
+                to: { host: parsed.data.host, port: parsed.data.port },
+            },
+        },
+    });
 
     revalidatePath('/pengaturan');
     return { ok: true as const };

@@ -1,11 +1,33 @@
 import { z } from 'zod';
 
+export const USERNAME_REGEX = /^[a-z0-9._-]{3,30}$/;
+
+export function isValidUsername(value: string): boolean {
+    return USERNAME_REGEX.test(value.trim().toLowerCase());
+}
+
 export const loginSchema = z.object({
-    email: z
+    identifier: z
         .string()
         .trim()
-        .min(1, 'Email wajib diisi')
-        .email('Format email tidak valid (contoh: nama@dinkes.go.id)'),
+        .min(1, 'Email atau username wajib diisi')
+        .superRefine((val, ctx) => {
+            if (val.includes('@')) {
+                if (!z.email().safeParse(val).success) {
+                    ctx.addIssue({
+                        code: 'custom',
+                        message:
+                            'Format email tidak valid (contoh: nama@dinkes.go.id)',
+                    });
+                }
+            } else if (!USERNAME_REGEX.test(val.toLowerCase())) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message:
+                        'Username 3–30 karakter (huruf, angka, titik, garis bawah, atau tanda hubung)',
+                });
+            }
+        }),
     password: z.string().min(1, 'Password wajib diisi'),
 });
 
@@ -16,6 +38,15 @@ export const registerSchema = z
             .trim()
             .min(3, 'Nama lengkap minimal 3 karakter')
             .max(100, 'Nama lengkap maksimal 100 karakter'),
+        username: z
+            .string()
+            .trim()
+            .transform((v) => v.toLowerCase())
+            .refine(
+                (v) => v === '' || USERNAME_REGEX.test(v),
+                'Username 3–30 karakter (huruf kecil, angka, titik, _, atau -)',
+            )
+            .optional(),
         email: z
             .string()
             .trim()
@@ -27,7 +58,7 @@ export const registerSchema = z
         institutionId: z.string().optional().nullable(),
         password: z
             .string()
-            .min(7, 'Password minimal 7 karakter')
+            .min(8, 'Password minimal 8 karakter')
             .regex(
                 /[^a-zA-Z0-9]/,
                 'Password wajib mengandung minimal 1 simbol (contoh: @, #, $, !, %, &)',
@@ -70,7 +101,7 @@ export const resetPasswordSchema = z
         otp: z.string().trim().length(6, 'Kode OTP harus berupa 6 digit angka'),
         password: z
             .string()
-            .min(7, 'Password minimal 7 karakter')
+            .min(8, 'Password minimal 8 karakter')
             .regex(
                 /[^a-zA-Z0-9]/,
                 'Password wajib mengandung minimal 1 simbol khusus (contoh: @, #, $, !, %, *)',

@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { getDb } from '@/db';
 import { institutions, reportsPE, reportsRS, foggingCycles } from '@/db/schema';
 import { decryptPii } from '@/lib/crypto';
+import { sanitizeWorkbookStrings } from '@/lib/security';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 
 export type AgeGroupCounts = {
@@ -85,7 +86,9 @@ export function extractRtRw(address: string): { rt: string; rw: string } {
     if (rwMatch) rw = String(parseInt(rwMatch[1], 10)).padStart(2, '0');
 
     if (rt === '-' && rw === '-') {
-        const slashMatch = address.match(/\b(?:RT\s*[\/]?\s*RW|RT\/RW)\s*[:.]?\s*(\d{1,3})\s*[\/]\s*(\d{1,3})\b/i);
+        const slashMatch = address.match(
+            /\b(?:RT\s*[\/]?\s*RW|RT\/RW)\s*[:.]?\s*(\d{1,3})\s*[\/]\s*(\d{1,3})\b/i,
+        );
         if (slashMatch) {
             rt = String(parseInt(slashMatch[1], 10)).padStart(2, '0');
             rw = String(parseInt(slashMatch[2], 10)).padStart(2, '0');
@@ -141,15 +144,22 @@ export async function getSurveillanceReportData(
     const db = getDb();
     const now = new Date();
     const year =
-        params.year && Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+        params.year &&
+        Number.isInteger(params.year) &&
+        params.year >= 2000 &&
+        params.year <= 2100
             ? params.year
             : now.getFullYear();
     const month =
-        params.month && Number.isInteger(params.month) && params.month >= 1 && params.month <= 12
+        params.month &&
+        Number.isInteger(params.month) &&
+        params.month >= 1 &&
+        params.month <= 12
             ? params.month
             : now.getMonth() + 1;
 
-    let level: 'kota' | 'puskesmas' = params.level === 'puskesmas' ? 'puskesmas' : 'kota';
+    let level: 'kota' | 'puskesmas' =
+        params.level === 'puskesmas' ? 'puskesmas' : 'kota';
     let targetPuskesmasId = validUuid(params.puskesmasId);
 
     // Enforce role-based boundaries
@@ -325,8 +335,12 @@ export async function getSurveillanceReportData(
             }
 
             const kel = (r.kelurahan || 'Kelurahan Lainnya').trim();
-            const rwStr = rw ? `RW ${rw.replace(/\D/g, '').padStart(2, '0')}` : 'RW -';
-            const rtStr = rt ? `RT ${rt.replace(/\D/g, '').padStart(2, '0')}` : 'RT -';
+            const rwStr = rw
+                ? `RW ${rw.replace(/\D/g, '').padStart(2, '0')}`
+                : 'RW -';
+            const rtStr = rt
+                ? `RT ${rt.replace(/\D/g, '').padStart(2, '0')}`
+                : 'RT -';
             groupKelurahan = kel;
             groupRw = rwStr;
             groupRt = rtStr;
@@ -361,7 +375,9 @@ export async function getSurveillanceReportData(
         const isMale = r.patientGender === 'L';
         const rawStatus = (r.dischargeStatus || '').toLowerCase();
         const isDeceased =
-            rawStatus.includes('meninggal') || rawStatus.includes('dead') || rawStatus.includes('wafat');
+            rawStatus.includes('meninggal') ||
+            rawStatus.includes('dead') ||
+            rawStatus.includes('wafat');
 
         const age = r.patientAge ?? 0;
         let targetBucket: AgeGroupCounts;
@@ -386,7 +402,11 @@ export async function getSurveillanceReportData(
         }
 
         // PE status
-        if (r.peId && r.peStatus && ['COMPLETED', 'VERIFIED'].includes(r.peStatus)) {
+        if (
+            r.peId &&
+            r.peStatus &&
+            ['COMPLETED', 'VERIFIED'].includes(r.peStatus)
+        ) {
             group.diPeReports.add(r.id);
             if (r.abj) {
                 const abjVal = parseFloat(String(r.abj));
@@ -431,7 +451,8 @@ export async function getSurveillanceReportData(
     let counter = 1;
     const sortedGroups = Array.from(groupMap.values()).sort((a, b) => {
         if (a.kelurahan && b.kelurahan) {
-            if (a.kelurahan !== b.kelurahan) return a.kelurahan.localeCompare(b.kelurahan);
+            if (a.kelurahan !== b.kelurahan)
+                return a.kelurahan.localeCompare(b.kelurahan);
             if (a.rw !== b.rw) return (a.rw || '').localeCompare(b.rw || '');
             return (a.rt || '').localeCompare(b.rt || '');
         }
@@ -450,7 +471,8 @@ export async function getSurveillanceReportData(
         const totalM = totalGender.l_m + totalGender.p_m;
         const totalAll = totalP + totalM;
 
-        const rowAbj = g.abjCount > 0 ? Number((g.abjSum / g.abjCount).toFixed(1)) : null;
+        const rowAbj =
+            g.abjCount > 0 ? Number((g.abjSum / g.abjCount).toFixed(1)) : null;
 
         rows.push({
             id: g.id,
@@ -533,7 +555,12 @@ export async function getSurveillanceReportData(
             difogging: totalAccumulator.difogging,
             avgAbj:
                 totalAccumulator.totalAbjCount > 0
-                    ? Number((totalAccumulator.totalAbjSum / totalAccumulator.totalAbjCount).toFixed(1))
+                    ? Number(
+                          (
+                              totalAccumulator.totalAbjSum /
+                              totalAccumulator.totalAbjCount
+                          ).toFixed(1),
+                      )
                     : null,
         },
     };
@@ -551,7 +578,9 @@ export async function generateSurveillanceWorkbook(
     wb.created = new Date();
 
     const isPuskesmasLevel = data.level === 'puskesmas';
-    const sheetName = isPuskesmasLevel ? 'Rekap DBD per RT-RW' : 'Rekap DBD per Puskesmas';
+    const sheetName = isPuskesmasLevel
+        ? 'Rekap DBD per RT-RW'
+        : 'Rekap DBD per Puskesmas';
     const ws = wb.addWorksheet(sheetName, {
         views: [{ state: 'frozen', ySplit: 6 }],
     });
@@ -583,7 +612,12 @@ export async function generateSurveillanceWorkbook(
     ws.mergeCells(1, 1, 1, totalCols);
     const r1 = ws.getCell(1, 1);
     r1.value = data.title;
-    r1.font = { name: 'Arial', size: 13, bold: true, color: { argb: 'FF0F172A' } };
+    r1.font = {
+        name: 'Arial',
+        size: 13,
+        bold: true,
+        color: { argb: 'FF0F172A' },
+    };
     r1.alignment = { horizontal: 'center', vertical: 'middle' };
     ws.getRow(1).height = 24;
 
@@ -591,7 +625,12 @@ export async function generateSurveillanceWorkbook(
     ws.mergeCells(2, 1, 2, totalCols);
     const r2 = ws.getCell(2, 1);
     r2.value = data.subtitle;
-    r2.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+    r2.font = {
+        name: 'Arial',
+        size: 10,
+        bold: true,
+        color: { argb: 'FF334155' },
+    };
     r2.alignment = { horizontal: 'center', vertical: 'middle' };
     ws.getRow(2).height = 18;
 
@@ -630,15 +669,24 @@ export async function generateSurveillanceWorkbook(
     if (isPuskesmasLevel) {
         ws.mergeCells(4, 2, 6, 2);
         ws.getCell(4, 2).value = 'KELURAHAN';
-        ws.getCell(4, 2).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(4, 2).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         ws.mergeCells(4, 3, 6, 3);
         ws.getCell(4, 3).value = 'RW';
-        ws.getCell(4, 3).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(4, 3).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         ws.mergeCells(4, 4, 6, 4);
         ws.getCell(4, 4).value = 'RT';
-        ws.getCell(4, 4).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(4, 4).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
     } else {
         ws.mergeCells(4, 2, 6, 2);
         const pCell = ws.getCell(4, 2);
@@ -673,20 +721,32 @@ export async function generateSurveillanceWorkbook(
         // L
         ws.mergeCells(6, currCol, 6, currCol);
         ws.getCell(6, currCol).value = 'L';
-        ws.getCell(6, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(6, currCol).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         ws.mergeCells(6, currCol + 1, 6, currCol + 1);
         ws.getCell(6, currCol + 1).value = 'M';
-        ws.getCell(6, currCol + 1).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(6, currCol + 1).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         // P
         ws.mergeCells(6, currCol + 2, 6, currCol + 2);
         ws.getCell(6, currCol + 2).value = 'P';
-        ws.getCell(6, currCol + 2).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(6, currCol + 2).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         ws.mergeCells(6, currCol + 3, 6, currCol + 3);
         ws.getCell(6, currCol + 3).value = 'M';
-        ws.getCell(6, currCol + 3).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(6, currCol + 3).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         currCol += b.span;
     }
@@ -700,20 +760,38 @@ export async function generateSurveillanceWorkbook(
 
     ws.mergeCells(5, totalStartCol, 5, totalStartCol + 1);
     ws.getCell(5, totalStartCol).value = 'L';
-    ws.getCell(5, totalStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(5, totalStartCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     ws.mergeCells(5, totalStartCol + 2, 5, totalStartCol + 3);
     ws.getCell(5, totalStartCol + 2).value = 'P';
-    ws.getCell(5, totalStartCol + 2).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(5, totalStartCol + 2).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     ws.getCell(6, totalStartCol).value = 'P';
-    ws.getCell(6, totalStartCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, totalStartCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     ws.getCell(6, totalStartCol + 1).value = 'M';
-    ws.getCell(6, totalStartCol + 1).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, totalStartCol + 1).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     ws.getCell(6, totalStartCol + 2).value = 'P';
-    ws.getCell(6, totalStartCol + 2).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, totalStartCol + 2).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     ws.getCell(6, totalStartCol + 3).value = 'M';
-    ws.getCell(6, totalStartCol + 3).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, totalStartCol + 3).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     currCol += 4;
 
@@ -724,34 +802,52 @@ export async function generateSurveillanceWorkbook(
     jmHead.alignment = { horizontal: 'center', vertical: 'middle' };
 
     ws.getCell(6, currCol).value = 'P';
-    ws.getCell(6, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, currCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     ws.getCell(6, currCol + 1).value = 'M';
-    ws.getCell(6, currCol + 1).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(6, currCol + 1).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     currCol += 2;
 
     // 6. DI PE
     ws.mergeCells(4, currCol, 6, currCol);
     ws.getCell(4, currCol).value = 'DI PE';
-    ws.getCell(4, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(4, currCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     currCol += 1;
 
     // 7. LARVASIDASI
     ws.mergeCells(4, currCol, 6, currCol);
     ws.getCell(4, currCol).value = 'LARVASIDASI';
-    ws.getCell(4, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(4, currCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     currCol += 1;
 
     // 8. DIFOGGING
     ws.mergeCells(4, currCol, 6, currCol);
     ws.getCell(4, currCol).value = 'DIFOGGING';
-    ws.getCell(4, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(4, currCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
     currCol += 1;
 
     // 9. ABJ
     ws.mergeCells(4, currCol, 6, currCol);
     ws.getCell(4, currCol).value = 'ABJ (%)';
-    ws.getCell(4, currCol).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(4, currCol).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     // Apply header style and borders across all header cells in R4, R5, R6
     for (let r = 4; r <= 6; r++) {
@@ -769,18 +865,33 @@ export async function generateSurveillanceWorkbook(
     for (const r of data.rows) {
         ws.getRow(rowIdx).height = 18;
         ws.getCell(rowIdx, 1).value = r.no;
-        ws.getCell(rowIdx, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(rowIdx, 1).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         if (isPuskesmasLevel) {
             ws.getCell(rowIdx, 2).value = r.kelurahan || '-';
-            ws.getCell(rowIdx, 2).alignment = { horizontal: 'left', vertical: 'middle' };
+            ws.getCell(rowIdx, 2).alignment = {
+                horizontal: 'left',
+                vertical: 'middle',
+            };
             ws.getCell(rowIdx, 3).value = r.rw || '-';
-            ws.getCell(rowIdx, 3).alignment = { horizontal: 'center', vertical: 'middle' };
+            ws.getCell(rowIdx, 3).alignment = {
+                horizontal: 'center',
+                vertical: 'middle',
+            };
             ws.getCell(rowIdx, 4).value = r.rt || '-';
-            ws.getCell(rowIdx, 4).alignment = { horizontal: 'center', vertical: 'middle' };
+            ws.getCell(rowIdx, 4).alignment = {
+                horizontal: 'center',
+                vertical: 'middle',
+            };
         } else {
             ws.getCell(rowIdx, 2).value = r.name;
-            ws.getCell(rowIdx, 2).alignment = { horizontal: 'left', vertical: 'middle' };
+            ws.getCell(rowIdx, 2).alignment = {
+                horizontal: 'left',
+                vertical: 'middle',
+            };
         }
 
         const counts = [
@@ -886,7 +997,8 @@ export async function generateSurveillanceWorkbook(
     }
 
     const totAbjCell = ws.getCell(rowIdx, totalCols);
-    totAbjCell.value = data.totals.avgAbj !== null ? `${data.totals.avgAbj}%` : '-';
+    totAbjCell.value =
+        data.totals.avgAbj !== null ? `${data.totals.avgAbj}%` : '-';
     totAbjCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     const sumFill: ExcelJS.Fill = {
@@ -902,7 +1014,7 @@ export async function generateSurveillanceWorkbook(
         cell.border = thinBorder;
     }
 
-    return wb;
+    return sanitizeWorkbookStrings(wb);
 }
 
 // =========================================================================
@@ -916,7 +1028,7 @@ export function getEpiWeek(d: Date): number {
     const firstThursday = target.valueOf();
     target.setMonth(0, 1);
     if (target.getDay() !== 4) {
-        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
     }
     const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
     return Math.min(Math.max(week, 1), 52);
@@ -957,14 +1069,14 @@ export async function getEpiWeekReportData(
     const db = getDb();
     const nowYear = new Date().getFullYear();
     const year =
-        Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+        Number.isInteger(params.year) &&
+        params.year >= 2000 &&
+        params.year <= 2100
             ? params.year
             : nowYear;
-    const level = actor.role === 'PUSKESMAS' ? 'puskesmas' : params.level ?? 'kota';
-    const puskesmasId =
-        actor.role === 'PUSKESMAS'
-            ? validUuid(actor.institutionId)
-            : validUuid(params.puskesmasId);
+    const scopedInstitutionId = validUuid(scopeToInstitution(actor));
+    const level = scopedInstitutionId ? 'puskesmas' : (params.level ?? 'kota');
+    const puskesmasId = scopedInstitutionId ?? validUuid(params.puskesmasId);
 
     const startDate = new Date(Date.UTC(year, 0, 1));
     const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
@@ -984,8 +1096,15 @@ export async function getEpiWeekReportData(
                   .orderBy(institutions.name)
             : [];
 
-    if (level === 'puskesmas' && puskesmasId) {
-        conditions.push(eq(reportsRS.assignedPuskesmasId, puskesmasId));
+    if (actor.role === 'RUMAH_SAKIT' && scopedInstitutionId) {
+        conditions.push(eq(reportsRS.institutionId, scopedInstitutionId));
+    } else if (level === 'puskesmas' && puskesmasId) {
+        conditions.push(
+            or(
+                eq(reportsRS.assignedPuskesmasId, puskesmasId),
+                eq(reportsRS.institutionId, puskesmasId),
+            )!,
+        );
     }
 
     const reports = await db
@@ -1066,12 +1185,18 @@ export async function getEpiWeekReportData(
                     decryptedAddress = '';
                 }
                 const parsed = extractRtRw(decryptedAddress);
-                if (!parsedRt && parsed.rt && parsed.rt !== '-') parsedRt = parsed.rt;
-                if (!parsedRw && parsed.rw && parsed.rw !== '-') parsedRw = parsed.rw;
+                if (!parsedRt && parsed.rt && parsed.rt !== '-')
+                    parsedRt = parsed.rt;
+                if (!parsedRw && parsed.rw && parsed.rw !== '-')
+                    parsedRw = parsed.rw;
             }
             kel = r.kelurahan || 'Kelurahan Lain';
-            rw = parsedRw ? `RW ${parsedRw.replace(/\D/g, '').padStart(2, '0')}` : 'RW -';
-            rt = parsedRt ? `RT ${parsedRt.replace(/\D/g, '').padStart(2, '0')}` : 'RT -';
+            rw = parsedRw
+                ? `RW ${parsedRw.replace(/\D/g, '').padStart(2, '0')}`
+                : 'RW -';
+            rt = parsedRt
+                ? `RT ${parsedRt.replace(/\D/g, '').padStart(2, '0')}`
+                : 'RT -';
             key = `${rw}__${rt}__${kel}`;
             name = `${kel} - ${rw} / ${rt}`;
 
@@ -1157,7 +1282,7 @@ export async function getEpiWeekReportData(
         subtitle:
             level === 'puskesmas'
                 ? `Puskesmas ${pkmName ?? ''} - Tahun ${year}`
-                : `Kota Bandung - Berdasarkan Puskesmas Tahun ${year}`,
+                : `Rekapitulasi Wilayah - Berdasarkan Puskesmas Tahun ${year}`,
         year,
         level,
         puskesmasName: pkmName,
@@ -1207,7 +1332,9 @@ export async function getEndemicityStratification(
 ): Promise<EndemicityResult> {
     const db = getDb();
     const safeYear =
-        Number.isInteger(currentYear) && currentYear >= 2000 && currentYear <= 2100
+        Number.isInteger(currentYear) &&
+        currentYear >= 2000 &&
+        currentYear <= 2100
             ? currentYear
             : new Date().getFullYear();
     const y0 = safeYear;
@@ -1216,6 +1343,16 @@ export async function getEndemicityStratification(
 
     const start3Years = new Date(Date.UTC(y2, 0, 1));
     const end3Years = new Date(Date.UTC(y0, 11, 31, 23, 59, 59, 999));
+
+    const scopedInstitutionId = validUuid(scopeToInstitution(actor));
+    const reportScopeCondition = scopedInstitutionId
+        ? actor.role === 'RUMAH_SAKIT'
+            ? eq(reportsRS.institutionId, scopedInstitutionId)
+            : or(
+                  eq(reportsRS.assignedPuskesmasId, scopedInstitutionId),
+                  eq(reportsRS.institutionId, scopedInstitutionId),
+              )!
+        : undefined;
 
     const reports = await db
         .select({
@@ -1230,6 +1367,7 @@ export async function getEndemicityStratification(
                 gte(reportsRS.createdAt, start3Years),
                 lte(reportsRS.createdAt, end3Years),
                 ne(reportsRS.status, 'ARCHIVED_CROSS_BORDER'),
+                ...(reportScopeCondition ? [reportScopeCondition] : []),
             ),
         );
 
@@ -1240,7 +1378,12 @@ export async function getEndemicityStratification(
         })
         .from(reportsPE)
         .innerJoin(reportsRS, eq(reportsPE.reportRSId, reportsRS.id))
-        .where(gte(reportsPE.createdAt, start3Years));
+        .where(
+            and(
+                gte(reportsPE.createdAt, start3Years),
+                ...(reportScopeCondition ? [reportScopeCondition] : []),
+            ),
+        );
 
     const kelMap = new Map<
         string,
@@ -1299,7 +1442,10 @@ export async function getEndemicityStratification(
     const rows: EndemicityRow[] = Array.from(kelMap.values())
         .map((k, idx) => {
             const total3Years = k.n2 + k.n1 + k.n0;
-            const avgAbj = k.abjCount > 0 ? Math.round((k.abjSum / k.abjCount) * 10) / 10 : null;
+            const avgAbj =
+                k.abjCount > 0
+                    ? Math.round((k.abjSum / k.abjCount) * 10) / 10
+                    : null;
 
             let status: EndemicityStatus = 'BEBAS';
             let statusLabel = 'Bebas Kasus DBD (3 Tahun Terakhir)';
@@ -1389,11 +1535,16 @@ export async function getPeComplianceReport(
     const db = getDb();
     const now = new Date();
     const year =
-        Number.isInteger(params.year) && params.year >= 2000 && params.year <= 2100
+        Number.isInteger(params.year) &&
+        params.year >= 2000 &&
+        params.year <= 2100
             ? params.year
             : now.getFullYear();
     const month =
-        params.month && Number.isInteger(params.month) && params.month >= 1 && params.month <= 12
+        params.month &&
+        Number.isInteger(params.month) &&
+        params.month >= 1 &&
+        params.month <= 12
             ? params.month
             : undefined;
 
@@ -1405,8 +1556,18 @@ export async function getPeComplianceReport(
         start = new Date(Date.UTC(year, month - 1, 1));
         end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
         const monthNames = [
-            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            'Januari',
+            'Februari',
+            'Maret',
+            'April',
+            'Mei',
+            'Juni',
+            'Juli',
+            'Agustus',
+            'September',
+            'Oktober',
+            'November',
+            'Desember',
         ];
         periodLabel = `Bulan ${monthNames[month - 1]} ${year}`;
     } else {
@@ -1414,10 +1575,18 @@ export async function getPeComplianceReport(
         end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
     }
 
+    const scopedInstitutionId = validUuid(scopeToInstitution(actor));
     const puskesmasList = await db
         .select({ id: institutions.id, name: institutions.name })
         .from(institutions)
-        .where(eq(institutions.type, 'PUSKESMAS'))
+        .where(
+            scopedInstitutionId
+                ? and(
+                      eq(institutions.type, 'PUSKESMAS'),
+                      eq(institutions.id, scopedInstitutionId),
+                  )
+                : eq(institutions.type, 'PUSKESMAS'),
+        )
         .orderBy(institutions.name);
 
     const reports = await db
@@ -1435,6 +1604,22 @@ export async function getPeComplianceReport(
                 gte(reportsRS.createdAt, start),
                 lte(reportsRS.createdAt, end),
                 ne(reportsRS.status, 'ARCHIVED_CROSS_BORDER'),
+                ...(scopedInstitutionId
+                    ? [
+                          actor.role === 'RUMAH_SAKIT'
+                              ? eq(reportsRS.institutionId, scopedInstitutionId)
+                              : or(
+                                    eq(
+                                        reportsRS.assignedPuskesmasId,
+                                        scopedInstitutionId,
+                                    ),
+                                    eq(
+                                        reportsRS.institutionId,
+                                        scopedInstitutionId,
+                                    ),
+                                )!,
+                      ]
+                    : []),
             ),
         );
 
@@ -1485,7 +1670,8 @@ export async function getPeComplianceReport(
 
         if (r.peDate) {
             item.investigated++;
-            const diffHours = (r.peDate.getTime() - r.createdAt.getTime()) / (1000 * 60 * 60);
+            const diffHours =
+                (r.peDate.getTime() - r.createdAt.getTime()) / (1000 * 60 * 60);
             if (diffHours <= 24) {
                 item.under24++;
             } else if (diffHours <= 72) {
@@ -1498,22 +1684,27 @@ export async function getPeComplianceReport(
         }
     }
 
-    const rows: PeComplianceRow[] = Array.from(pkmMap.values()).map((p, idx) => {
-        const compliantCount = p.under24 + p.h24to72;
-        const rate = p.total > 0 ? Math.round((compliantCount / p.total) * 1000) / 10 : 100;
-        return {
-            no: idx + 1,
-            puskesmasId: p.id,
-            puskesmasName: p.name,
-            totalCases: p.total,
-            investigatedCount: p.investigated,
-            under24h: p.under24,
-            hours24to72: p.h24to72,
-            over72h: p.over72,
-            notInvestigated: p.notInv,
-            complianceRate: rate,
-        };
-    });
+    const rows: PeComplianceRow[] = Array.from(pkmMap.values()).map(
+        (p, idx) => {
+            const compliantCount = p.under24 + p.h24to72;
+            const rate =
+                p.total > 0
+                    ? Math.round((compliantCount / p.total) * 1000) / 10
+                    : 100;
+            return {
+                no: idx + 1,
+                puskesmasId: p.id,
+                puskesmasName: p.name,
+                totalCases: p.total,
+                investigatedCount: p.investigated,
+                under24h: p.under24,
+                hours24to72: p.h24to72,
+                over72h: p.over72,
+                notInvestigated: p.notInv,
+                complianceRate: rate,
+            };
+        },
+    );
 
     const totals = {
         totalCases: 0,
@@ -1536,7 +1727,9 @@ export async function getPeComplianceReport(
 
     const totalCompliant = totals.under24h + totals.hours24to72;
     totals.avgComplianceRate =
-        totals.totalCases > 0 ? Math.round((totalCompliant / totals.totalCases) * 1000) / 10 : 100;
+        totals.totalCases > 0
+            ? Math.round((totalCompliant / totals.totalCases) * 1000) / 10
+            : 100;
 
     return {
         title: 'LAPORAN REKAPITULASI KEPATUHAN WAKTU RESPON PE PUSKESMAS',
@@ -1585,14 +1778,24 @@ export async function generateEpiWeekWorkbook(
     ws.mergeCells(1, 1, 1, totalCols);
     const r1 = ws.getCell(1, 1);
     r1.value = data.title;
-    r1.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+    r1.font = {
+        name: 'Arial',
+        size: 12,
+        bold: true,
+        color: { argb: 'FF0F172A' },
+    };
     r1.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Subtitle
     ws.mergeCells(2, 1, 2, totalCols);
     const r2 = ws.getCell(2, 1);
     r2.value = data.subtitle;
-    r2.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+    r2.font = {
+        name: 'Arial',
+        size: 10,
+        bold: true,
+        color: { argb: 'FF334155' },
+    };
     r2.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Header Row 4
@@ -1626,7 +1829,12 @@ export async function generateEpiWeekWorkbook(
     for (let c = 1; c <= totalCols; c++) {
         const cell = ws.getCell(4, c);
         cell.fill = headerFill;
-        cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.font = {
+            name: 'Arial',
+            size: 8,
+            bold: true,
+            color: { argb: 'FFFFFFFF' },
+        };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = thinBorder;
     }
@@ -1634,14 +1842,20 @@ export async function generateEpiWeekWorkbook(
     let rIdx = 5;
     for (const row of data.rows) {
         ws.getCell(rIdx, 1).value = row.no;
-        ws.getCell(rIdx, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(rIdx, 1).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
 
         let c = 2;
         if (isPuskesmas) {
             ws.getCell(rIdx, c).value = row.kelurahan || '-';
             c++;
             ws.getCell(rIdx, c).value = row.rw || '-';
-            ws.getCell(rIdx, c).alignment = { horizontal: 'center', vertical: 'middle' };
+            ws.getCell(rIdx, c).alignment = {
+                horizontal: 'center',
+                vertical: 'middle',
+            };
             c++;
         } else {
             ws.getCell(rIdx, c).value = row.name;
@@ -1650,17 +1864,24 @@ export async function generateEpiWeekWorkbook(
 
         for (let w = 0; w < 52; w++) {
             ws.getCell(rIdx, c).value = row.weeks[w] || 0;
-            ws.getCell(rIdx, c).alignment = { horizontal: 'center', vertical: 'middle' };
+            ws.getCell(rIdx, c).alignment = {
+                horizontal: 'center',
+                vertical: 'middle',
+            };
             c++;
         }
 
         ws.getCell(rIdx, c).value = row.total;
-        ws.getCell(rIdx, c).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(rIdx, c).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
         ws.getCell(rIdx, c).font = { name: 'Arial', size: 9, bold: true };
 
         for (let j = 1; j <= totalCols; j++) {
             ws.getCell(rIdx, j).border = thinBorder;
-            if (j !== totalCols) ws.getCell(rIdx, j).font = { name: 'Arial', size: 9 };
+            if (j !== totalCols)
+                ws.getCell(rIdx, j).font = { name: 'Arial', size: 9 };
         }
         rIdx++;
     }
@@ -1668,17 +1889,26 @@ export async function generateEpiWeekWorkbook(
     // Grand Totals Row
     ws.mergeCells(rIdx, 1, rIdx, isPuskesmas ? 3 : 2);
     ws.getCell(rIdx, 1).value = 'TOTAL KASUS MINGGUAN';
-    ws.getCell(rIdx, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(rIdx, 1).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     let c = isPuskesmas ? 4 : 3;
     for (let w = 0; w < 52; w++) {
         ws.getCell(rIdx, c).value = data.totalWeeks[w];
-        ws.getCell(rIdx, c).alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getCell(rIdx, c).alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+        };
         c++;
     }
 
     ws.getCell(rIdx, c).value = data.grandTotal;
-    ws.getCell(rIdx, c).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getCell(rIdx, c).alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+    };
 
     const sumFill: ExcelJS.Fill = {
         type: 'pattern',
@@ -1693,7 +1923,7 @@ export async function generateEpiWeekWorkbook(
         cell.border = thinBorder;
     }
 
-    return wb;
+    return sanitizeWorkbookStrings(wb);
 }
 
 export async function generateEndemicityWorkbook(
@@ -1714,7 +1944,12 @@ export async function generateEndemicityWorkbook(
 
     ws.mergeCells(2, 1, 2, totalCols);
     ws.getCell(2, 1).value = data.subtitle;
-    ws.getCell(2, 1).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+    ws.getCell(2, 1).font = {
+        name: 'Arial',
+        size: 10,
+        bold: true,
+        color: { argb: 'FF334155' },
+    };
     ws.getCell(2, 1).alignment = { horizontal: 'center', vertical: 'middle' };
 
     const headerFill: ExcelJS.Fill = {
@@ -1740,7 +1975,12 @@ export async function generateEndemicityWorkbook(
         const cell = ws.getCell(4, i + 1);
         cell.value = h;
         cell.fill = headerFill;
-        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.font = {
+            name: 'Arial',
+            size: 9,
+            bold: true,
+            color: { argb: 'FFFFFFFF' },
+        };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
 
@@ -1782,7 +2022,7 @@ export async function generateEndemicityWorkbook(
         rIdx++;
     }
 
-    return wb;
+    return sanitizeWorkbookStrings(wb);
 }
 
 export async function generatePeComplianceWorkbook(
@@ -1803,7 +2043,12 @@ export async function generatePeComplianceWorkbook(
 
     ws.mergeCells(2, 1, 2, totalCols);
     ws.getCell(2, 1).value = data.subtitle;
-    ws.getCell(2, 1).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+    ws.getCell(2, 1).font = {
+        name: 'Arial',
+        size: 10,
+        bold: true,
+        color: { argb: 'FF334155' },
+    };
     ws.getCell(2, 1).alignment = { horizontal: 'center', vertical: 'middle' };
 
     const headerFill: ExcelJS.Fill = {
@@ -1829,7 +2074,12 @@ export async function generatePeComplianceWorkbook(
         const cell = ws.getCell(4, i + 1);
         cell.value = h;
         cell.fill = headerFill;
-        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.font = {
+            name: 'Arial',
+            size: 9,
+            bold: true,
+            color: { argb: 'FFFFFFFF' },
+        };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
 
@@ -1901,5 +2151,5 @@ export async function generatePeComplianceWorkbook(
         };
     }
 
-    return wb;
+    return sanitizeWorkbookStrings(wb);
 }

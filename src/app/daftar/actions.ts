@@ -12,8 +12,8 @@ import {
     generateOtpCode,
     hashOtp,
     recordOtpVerifyAttempt,
-    verifyOtpDigest,
 } from '@/lib/rate-limit';
+import { isValidUuid } from '@/lib/security';
 import { type Role } from '@/lib/roles';
 
 /**
@@ -33,9 +33,10 @@ export async function sendRegisterOtpAction(input: RegisterInput) {
         };
     }
 
-    const { email, role, institutionId } = parsed.data;
+    const { email, username, role, institutionId } = parsed.data;
     const db = getDb();
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedUsername = username?.trim().toLowerCase() || null;
 
     const rateCheck = await checkOtpSendRateLimit('register', normalizedEmail);
     if (!rateCheck.allowed) {
@@ -43,6 +44,21 @@ export async function sendRegisterOtpAction(input: RegisterInput) {
             ok: false as const,
             error: rateCheck.error || 'Terlalu banyak permintaan OTP.',
         };
+    }
+
+    if (normalizedUsername) {
+        const [takenUsername] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.username, normalizedUsername))
+            .limit(1);
+        if (takenUsername) {
+            return {
+                ok: false as const,
+                error: 'Username tersebut sudah digunakan. Silakan pilih username lain.',
+                fieldErrors: { username: 'Username sudah digunakan' },
+            };
+        }
     }
 
     // Check if email is already registered
@@ -53,18 +69,27 @@ export async function sendRegisterOtpAction(input: RegisterInput) {
         .limit(1);
 
     if (existing) {
+        // Equalize timing slightly and avoid confirming whether email is registered
+        hashOtp(`register-otp:${normalizedEmail}`, generateOtpCode());
+        await new Promise((r) => setTimeout(r, 120 + Math.floor(Math.random() * 80)));
         return {
             ok: false as const,
-            error: 'Alamat email ini sudah terdaftar. Silakan masuk atau gunakan fitur lupa kata sandi.',
+            error: 'Tidak dapat memproses pendaftaran dengan alamat email tersebut. Jika Anda sudah memiliki akun, silakan masuk atau gunakan fitur lupa kata sandi.',
         };
     }
 
     // Verify institution exists if role is PUSKESMAS / RUMAH_SAKIT
     if (role === 'PUSKESMAS' || role === 'RUMAH_SAKIT') {
+        if (!institutionId || !isValidUuid(institutionId)) {
+            return {
+                ok: false as const,
+                error: 'Fasilitas kesehatan tidak valid atau tidak cocok dengan peran yang dipilih.',
+            };
+        }
         const [inst] = await db
             .select({ id: institutions.id, type: institutions.type })
             .from(institutions)
-            .where(eq(institutions.id, institutionId!))
+            .where(eq(institutions.id, institutionId))
             .limit(1);
 
         if (!inst || inst.type !== role) {
@@ -120,38 +145,47 @@ export async function verifyAndRegisterAction(input: RegisterInput & { otp: stri
         return { ok: false as const, error: 'Kode OTP harus berupa 6 digit angka' };
     }
 
-    const { name, email, password, role, institutionId } = parsed.data;
+    const { name, username, email, password, role, institutionId } = parsed.data;
     const db = getDb();
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedUsername = username?.trim().toLowerCase() || null;
     const identifier = `register-otp:${normalizedEmail}`;
 
-    // Verify OTP code
-    const [record] = await db
-        .select({
-            id: verifications.id,
-            value: verifications.value,
-            expiresAt: verifications.expiresAt,
-        })
-        .from(verifications)
+    // Atomically consume matching unexpired OTP so concurrent requests cannot reuse it
+    const expectedDigest = hashOtp(identifier, otpCode);
+    const [consumed] = await db
+        .delete(verifications)
         .where(
             and(
                 eq(verifications.identifier, identifier),
+                eq(verifications.value, expectedDigest),
                 gt(verifications.expiresAt, new Date()),
             ),
         )
-        .limit(1);
+        .returning({ id: verifications.id });
 
-    if (!record) {
-        return {
-            ok: false as const,
-            error: 'Kode OTP tidak valid atau sudah kadaluarsa. Silakan minta kode baru.',
-        };
-    }
+    if (!consumed) {
+        const [existingOtp] = await db
+            .select({ id: verifications.id })
+            .from(verifications)
+            .where(
+                and(
+                    eq(verifications.identifier, identifier),
+                    gt(verifications.expiresAt, new Date()),
+                ),
+            )
+            .limit(1);
 
-    if (!verifyOtpDigest(record.value, identifier, otpCode)) {
+        if (!existingOtp) {
+            return {
+                ok: false as const,
+                error: 'Kode OTP tidak valid atau sudah kadaluarsa. Silakan minta kode baru.',
+            };
+        }
+
         const attempt = await recordOtpVerifyAttempt(identifier);
         if (attempt.exhausted) {
-            await db.delete(verifications).where(eq(verifications.id, record.id));
+            await db.delete(verifications).where(eq(verifications.id, existingOtp.id));
             return {
                 ok: false as const,
                 error: 'Terlalu banyak percobaan OTP gagal. Silakan minta kode OTP baru.',
@@ -163,8 +197,6 @@ export async function verifyAndRegisterAction(input: RegisterInput & { otp: stri
         };
     }
 
-    // Delete used OTP and clear failure counter
-    await db.delete(verifications).where(eq(verifications.id, record.id));
     await clearOtpVerifyAttempts(identifier);
 
     // Register user through Better-Auth
@@ -193,6 +225,8 @@ export async function verifyAndRegisterAction(input: RegisterInput & { otp: stri
         await db
             .update(users)
             .set({
+                username: normalizedUsername,
+                displayUsername: normalizedUsername,
                 role: role as Role,
                 institutionId: role === 'DINKES' ? null : institutionId,
                 status: 'PENDING',

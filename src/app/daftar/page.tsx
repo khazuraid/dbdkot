@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { institutions } from '@/db/schema';
+import { getPortalBranding } from '@/lib/branding';
 import { FadeIn } from '@/components/shell/fade-in';
 import { AuthCardHeader } from '@/components/auth/auth-ui';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,24 +13,32 @@ import { RegisterForm } from './register-form';
 export const instant = false;
 
 export const metadata: Metadata = {
-    title: 'Ajukan akun: WALI-EPI',
+    title: 'Ajukan akun',
 };
 
 async function DaftarFormSection() {
     await connection();
     const db = getDb();
-    const instList = await db
-        .select({
-            id: institutions.id,
-            name: institutions.name,
-            type: institutions.type,
-            city: institutions.city,
-        })
-        .from(institutions)
-        .where(eq(institutions.isActive, true))
-        .orderBy(institutions.name);
+    const [instList, branding] = await Promise.all([
+        db
+            .select({
+                id: institutions.id,
+                name: institutions.name,
+                type: institutions.type,
+                city: institutions.city,
+            })
+            .from(institutions)
+            .where(eq(institutions.isActive, true))
+            .orderBy(institutions.name),
+        getPortalBranding(),
+    ]);
 
-    return <RegisterForm institutions={instList} />;
+    return (
+        <RegisterForm
+            institutions={instList}
+            institutionName={branding.institutionName}
+        />
+    );
 }
 
 export default function DaftarPage() {

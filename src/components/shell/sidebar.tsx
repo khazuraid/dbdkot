@@ -16,11 +16,18 @@ import type { Role } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { UserMenu } from './user-menu';
 
+type ShellBranding = {
+    title: string;
+    tagline: string;
+    logoUrl: string | null;
+};
+
 type Props = {
     role: Role;
     name: string;
     email: string;
     institution: string | null;
+    branding?: ShellBranding;
 };
 
 export function isNavActive(
@@ -59,7 +66,10 @@ function subscribeCollapse(onChange: () => void) {
  * pine-teal active indicator so operators can scan up to a dozen routes without
  * chrome noise.
  */
-export function Sidebar({ role, name, email, institution }: Props) {
+export function Sidebar({ role, name, email, institution, branding }: Props) {
+    const brandTitle = branding?.title || 'WALI-EPI';
+    const brandTagline = branding?.tagline || 'Surveilans DBD';
+    const brandLogo = branding?.logoUrl ?? null;
     const pathname = usePathname();
     const groups = useMemo(() => NAV[role] ?? [], [role]);
     const allHrefs = useMemo(
@@ -107,14 +117,26 @@ export function Sidebar({ role, name, email, institution }: Props) {
                             aria-hidden
                             className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-[var(--accent)] text-[var(--accent-ink)]"
                         >
-                            <Activity className="size-4" strokeWidth={2.2} />
+                            {brandLogo ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={brandLogo}
+                                    alt={brandTitle}
+                                    className="size-8 rounded-[8px] object-contain"
+                                />
+                            ) : (
+                                <Activity
+                                    className="size-4"
+                                    strokeWidth={2.2}
+                                />
+                            )}
                         </span>
                         <span className="min-w-0">
                             <span className="block truncate text-[14px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
-                                WALI-EPI
+                                {brandTitle}
                             </span>
                             <span className="block truncate text-[11px] text-muted-foreground">
-                                Surveilans DBD
+                                {brandTagline}
                             </span>
                         </span>
                     </Link>
@@ -160,12 +182,12 @@ export function Sidebar({ role, name, email, institution }: Props) {
                             <p className="truncate text-[12px] leading-tight font-medium text-foreground">
                                 {institution ??
                                     (role === 'DINKES'
-                                        ? 'Dinas Kesehatan Kota Cirebon'
+                                        ? 'Dinas Kesehatan'
                                         : role === 'ADMIN'
                                           ? 'Pusat Administrator'
                                           : 'Fasilitas Kesehatan')}
                             </p>
-                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground flex items-center gap-1.5">
+                            <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
                                 <span className="inline-block size-1.5 rounded-full bg-[var(--accent)]" />
                                 {ROLE_LABEL[role] ?? role}
                             </p>

@@ -57,6 +57,13 @@
       "when": 1794713749452,
       "tag": "0007_add_rt_rw_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795439754553,
+      "tag": "0008_add_user_username",
+      "breakpoints": true
     }
   ]
 }

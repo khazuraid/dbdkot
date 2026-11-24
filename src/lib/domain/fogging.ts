@@ -10,6 +10,7 @@ import {
 } from '@/db/schema';
 import { audit } from '@/lib/audit';
 import { enqueueFoggingReminders } from '@/lib/queue';
+import { isValidUuid } from '@/lib/security';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { FoggingCycleInput } from './form-contracts';
 import { insertNotifications } from './notify';
@@ -140,6 +141,10 @@ export async function executeFoggingCycle(
         };
     }
 
+    if (!isValidUuid(input.reportRSId)) {
+        return { ok: false, error: 'Laporan tidak ditemukan.' };
+    }
+
     const institutionId = scopeToInstitution(actor);
     const db = getDb();
 
@@ -206,7 +211,32 @@ export async function executeFoggingCycle(
         .where(eq(reportsPE.reportRSId, input.reportRSId))
         .limit(1);
 
-    await db.transaction(async (tx) => {
+    const allowedPriorStatuses =
+        input.cycleNumber === 1
+            ? (['FOGGING_REQUIRED'] as const)
+            : (['SIKLUS_1_DONE', 'SIKLUS_2_SCHEDULED'] as const);
+
+    const transitioned = await db.transaction(async (tx) => {
+        // Atomic conditional status transition prevents concurrent double execution & double stock deduction
+        const [updatedReport] = await tx
+            .update(reportsRS)
+            .set({
+                status: nextStatus,
+                updatedById: actor.userId,
+                updatedAt: now,
+            })
+            .where(
+                and(
+                    eq(reportsRS.id, input.reportRSId),
+                    inArray(reportsRS.status, [...allowedPriorStatuses]),
+                ),
+            )
+            .returning({ id: reportsRS.id });
+
+        if (!updatedReport) {
+            return false;
+        }
+
         await tx
             .insert(foggingCycles)
             .values({
@@ -264,14 +294,13 @@ export async function executeFoggingCycle(
                 .onConflictDoNothing();
         }
 
-        // Deduct matching vector logistics stocks when tracked in assets table.
+        // Deduct matching vector logistics stocks atomically in SQL when tracked in assets table.
         if (input.abateUsedKg > 0 || input.insecticideUsedLiter > 0) {
             const instAssets = await tx
                 .select({
                     id: assets.id,
                     name: assets.name,
                     category: assets.category,
-                    currentStock: assets.currentStock,
                 })
                 .from(assets)
                 .where(eq(assets.institutionId, targetInstitutionId));
@@ -288,10 +317,12 @@ export async function executeFoggingCycle(
                 );
                 if (!match) return;
                 const qty = Math.max(1, Math.round(usedAmount));
-                const nextStock = Math.max(0, match.currentStock - qty);
                 await tx
                     .update(assets)
-                    .set({ currentStock: nextStock, updatedAt: now })
+                    .set({
+                        currentStock: sql`GREATEST(0, ${assets.currentStock} - ${qty})`,
+                        updatedAt: now,
+                    })
                     .where(eq(assets.id, match.id));
                 await tx.insert(assetTransactions).values({
                     assetId: match.id,
@@ -306,15 +337,15 @@ export async function executeFoggingCycle(
             await deductAsset('insektisida', input.insecticideUsedLiter);
         }
 
-        await tx
-            .update(reportsRS)
-            .set({
-                status: nextStatus,
-                updatedById: actor.userId,
-                updatedAt: now,
-            })
-            .where(eq(reportsRS.id, input.reportRSId));
+        return true;
     });
+
+    if (!transitioned) {
+        return {
+            ok: false,
+            error: `Siklus ${input.cycleNumber} sudah dicatat atau status laporan telah berubah.`,
+        };
+    }
 
     if (input.cycleNumber === 1) {
         try {

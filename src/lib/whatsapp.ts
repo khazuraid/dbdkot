@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { systemSettings, waDispatches } from '@/db/schema';
+import { decryptSettingValue, safeFetch } from './security-server';
 
 export type WaEventKind =
     | 'ASSIGNMENT'
@@ -56,9 +57,21 @@ async function resolveGatewayConfig(): Promise<GatewayConfig> {
             .from(systemSettings)
             .where(eq(systemSettings.key, 'whatsapp_gateway'))
             .limit(1);
-        const val = setting?.value as
+        const rawStored = decryptSettingValue(setting?.value);
+        let val:
             | { webhookUrl?: string; token?: string; enabled?: boolean }
             | undefined;
+        if (rawStored) {
+            try {
+                val = JSON.parse(rawStored) as {
+                    webhookUrl?: string;
+                    token?: string;
+                    enabled?: boolean;
+                };
+            } catch {
+                val = undefined;
+            }
+        }
         if (val?.enabled && val.webhookUrl?.trim()) {
             return {
                 url: val.webhookUrl.trim(),
@@ -136,7 +149,7 @@ export async function dispatchWhatsApp(
     try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8_000);
-        const res = await fetch(gateway.url, {
+        const res = await safeFetch(gateway.url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

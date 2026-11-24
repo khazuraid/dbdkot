@@ -2,6 +2,7 @@ import {
     parseBoundaryGeoJson,
     type BoundaryGeoJson,
 } from './boundary-schema';
+import { safeFetch } from '@/lib/security-server';
 
 export type BoundaryCandidate = {
     placeId: number;
@@ -85,7 +86,7 @@ async function fetchNominatim(query: string): Promise<BoundaryCandidate[]> {
     url.searchParams.set('countrycodes', 'id');
     url.searchParams.set('limit', '6');
 
-    const res = await fetch(url, {
+    const res = await safeFetch(url.toString(), {
         headers: {
             Accept: 'application/json',
             'Accept-Language': 'id,en;q=0.8',

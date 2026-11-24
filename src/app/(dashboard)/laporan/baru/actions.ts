@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireActor } from '@/lib/session';
 import { createReport, createReportSchema } from '@/lib/domain/report-create';
+import { consumeRateLimit } from '@/lib/rate-limit';
+import { safeFetch } from '@/lib/security-server';
 
 export type FormState = {
     error?: string;
@@ -82,30 +84,32 @@ export async function geocodePatientAddress(params: {
     kecamatan?: string;
     kota?: string;
 }): Promise<GeocodeResult> {
-    await requireActor();
+    const actor = await requireActor();
+
+    const rate = await consumeRateLimit(`geocode:${actor.userId}`, 60, 20);
+    if (!rate.allowed) {
+        return {
+            ok: false,
+            error: 'Terlalu banyak permintaan pencarian lokasi. Coba sebentar lagi.',
+        };
+    }
 
     const NOMINATIM_SEARCH =
         process.env.NOMINATIM_URL ?? 'https://nominatim.openstreetmap.org/search';
 
     const clean = (s?: string) => (s ?? '').trim();
-    const addr = clean(params.address);
+    // Do not transmit full patient street address (PII) to third-party Nominatim;
+    // geocode only administrative area (kelurahan/kecamatan/kota) and let user refine pin locally.
     const kel = clean(params.kelurahan);
     const kec = clean(params.kecamatan);
     const kota = clean(params.kota);
 
     const queries: { q: string; isFallback: boolean }[] = [];
 
-    if (addr && (kel || kec || kota)) {
-        queries.push({
-            q: [addr, kel, kec, kota, 'Indonesia'].filter(Boolean).join(', '),
-            isFallback: false,
-        });
-    }
-
     if (kel && (kec || kota)) {
         queries.push({
             q: [`Kelurahan ${kel}`, kec, kota, 'Indonesia'].filter(Boolean).join(', '),
-            isFallback: true,
+            isFallback: false,
         });
         queries.push({
             q: [kel, kec, kota, 'Indonesia'].filter(Boolean).join(', '),
@@ -140,11 +144,11 @@ export async function geocodePatientAddress(params: {
             url.searchParams.set('countrycodes', 'id');
             url.searchParams.set('limit', '1');
 
-            const res = await fetch(url, {
+            const res = await safeFetch(url.toString(), {
                 headers: {
                     Accept: 'application/json',
                     'Accept-Language': 'id,en;q=0.8',
-                    'User-Agent': 'wali-epi-surveilans/1.0 (https://localhost)',
+                    'User-Agent': 'wali-epi-surveilans/1.0',
                 },
                 signal: AbortSignal.timeout(6000),
             });

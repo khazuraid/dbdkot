@@ -18,10 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Panel } from '@/components/shell/page';
 import { Badge } from '@/components/ui/badge';
-import {
-    saveBrandingSettingsAction,
-    type BrandingConfig,
-} from './actions';
+import { saveBrandingSettingsAction, type BrandingConfig } from './actions';
 import type { SettingRow } from './settings-editor';
 
 type Props = {
@@ -38,14 +35,14 @@ export function BrandingSettings({ settings, canManage }: Props) {
     }
 
     const [appTitle, setAppTitle] = useState(
-        settingsMap.get('APP_TITLE') || 'WALI-EPI Kota Cirebon',
+        settingsMap.get('APP_TITLE') || 'WALI-EPI',
     );
     const [appTagline, setAppTagline] = useState(
         settingsMap.get('APP_TAGLINE') ||
             'Sistem Surveilans & Respons Cepat DBD Berbasis Wilayah',
     );
     const [institutionName, setInstitutionName] = useState(
-        settingsMap.get('INSTITUTION_NAME') || 'Dinas Kesehatan Kota Cirebon',
+        settingsMap.get('INSTITUTION_NAME') || 'Dinas Kesehatan',
     );
     const [logoUrl, setLogoUrl] = useState(
         settingsMap.get('APP_LOGO_URL') || '',
@@ -55,13 +52,13 @@ export function BrandingSettings({ settings, canManage }: Props) {
     );
     const [footerText, setFooterText] = useState(
         settingsMap.get('APP_FOOTER_TEXT') ||
-            '© 2025 Dinas Kesehatan Kota Cirebon. Hak Cipta Dilindungi.',
+            'Platform Surveilans Demam Berdarah Dengue Lintas Fasilitas Kesehatan',
     );
     const [emergencyHotline, setEmergencyHotline] = useState(
-        settingsMap.get('EMERGENCY_HOTLINE') || '119 / (0231) 206444',
+        settingsMap.get('EMERGENCY_HOTLINE') || '119',
     );
     const [supportEmail, setSupportEmail] = useState(
-        settingsMap.get('SUPPORT_EMAIL') || 'dinkes@cirebonkota.go.id',
+        settingsMap.get('SUPPORT_EMAIL') || '',
     );
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -82,7 +79,9 @@ export function BrandingSettings({ settings, canManage }: Props) {
 
             const res = await saveBrandingSettingsAction(payload);
             if (res.ok) {
-                toast.success('Pengaturan identitas & branding portal berhasil diperbarui');
+                toast.success(
+                    'Pengaturan identitas & branding portal berhasil diperbarui',
+                );
             } else {
                 toast.error(res.error);
             }
@@ -100,23 +99,24 @@ export function BrandingSettings({ settings, canManage }: Props) {
                     </Badge>
                 }
             >
-                <div className="p-5 space-y-5">
+                <div className="space-y-5 p-5">
                     {/* Visual Brand Preview Card */}
                     <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--raised)]/40 p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                        <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             <Sparkles className="size-3.5 text-[var(--accent)]" />
                             Pratinjau Header & Identitas
                         </div>
                         <div className="flex items-center gap-3.5">
-                            <div className="size-11 shrink-0 rounded-[10px] bg-[var(--accent)] text-[var(--accent-ink)] flex items-center justify-center font-bold text-lg shadow-xs overflow-hidden">
+                            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-[var(--accent)] text-lg font-bold text-[var(--accent-ink)] shadow-xs">
                                 {logoUrl ? (
                                     <img
                                         src={logoUrl}
                                         alt="Logo Preview"
                                         className="size-full object-contain p-1"
                                         onError={(e) => {
-                                            (e.currentTarget as HTMLImageElement).style.display =
-                                                'none';
+                                            (
+                                                e.currentTarget as HTMLImageElement
+                                            ).style.display = 'none';
                                         }}
                                     />
                                 ) : (
@@ -124,10 +124,10 @@ export function BrandingSettings({ settings, canManage }: Props) {
                                 )}
                             </div>
                             <div className="min-w-0">
-                                <h4 className="text-base font-bold text-foreground truncate">
+                                <h4 className="truncate text-base font-bold text-foreground">
                                     {appTitle || 'WALI-EPI Kota Cirebon'}
                                 </h4>
-                                <p className="text-xs text-muted-foreground truncate">
+                                <p className="truncate text-xs text-muted-foreground">
                                     {appTagline ||
                                         'Sistem Surveilans & Respons Cepat DBD Berbasis Wilayah'}
                                 </p>
@@ -135,9 +135,12 @@ export function BrandingSettings({ settings, canManage }: Props) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="app-title" className="text-xs font-semibold">
+                            <Label
+                                htmlFor="app-title"
+                                className="text-xs font-semibold"
+                            >
                                 Judul Website / Nama Aplikasi
                             </Label>
                             <Input
@@ -151,13 +154,18 @@ export function BrandingSettings({ settings, canManage }: Props) {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="inst-name" className="text-xs font-semibold">
+                            <Label
+                                htmlFor="inst-name"
+                                className="text-xs font-semibold"
+                            >
                                 Nama Instansi Pembina
                             </Label>
                             <Input
                                 id="inst-name"
                                 value={institutionName}
-                                onChange={(e) => setInstitutionName(e.target.value)}
+                                onChange={(e) =>
+                                    setInstitutionName(e.target.value)
+                                }
                                 placeholder="Dinas Kesehatan Kota Cirebon"
                                 className="text-sm"
                                 disabled={!canManage}
@@ -166,7 +174,10 @@ export function BrandingSettings({ settings, canManage }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="app-tagline" className="text-xs font-semibold">
+                        <Label
+                            htmlFor="app-tagline"
+                            className="text-xs font-semibold"
+                        >
                             Subjudul / Slogan Sistem
                         </Label>
                         <Input
@@ -179,9 +190,12 @@ export function BrandingSettings({ settings, canManage }: Props) {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="logo-url" className="text-xs font-semibold flex items-center gap-1.5">
+                            <Label
+                                htmlFor="logo-url"
+                                className="flex items-center gap-1.5 text-xs font-semibold"
+                            >
                                 <ImageIcon className="size-3.5 text-muted-foreground" />
                                 URL Gambar Logo Utama
                             </Label>
@@ -194,12 +208,16 @@ export function BrandingSettings({ settings, canManage }: Props) {
                                 disabled={!canManage}
                             />
                             <p className="text-[11px] text-muted-foreground">
-                                Format PNG atau SVG transparan direkomendasikan (rasio 1:1).
+                                Format PNG atau SVG transparan direkomendasikan
+                                (rasio 1:1).
                             </p>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="favicon-url" className="text-xs font-semibold flex items-center gap-1.5">
+                            <Label
+                                htmlFor="favicon-url"
+                                className="flex items-center gap-1.5 text-xs font-semibold"
+                            >
                                 <Globe className="size-3.5 text-muted-foreground" />
                                 URL Favicon Browser
                             </Label>
@@ -217,24 +235,32 @@ export function BrandingSettings({ settings, canManage }: Props) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="emergency-phone" className="text-xs font-semibold flex items-center gap-1.5">
+                            <Label
+                                htmlFor="emergency-phone"
+                                className="flex items-center gap-1.5 text-xs font-semibold"
+                            >
                                 <PhoneCall className="size-3.5 text-rose-500" />
                                 Hotline Darurat DBD / PSC 119
                             </Label>
                             <Input
                                 id="emergency-phone"
                                 value={emergencyHotline}
-                                onChange={(e) => setEmergencyHotline(e.target.value)}
+                                onChange={(e) =>
+                                    setEmergencyHotline(e.target.value)
+                                }
                                 placeholder="119 / (0231) 206444"
-                                className="text-sm font-mono"
+                                className="font-mono text-sm"
                                 disabled={!canManage}
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="support-email" className="text-xs font-semibold flex items-center gap-1.5">
+                            <Label
+                                htmlFor="support-email"
+                                className="flex items-center gap-1.5 text-xs font-semibold"
+                            >
                                 <Mail className="size-3.5 text-[var(--accent)]" />
                                 Email Layanan / Pengaduan
                             </Label>
@@ -242,16 +268,21 @@ export function BrandingSettings({ settings, canManage }: Props) {
                                 id="support-email"
                                 type="email"
                                 value={supportEmail}
-                                onChange={(e) => setSupportEmail(e.target.value)}
+                                onChange={(e) =>
+                                    setSupportEmail(e.target.value)
+                                }
                                 placeholder="dinkes@cirebonkota.go.id"
-                                className="text-sm font-mono"
+                                className="font-mono text-sm"
                                 disabled={!canManage}
                             />
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="footer-text" className="text-xs font-semibold">
+                        <Label
+                            htmlFor="footer-text"
+                            className="text-xs font-semibold"
+                        >
                             Teks Hak Cipta & Footer
                         </Label>
                         <Input
@@ -265,14 +296,16 @@ export function BrandingSettings({ settings, canManage }: Props) {
                     </div>
 
                     {canManage && (
-                        <div className="flex justify-end pt-3 border-t border-[var(--border)]">
+                        <div className="flex justify-end border-t border-[var(--border)] pt-3">
                             <Button
                                 type="submit"
                                 disabled={isSaving}
                                 className="gap-2 bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90"
                             >
                                 <Save className="size-4" />
-                                {isSaving ? 'Menyimpan...' : 'Simpan Identitas & Branding'}
+                                {isSaving
+                                    ? 'Menyimpan...'
+                                    : 'Simpan Identitas & Branding'}
                             </Button>
                         </div>
                     )}

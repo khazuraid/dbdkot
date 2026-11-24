@@ -9,6 +9,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import '@/app/map.css';
 import { LocateFixed, MapPin, Radar, ShieldCheck } from 'lucide-react';
 import type { PublicCaseGeoPoint } from '@/lib/domain/map-data';
+import { escapeHtml } from '@/lib/security';
 
 const DEFAULT_CENTER: [number, number] = [-6.72, 108.55];
 const DEFAULT_ZOOM = 12;
@@ -97,11 +98,15 @@ export default function PublicCaseMapInner({
             });
 
             // Anonymous, privacy-first popup with NO names or personal data
+            const safeCaseType = escapeHtml(c.caseType || 'DBD');
+            const safeKelurahan = c.kelurahan
+                ? `Kel. ${escapeHtml(c.kelurahan)}`
+                : 'Wilayah Kota';
             const popupHtml = `
                 <div style="font-family: inherit; min-width: 170px; padding: 2px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
                         <span style="font-size: 12px; font-weight: 700; color: ${isClustered ? '#e11d48' : '#0d9488'};">
-                            Kasus ${c.caseType || 'DBD'}
+                            Kasus ${safeCaseType}
                         </span>
                         ${
                             isClustered
@@ -110,8 +115,8 @@ export default function PublicCaseMapInner({
                         }
                     </div>
                     <div style="font-size: 11px; color: #52525b; line-height: 1.4;">
-                        <div>Wilayah: <strong>${c.kelurahan ? `Kel. ${c.kelurahan}` : 'Wilayah Kota'}</strong></div>
-                        <div style="margin-top: 4px; font-size: 10px; color: #71717a; border-top: 1px solid #f4f4f5; pt: 3px;">
+                        <div>Wilayah: <strong>${safeKelurahan}</strong></div>
+                        <div style="margin-top: 4px; font-size: 10px; color: #71717a; border-top: 1px solid #f4f4f5; padding-top: 3px;">
                             Data spasial terverifikasi (Anonim)
                         </div>
                     </div>
@@ -166,7 +171,7 @@ export default function PublicCaseMapInner({
                             Peta Sebaran Kasus DBD
                         </p>
                         <p className="text-[10.5px] text-muted-foreground">
-                            Sebaran spasial epidemiologi Kota Cirebon (Data Anonim)
+                            Sebaran spasial epidemiologi wilayah (Data Anonim)
                         </p>
                     </div>
                 </div>
@@ -215,7 +220,9 @@ export default function PublicCaseMapInner({
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground/80">
                     <ShieldCheck className="size-3 text-teal-600" />
-                    <span>Perlindungan PII: Nama & Identitas Pasien Dihilangkan</span>
+                    <span>
+                        Perlindungan PII: Nama & Identitas Pasien Dihilangkan
+                    </span>
                 </div>
             </div>
         </div>

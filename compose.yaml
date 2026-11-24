@@ -12,6 +12,8 @@ services:
     postgres:
         image: postgres:18-alpine
         restart: unless-stopped
+        security_opt:
+            - no-new-privileges:true
         environment:
             POSTGRES_USER: ${POSTGRES_USER:-wali_epi}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wali_epi_password}
@@ -38,6 +40,8 @@ services:
     redis:
         image: redis:8-alpine
         restart: unless-stopped
+        security_opt:
+            - no-new-privileges:true
         # BullMQ needs persistence across a restart, or queued jobs are lost.
         command: redis-server --appendonly yes
         volumes:
@@ -58,6 +62,10 @@ services:
             context: .
             target: runner
         command: ['npm', 'run', 'db:migrate']
+        security_opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
         # No `env_file: .env` here on purpose. Migrations touch the schema and
         # nothing else, so this service is given the one variable it needs
         # rather than the full secret set (auth, OAuth, PII keys, S3).
@@ -74,6 +82,10 @@ services:
         image: wali-epi:latest
         pull_policy: never
         restart: unless-stopped
+        security_opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
         env_file: .env
         environment:
             DATABASE_URL: postgresql://${POSTGRES_USER:-wali_epi}:${POSTGRES_PASSWORD:-wali_epi_password}@postgres:5432/${POSTGRES_DB:-wali_epi_db}
@@ -95,6 +107,10 @@ services:
     worker:
         image: wali-epi:latest
         pull_policy: never
+        security_opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
         # Runs the TypeScript source through tsx, the same way `npm run worker`
         # does locally. It is a separate service because a long job must not
         # occupy a web request, and restarting the web app must not kill it.

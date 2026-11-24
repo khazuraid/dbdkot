@@ -119,3 +119,25 @@ export type ReportListRow = {
     status: ReportStatus;
     createdAt: Date;
 };
+
+export type Transition =
+    | 'ACCEPT'
+    | 'START_PE'
+    | 'REJECT'
+    | 'VERIFY'
+    | 'REJECT_BY_DINKES'
+    | 'MARK_CLOSED';
+
+export function validateTransitionNote(
+    transition: Transition,
+    note?: string,
+): { ok: true; note: string | null } | { ok: false; reason: 'NOTE_REQUIRED' } {
+    const trimmed = note?.trim() ?? '';
+    if (transition === 'REJECT' || transition === 'REJECT_BY_DINKES') {
+        if (trimmed.length < 5) {
+            return { ok: false, reason: 'NOTE_REQUIRED' };
+        }
+        return { ok: true, note: trimmed };
+    }
+    return { ok: true, note: trimmed || null };
+}

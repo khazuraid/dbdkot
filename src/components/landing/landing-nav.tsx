@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { Activity, ArrowRight } from 'lucide-react';
 
-export function LandingNav() {
+export function LandingNav({
+    branding,
+}: {
+    branding?: { title: string; tagline: string; logoUrl: string | null };
+}) {
+    const title = branding?.title || 'WALI-EPI';
+    const logoUrl = branding?.logoUrl ?? null;
+
     return (
         <header className="sticky top-4 z-40 px-4 md:px-6">
             <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-[var(--border)] bg-[var(--surface)]/85 px-4 sm:px-6 shadow-sm backdrop-blur-xl">
@@ -11,14 +18,23 @@ export function LandingNav() {
                 <Link
                     href="/"
                     className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
-                    aria-label="WALI-EPI Beranda"
+                    aria-label={`${title} Beranda`}
                 >
-                    <span className="grid size-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs">
-                        <Activity className="size-4" strokeWidth={2.2} />
+                    <span className="grid size-8 place-items-center overflow-hidden rounded-lg bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs">
+                        {logoUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                                src={logoUrl}
+                                alt={title}
+                                className="size-8 object-contain"
+                            />
+                        ) : (
+                            <Activity className="size-4" strokeWidth={2.2} />
+                        )}
                     </span>
                     <span className="flex flex-col">
                         <span className="text-[14px] leading-tight font-bold tracking-tight text-foreground">
-                            WALI-EPI
+                            {title}
                         </span>
                         <span className="text-[10.5px] font-medium text-muted-foreground flex items-center gap-1">
                             <span className="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse" />

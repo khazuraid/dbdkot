@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { requireActor } from '@/lib/session';
 import { audit } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
+import { sanitizeWorkbookStrings } from '@/lib/security';
 import {
     STATUSES,
     STATUS_LABEL,
@@ -20,34 +22,54 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rate = await consumeRateLimit(
+        `export:laporan:${actor.userId}`,
+        60,
+        15,
+    );
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak permintaan ekspor. Coba sebentar lagi.' },
+            {
+                status: 429,
+                headers: { 'Retry-After': String(rate.retryAfter ?? 60) },
+            },
+        );
+    }
+
     const { searchParams } = new URL(req.url);
 
     const rawStatus = searchParams.get('status');
-    const status = rawStatus && STATUSES.includes(rawStatus as ReportStatus)
-        ? (rawStatus as ReportStatus)
-        : undefined;
+    const status =
+        rawStatus && STATUSES.includes(rawStatus as ReportStatus)
+            ? (rawStatus as ReportStatus)
+            : undefined;
 
     const search = searchParams.get('search')?.trim() || undefined;
 
     const rawPeriod = searchParams.get('period');
-    const period = ['weekly', 'monthly', 'quarterly', 'yearly'].includes(rawPeriod ?? '')
+    const period = ['weekly', 'monthly', 'quarterly', 'yearly'].includes(
+        rawPeriod ?? '',
+    )
         ? (rawPeriod as ReportPeriod)
         : undefined;
 
     const caseType = searchParams.get('caseType')?.trim() || undefined;
 
     const rawGender = searchParams.get('gender');
-    const gender = rawGender === 'L' || rawGender === 'P' ? rawGender : undefined;
+    const gender =
+        rawGender === 'L' || rawGender === 'P' ? rawGender : undefined;
 
     const rawAgeGroup = searchParams.get('ageGroup');
-    const ageGroup = ['under_5', '5_14', '15_44', '45_plus'].includes(rawAgeGroup ?? '')
+    const ageGroup = ['under_5', '5_14', '15_44', '45_plus'].includes(
+        rawAgeGroup ?? '',
+    )
         ? (rawAgeGroup as ReportAgeGroup)
         : undefined;
 
     const rawSource = searchParams.get('sourceType');
-    const sourceType = rawSource === 'RS' || rawSource === 'PUSKESMAS'
-        ? rawSource
-        : undefined;
+    const sourceType =
+        rawSource === 'RS' || rawSource === 'PUSKESMAS' ? rawSource : undefined;
 
     const rows = await getReportsForExport(actor, {
         status,
@@ -67,7 +89,16 @@ export async function GET(req: Request) {
         changes: {
             filters: {
                 from: null,
-                to: { status, search, period, caseType, gender, ageGroup, sourceType, rowCount: rows.length },
+                to: {
+                    status,
+                    search,
+                    period,
+                    caseType,
+                    gender,
+                    ageGroup,
+                    sourceType,
+                    rowCount: rows.length,
+                },
             },
         },
     });
@@ -84,7 +115,12 @@ export async function GET(req: Request) {
     ws.mergeCells('A1:N1');
     const titleCell = ws.getCell('A1');
     titleCell.value = 'SISTEM SURVEILANS EPIDEMIOLOGI DENGUE (WALI-EPI)';
-    titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.font = {
+        name: 'Arial',
+        size: 14,
+        bold: true,
+        color: { argb: 'FFFFFFFF' },
+    };
     titleCell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -97,7 +133,12 @@ export async function GET(req: Request) {
     ws.mergeCells('A2:N2');
     const subCell = ws.getCell('A2');
     subCell.value = `Rekapitulasi Data Kasus Dengue | Diunduh oleh: ${actor.email} (${actor.role}) | Tanggal: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} WIB`;
-    subCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF334155' } };
+    subCell.font = {
+        name: 'Arial',
+        size: 10,
+        italic: true,
+        color: { argb: 'FF334155' },
+    };
     subCell.alignment = { vertical: 'middle', horizontal: 'center' };
     ws.getRow(2).height = 20;
 
@@ -114,8 +155,10 @@ export async function GET(req: Request) {
         };
         filterParts.push(`Periode: ${periodMap[period] ?? period}`);
     }
-    if (caseType) filterParts.push(`Diagnosa: ${CASE_TYPE_LABEL[caseType] ?? caseType}`);
-    if (gender) filterParts.push(`JK: ${gender === 'L' ? 'Laki-laki' : 'Perempuan'}`);
+    if (caseType)
+        filterParts.push(`Diagnosa: ${CASE_TYPE_LABEL[caseType] ?? caseType}`);
+    if (gender)
+        filterParts.push(`JK: ${gender === 'L' ? 'Laki-laki' : 'Perempuan'}`);
     if (ageGroup) {
         const ageMap: Record<string, string> = {
             under_5: 'Balita (<5 th)',
@@ -125,14 +168,23 @@ export async function GET(req: Request) {
         };
         filterParts.push(`Umur: ${ageMap[ageGroup] ?? ageGroup}`);
     }
-    if (sourceType) filterParts.push(`Sumber: ${sourceType === 'RS' ? 'Rumah Sakit' : 'Puskesmas'}`);
+    if (sourceType)
+        filterParts.push(
+            `Sumber: ${sourceType === 'RS' ? 'Rumah Sakit' : 'Puskesmas'}`,
+        );
     if (status) filterParts.push(`Status: ${STATUS_LABEL[status] ?? status}`);
     if (search) filterParts.push(`Pencarian: "${search}"`);
 
-    filterInfoCell.value = filterParts.length > 0
-        ? `Filter Aktif: ${filterParts.join(' | ')} (Total: ${rows.length} kasus)`
-        : `Semua Data Kasus (Total: ${rows.length} kasus)`;
-    filterInfoCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF0F766E' } };
+    filterInfoCell.value =
+        filterParts.length > 0
+            ? `Filter Aktif: ${filterParts.join(' | ')} (Total: ${rows.length} kasus)`
+            : `Semua Data Kasus (Total: ${rows.length} kasus)`;
+    filterInfoCell.font = {
+        name: 'Arial',
+        size: 9,
+        bold: true,
+        color: { argb: 'FF0F766E' },
+    };
     filterInfoCell.alignment = { vertical: 'middle', horizontal: 'left' };
     ws.getRow(3).height = 18;
 
@@ -161,7 +213,12 @@ export async function GET(req: Request) {
     tableHeaderRow.values = columns.map((c) => c.header);
     tableHeaderRow.height = 26;
     tableHeaderRow.eachCell((cell) => {
-        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.font = {
+            name: 'Arial',
+            size: 10,
+            bold: true,
+            color: { argb: 'FFFFFFFF' },
+        };
         cell.fill = {
             type: 'pattern',
             pattern: 'solid',
@@ -185,9 +242,15 @@ export async function GET(req: Request) {
         const rowIdx = idx + 6;
         const row = ws.getRow(rowIdx);
 
-        const isPuskesmas = r.sourceType === 'PUSKESMAS_POLI' || r.sourceType === 'PUSKESMAS';
+        const isPuskesmas =
+            r.sourceType === 'PUSKESMAS_POLI' || r.sourceType === 'PUSKESMAS';
         const sourceLabel = isPuskesmas ? 'Puskesmas' : 'Rumah Sakit';
-        const genderLabel = r.gender === 'L' ? 'Laki-laki' : r.gender === 'P' ? 'Perempuan' : '-';
+        const genderLabel =
+            r.gender === 'L'
+                ? 'Laki-laki'
+                : r.gender === 'P'
+                  ? 'Perempuan'
+                  : '-';
         const caseLabel = CASE_TYPE_LABEL[r.caseType] ?? r.caseType;
         const statusLabel = STATUS_LABEL[r.status] ?? r.status;
 
@@ -209,7 +272,7 @@ export async function GET(req: Request) {
             genderLabel,
             r.kelurahan ?? '-',
             r.kecamatan ?? '-',
-            r.kota ?? 'Kota Bandung',
+            r.kota ?? '-',
             statusLabel,
             r.latitude ?? '-',
             r.longitude ?? '-',
@@ -233,9 +296,19 @@ export async function GET(req: Request) {
             };
 
             // Alignments
-            if (colNumber === 1 || colNumber === 3 || colNumber === 4 || colNumber === 5 || colNumber === 8) {
+            if (
+                colNumber === 1 ||
+                colNumber === 3 ||
+                colNumber === 4 ||
+                colNumber === 5 ||
+                colNumber === 8
+            ) {
                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            } else if (colNumber === 7 || colNumber === 13 || colNumber === 14) {
+            } else if (
+                colNumber === 7 ||
+                colNumber === 13 ||
+                colNumber === 14
+            ) {
                 cell.alignment = { vertical: 'middle', horizontal: 'right' };
             } else {
                 cell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -243,19 +316,27 @@ export async function GET(req: Request) {
 
             // Highlighting report number
             if (colNumber === 2) {
-                cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF0D9488' } };
+                cell.font = {
+                    name: 'Arial',
+                    size: 9,
+                    bold: true,
+                    color: { argb: 'FF0D9488' },
+                };
             }
         });
     });
 
+    sanitizeWorkbookStrings(wb);
     const buffer = await wb.xlsx.writeBuffer();
     const dateStamp = new Date().toISOString().slice(0, 10);
     const filename = `Rekap-Kasus-DBD-${dateStamp}.xlsx`;
 
     return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
         headers: {
-            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type':
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition': `attachment; filename="${filename}"`,
+            'Cache-Control': 'no-store, max-age=0',
         },
     });
 }

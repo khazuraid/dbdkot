@@ -12,6 +12,9 @@ import {
     SuratCamatLurahDocument,
     SuratHasilKadinkesDocument,
 } from '@/lib/pdf/kemenkes-templates';
+import { audit } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
+import { isValidUuid } from '@/lib/security';
 import { requireActor } from '@/lib/session';
 
 export async function GET(
@@ -25,7 +28,18 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rate = await consumeRateLimit(`export:pdf:${actor.userId}`, 60, 20);
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak permintaan PDF. Coba sebentar lagi.' },
+            { status: 429, headers: { 'Retry-After': String(rate.retryAfter ?? 60) } },
+        );
+    }
+
     const { kind, id } = await context.params;
+    if (!isValidUuid(id)) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     let report = await getReport(actor, id);
     if (!report) {
         const pe = await peDetail(actor, id);
@@ -81,6 +95,16 @@ export async function GET(
             { status: 400 },
         );
     }
+
+    await audit({
+        actor,
+        action: 'READ_PII',
+        entityType: 'REPORT_RS',
+        entityId: report.id,
+        changes: {
+            exportPdfKind: { from: null, to: kind },
+        },
+    });
 
     const buffer = await renderToBuffer(doc);
     return new NextResponse(new Uint8Array(buffer), {

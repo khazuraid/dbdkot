@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireActor } from '@/lib/session';
 import { audit } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
 import {
     getSurveillanceReportData,
     generateSurveillanceWorkbook,
@@ -20,8 +21,26 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rate = await consumeRateLimit(`export:rekap:${actor.userId}`, 60, 15);
+    if (!rate.allowed) {
+        return NextResponse.json(
+            { error: 'Terlalu banyak permintaan ekspor. Coba sebentar lagi.' },
+            {
+                status: 429,
+                headers: { 'Retry-After': String(rate.retryAfter ?? 60) },
+            },
+        );
+    }
+
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'age';
+    const isCityRole = actor.role === 'ADMIN' || actor.role === 'DINKES';
+    if ((type === 'endemicity' || type === 'pe_compliance') && !isCityRole) {
+        return NextResponse.json(
+            { error: 'Laporan ini hanya tersedia untuk Dinas Kesehatan dan Admin.' },
+            { status: 403 },
+        );
+    }
     const rawYear = searchParams.get('y') || searchParams.get('year');
     const rawMonth = searchParams.get('m') || searchParams.get('month');
     const level =

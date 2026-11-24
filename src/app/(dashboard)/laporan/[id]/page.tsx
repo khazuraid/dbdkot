@@ -41,6 +41,8 @@ import { SlaCountdown } from '@/components/reports/sla-countdown';
 import { PatientMapPanel } from '@/components/reports/patient-map-panel';
 import { DraftActionToolbar } from './draft-actions';
 import { PeActionToolbar } from '@/app/(dashboard)/pe/pe-actions';
+import { institutionChoices } from '@/lib/domain/master';
+import { ReassignControl } from '@/app/(dashboard)/admin/koreksi-wilayah/reassign-control';
 
 // Data pasien: rute ini harus dirender per permintaan, bukan dari shell statis.
 export const instant = false;
@@ -59,7 +61,14 @@ export default async function LaporanDetailPage({
     const isPuskesmasSource =
         report.institutionType === 'PUSKESMAS' ||
         report.sourceType === 'PUSKESMAS_POLI';
-    const sourceLabel = isPuskesmasSource ? 'Puskesmas' : 'Rumah Sakit';
+    const isDinkesSource =
+        report.institutionType === 'DINAS_KESEHATAN' ||
+        report.sourceType === 'DINKES';
+    const sourceLabel = isPuskesmasSource
+        ? 'Puskesmas'
+        : isDinkesSource
+          ? 'Dinas Kesehatan'
+          : 'Rumah Sakit';
 
     const canReview =
         actor.role === 'PUSKESMAS' &&
@@ -74,6 +83,17 @@ export default async function LaporanDetailPage({
     const canClose =
         (actor.role === 'DINKES' || actor.role === 'PUSKESMAS') &&
         (report.status === 'VERIFIED' || report.status === 'SIKLUS_2_DONE');
+    const canReassign =
+        (actor.role === 'DINKES' || actor.role === 'ADMIN') &&
+        (report.status === 'SUBMITTED' ||
+            report.status === 'PUSKESMAS_REJECTED' ||
+            report.status === 'CROSS_BORDER_PENDING');
+
+    const puskesmasOptions = canReassign
+        ? (await institutionChoices())
+              .filter((i) => i.type === 'PUSKESMAS')
+              .map((i) => ({ id: i.id, name: i.name }))
+        : [];
 
     const isDraft = report.status === 'DRAFT';
     const canManageReport =
@@ -89,20 +109,29 @@ export default async function LaporanDetailPage({
                     <div className="flex flex-wrap items-center gap-2 pt-1 text-[13px]">
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-0.5 text-xs font-semibold text-foreground">
                             {isPuskesmasSource ? (
-                                <Activity className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                                <Activity
+                                    className="size-3.5 text-emerald-600 dark:text-emerald-400"
+                                    aria-hidden
+                                />
                             ) : (
-                                <Building2 className="size-3.5 text-sky-600 dark:text-sky-400" aria-hidden />
+                                <Building2
+                                    className="size-3.5 text-sky-600 dark:text-sky-400"
+                                    aria-hidden
+                                />
                             )}
                             Sumber: {sourceLabel}
                         </span>
-                        <StatusText tone={STATUS_TONE[report.status] ?? 'neutral'}>
+                        <StatusText
+                            tone={STATUS_TONE[report.status] ?? 'neutral'}
+                        >
                             {STATUS_LABEL[report.status] ?? report.status}
                         </StatusText>
                         <span className="rounded bg-[var(--accent)]/10 px-2 py-0.5 font-semibold text-[var(--accent)]">
-                            {CASE_TYPE_LABEL[report.caseType] ?? report.caseType}
+                            {CASE_TYPE_LABEL[report.caseType] ??
+                                report.caseType}
                         </span>
                         <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-muted-foreground">
                             <Clock className="size-3.5" aria-hidden />
                             Dibuat: {formatDate(report.createdAt)}
                         </span>
@@ -125,7 +154,10 @@ export default async function LaporanDetailPage({
                             />
                         )}
                         <Button asChild variant="outline" size="sm">
-                            <Link href="/laporan" className="inline-flex items-center gap-1.5">
+                            <Link
+                                href="/laporan"
+                                className="inline-flex items-center gap-1.5"
+                            >
                                 <ArrowLeft className="size-3.5" aria-hidden />
                                 Daftar Laporan
                             </Link>
@@ -138,15 +170,22 @@ export default async function LaporanDetailPage({
                 {/* Draft Alert Banner */}
                 {isDraft && (
                     <div className="rounded-[var(--radius-card)] border border-amber-500/40 bg-amber-500/10 p-4 shadow-xs">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-start gap-3">
-                                <AlertCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
                                 <div className="space-y-0.5">
                                     <p className="text-[13.5px] font-semibold text-foreground">
-                                        Laporan Berstatus Draf (Belum Dikirim ke Surveilans)
+                                        Laporan Berstatus Draf (Belum Dikirim ke
+                                        Surveilans)
                                     </p>
-                                    <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-                                        Berkas kasus ini disimpan sebagai draf lokal faskes. Laporan belum didisposisi ke Puskesmas wilayah dan belum memicu SLA investigasi lapangan (24/72 jam). Anda dapat memeriksa data, mengedit rincian, menghapus draf ini, atau langsung mengirimkannya.
+                                    <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                                        Berkas kasus ini disimpan sebagai draf
+                                        lokal faskes. Laporan belum didisposisi
+                                        ke Puskesmas wilayah dan belum memicu
+                                        SLA investigasi lapangan (24/72 jam).
+                                        Anda dapat memeriksa data, mengedit
+                                        rincian, menghapus draf ini, atau
+                                        langsung mengirimkannya.
                                     </p>
                                 </div>
                             </div>
@@ -163,26 +202,33 @@ export default async function LaporanDetailPage({
                 )}
 
                 {/* Clinical KPI Summary Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4 lg:grid-cols-5">
                     {/* Trombosit */}
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="flex items-center justify-between text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             <span>Trombosit</span>
                             <Activity className="size-3 text-[var(--accent)]" />
                         </span>
                         <div className="flex items-baseline gap-1.5 pt-0.5">
-                            <span className={`text-base font-bold font-mono ${
-                                (report.plateletCount ?? 999999) < 50000
-                                    ? 'text-rose-600 dark:text-rose-400'
-                                    : (report.plateletCount ?? 999999) < 100000
-                                      ? 'text-amber-600 dark:text-amber-400'
-                                      : 'text-foreground'
-                            }`}>
-                                {report.plateletCount ? formatNumber(report.plateletCount) : '—'}
+                            <span
+                                className={`font-mono text-base font-bold ${
+                                    (report.plateletCount ?? 999999) < 50000
+                                        ? 'text-rose-600 dark:text-rose-400'
+                                        : (report.plateletCount ?? 999999) <
+                                            100000
+                                          ? 'text-amber-600 dark:text-amber-400'
+                                          : 'text-foreground'
+                                }`}
+                            >
+                                {report.plateletCount
+                                    ? formatNumber(report.plateletCount)
+                                    : '—'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">sel/µL</span>
+                            <span className="text-[10px] text-muted-foreground">
+                                sel/µL
+                            </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">
+                        <p className="truncate text-[10px] text-muted-foreground">
                             {report.plateletCount
                                 ? report.plateletCount < 50000
                                     ? 'Trombositopenia Berat (Kritis)'
@@ -194,72 +240,103 @@ export default async function LaporanDetailPage({
                     </div>
 
                     {/* Hematokrit */}
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Hematokrit (Ht)
                         </span>
                         <div className="flex items-baseline gap-1 pt-0.5">
-                            <span className="text-base font-bold font-mono text-foreground">
-                                {report.hematocrit ? `${report.hematocrit}%` : '—'}
+                            <span className="font-mono text-base font-bold text-foreground">
+                                {report.hematocrit
+                                    ? `${report.hematocrit}%`
+                                    : '—'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                            {report.hematocrit && Number(report.hematocrit) >= 45
+                        <p className="truncate text-[10px] text-muted-foreground">
+                            {report.hematocrit &&
+                            Number(report.hematocrit) >= 45
                                 ? 'Hemokonsentrasi Tinggi'
                                 : 'Dalam batas fisiologis'}
                         </p>
                     </div>
 
                     {/* Serologi NS1 / Rapid */}
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             NS1 Rapid Test
                         </span>
                         <div className="pt-0.5">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                                report.dengueBlot === 'POSITIF'
-                                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30'
-                                    : report.dengueBlot === 'NEGATIF'
-                                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                                      : 'bg-[var(--raised)] text-muted-foreground border border-[var(--border)]'
-                            }`}>
+                            <span
+                                className={`inline-block rounded px-2 py-0.5 text-[11px] font-semibold ${
+                                    report.dengueBlot === 'POSITIF'
+                                        ? 'border border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                                        : report.dengueBlot === 'NEGATIF'
+                                          ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                                          : 'border border-[var(--border)] bg-[var(--raised)] text-muted-foreground'
+                                }`}
+                            >
                                 {report.dengueBlot ?? 'TIDAK DIPERIKSA'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">Antigen Dengue Akut</p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                            Antigen Dengue Akut
+                        </p>
                     </div>
 
                     {/* Serologi IgM / IgG */}
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             IgM / IgG Dengue
                         </span>
                         <div className="flex items-center gap-1.5 pt-0.5">
-                            <span className="text-[11px] font-medium font-mono text-foreground">
-                                IgM: <span className={report.igm === 'POSITIF' ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-muted-foreground'}>{report.igm ?? '-'}</span>
+                            <span className="font-mono text-[11px] font-medium text-foreground">
+                                IgM:{' '}
+                                <span
+                                    className={
+                                        report.igm === 'POSITIF'
+                                            ? 'font-bold text-rose-600 dark:text-rose-400'
+                                            : 'text-muted-foreground'
+                                    }
+                                >
+                                    {report.igm ?? '-'}
+                                </span>
                             </span>
                             <span>·</span>
-                            <span className="text-[11px] font-medium font-mono text-foreground">
-                                IgG: <span className={report.igg === 'POSITIF' ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>{report.igg ?? '-'}</span>
+                            <span className="font-mono text-[11px] font-medium text-foreground">
+                                IgG:{' '}
+                                <span
+                                    className={
+                                        report.igg === 'POSITIF'
+                                            ? 'font-bold text-amber-600 dark:text-amber-400'
+                                            : 'text-muted-foreground'
+                                    }
+                                >
+                                    {report.igg ?? '-'}
+                                </span>
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">Antibodi Fase Lanjut</p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                            Antibodi Fase Lanjut
+                        </p>
                     </div>
 
                     {/* Usia & Kategori Pasien */}
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1 col-span-2 sm:col-span-4 lg:col-span-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="col-span-2 space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 sm:col-span-4 lg:col-span-1">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Kategori Pasien
                         </span>
-                        <div className="pt-0.5 flex items-center gap-1.5">
-                            <span className="text-base font-bold font-mono text-foreground">
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                            <span className="font-mono text-base font-bold text-foreground">
                                 {report.patient.age} Th
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                ({report.patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'})
+                                (
+                                {report.patient.gender === 'L'
+                                    ? 'Laki-laki'
+                                    : 'Perempuan'}
+                                )
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate">
+                        <p className="truncate text-[10px] text-muted-foreground">
                             {report.patient.age < 5
                                 ? 'Balita (Kelompok Rentan)'
                                 : report.patient.age < 15
@@ -271,7 +348,11 @@ export default async function LaporanDetailPage({
                     </div>
                 </div>
                 {/* Decision Action Bar if pending actor action */}
-                {(canReview || canStartPe || canVerify || canClose) && (
+                {(canReview ||
+                    canStartPe ||
+                    canVerify ||
+                    canClose ||
+                    canReassign) && (
                     <div className="rounded-[var(--radius-card)] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 shadow-xs">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -279,7 +360,8 @@ export default async function LaporanDetailPage({
                                     Keputusan Tindak Lanjut Surveilans
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">
-                                    Tindakan yang perlu diambil oleh faskes Anda pada tahap kasus saat ini.
+                                    Tindakan yang perlu diambil oleh faskes Anda
+                                    pada tahap kasus saat ini.
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -306,7 +388,9 @@ export default async function LaporanDetailPage({
                                             label="Mulai PE Lapangan"
                                         />
                                         <Button asChild size="sm">
-                                            <Link href={`/pe/baru?reportId=${id}`}>
+                                            <Link
+                                                href={`/pe/baru?reportId=${id}`}
+                                            >
                                                 Isi Formulir PE Sekarang
                                             </Link>
                                         </Button>
@@ -339,6 +423,14 @@ export default async function LaporanDetailPage({
                                         primary
                                     />
                                 )}
+                                {canReassign && (
+                                    <ReassignControl
+                                        reportId={id}
+                                        reportNumber={report.reportNumber}
+                                        kelurahan={report.kelurahan}
+                                        options={puskesmasOptions}
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>
@@ -354,10 +446,16 @@ export default async function LaporanDetailPage({
                     <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--warning)]/30 bg-[var(--pill-warning-bg)] p-4 text-[13px] text-[var(--warning)]">
                         <AlertCircle className="size-5 shrink-0" aria-hidden />
                         <div>
-                            <p className="font-semibold text-foreground">Kasus Lintas Wilayah Domisili</p>
+                            <p className="font-semibold text-foreground">
+                                Kasus Lintas Wilayah Domisili
+                            </p>
                             <p className="mt-0.5 text-muted-foreground">
-                                Domisili pasien berada di luar cakupan faskes lokal (
-                                {report.crossBorderTargetCity ?? report.kota ?? '-'}).{' '}
+                                Domisili pasien berada di luar cakupan faskes
+                                lokal (
+                                {report.crossBorderTargetCity ??
+                                    report.kota ??
+                                    '-'}
+                                ).{' '}
                                 {actor.role === 'DINKES' && (
                                     <Link
                                         href="/laporan/lintas-wilayah"
@@ -375,7 +473,9 @@ export default async function LaporanDetailPage({
                     <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--negative)]/30 bg-[var(--pill-negative-bg)] p-4 text-[13px] text-[var(--negative)]">
                         <AlertCircle className="size-5 shrink-0" aria-hidden />
                         <div>
-                            <p className="font-semibold">Laporan Ditolak / Dikembalikan</p>
+                            <p className="font-semibold">
+                                Laporan Ditolak / Dikembalikan
+                            </p>
                             <p className="mt-0.5">{report.rejectionReason}</p>
                         </div>
                     </div>
@@ -388,14 +488,16 @@ export default async function LaporanDetailPage({
                         title={
                             <span className="flex items-center gap-2 text-[#e11d48]">
                                 <MapPin className="size-4" aria-hidden />
-                                Klaster Spasial &le; 100 Meter ({report.clusterId})
+                                Klaster Spasial &le; 100 Meter (
+                                {report.clusterId})
                             </span>
                         }
                         subtitle="Kasus lain dalam radius 100 meter dan rentang waktu 14 hari."
                     >
                         {report.clusterSiblings.length === 0 ? (
                             <p className="text-[13px] text-muted-foreground">
-                                Kasus ini teridentifikasi dalam radius klaster {report.clusterId}.
+                                Kasus ini teridentifikasi dalam radius klaster{' '}
+                                {report.clusterId}.
                             </p>
                         ) : (
                             <ul className="flex flex-wrap gap-2.5">
@@ -405,13 +507,24 @@ export default async function LaporanDetailPage({
                                             href={`/laporan/${sib.id}`}
                                             className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12.5px] font-medium shadow-2xs transition-colors hover:bg-[var(--raised)]"
                                         >
-                                            <MapPin className="size-3.5 text-[#e11d48]" aria-hidden />
-                                            <span className="font-mono">{sib.reportNumber}</span>
+                                            <MapPin
+                                                className="size-3.5 text-[#e11d48]"
+                                                aria-hidden
+                                            />
+                                            <span className="font-mono">
+                                                {sib.reportNumber}
+                                            </span>
                                             <span className="text-muted-foreground">
                                                 Kel. {sib.kelurahan ?? '-'}
                                             </span>
-                                            <StatusText tone={STATUS_TONE[sib.status] ?? 'neutral'}>
-                                                {STATUS_LABEL[sib.status] ?? sib.status}
+                                            <StatusText
+                                                tone={
+                                                    STATUS_TONE[sib.status] ??
+                                                    'neutral'
+                                                }
+                                            >
+                                                {STATUS_LABEL[sib.status] ??
+                                                    sib.status}
                                             </StatusText>
                                         </Link>
                                     </li>
@@ -428,7 +541,10 @@ export default async function LaporanDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <User className="size-4 text-[var(--accent)]" aria-hidden />
+                                <User
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Identitas Pasien
                             </span>
                         }
@@ -441,15 +557,38 @@ export default async function LaporanDetailPage({
                         }
                     >
                         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                            <Field label="Nama Pasien" value={report.patient.name} />
-                            <Field label="NIK" value={report.patient.nik} numeric />
-                            <Field label="Umur" value={`${report.patient.age} tahun`} numeric />
+                            <Field
+                                label="Nama Pasien"
+                                value={report.patient.name}
+                            />
+                            <Field
+                                label="NIK"
+                                value={report.patient.nik}
+                                numeric
+                            />
+                            <Field
+                                label="Umur"
+                                value={`${report.patient.age} tahun`}
+                                numeric
+                            />
                             <Field
                                 label="Jenis Kelamin"
-                                value={report.patient.gender === 'L' ? 'Laki-laki (L)' : 'Perempuan (P)'}
+                                value={
+                                    report.patient.gender === 'L'
+                                        ? 'Laki-laki (L)'
+                                        : 'Perempuan (P)'
+                                }
                             />
-                            <Field label="Nomor Telepon" value={report.patient.phone || '-'} numeric />
-                            <Field label="Alamat Domisili" value={report.patient.address} wide />
+                            <Field
+                                label="Nomor Telepon"
+                                value={report.patient.phone || '-'}
+                                numeric
+                            />
+                            <Field
+                                label="Alamat Domisili"
+                                value={report.patient.address}
+                                wide
+                            />
                         </dl>
                     </Panel>
 
@@ -458,7 +597,10 @@ export default async function LaporanDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <Building2 className="size-4 text-[var(--accent)]" aria-hidden />
+                                <Building2
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Sumber Lapor & Rujukan Faskes
                             </span>
                         }
@@ -466,8 +608,10 @@ export default async function LaporanDetailPage({
                     >
                         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                             <div>
-                                <dt className="text-[12px] text-muted-foreground">Fasilitas Pelapor (Sumber)</dt>
-                                <dd className="mt-1 flex items-center gap-1.5 font-medium text-[13.5px] text-foreground">
+                                <dt className="text-[12px] text-muted-foreground">
+                                    Fasilitas Pelapor (Sumber)
+                                </dt>
+                                <dd className="mt-1 flex items-center gap-1.5 text-[13.5px] font-medium text-foreground">
                                     <span
                                         className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
                                             isPuskesmasSource
@@ -482,15 +626,28 @@ export default async function LaporanDetailPage({
                             </div>
                             <Field
                                 label="Puskesmas Wilayah Kerja"
-                                value={report.assignedPuskesmasName ?? 'Belum ditugaskan'}
+                                value={
+                                    report.assignedPuskesmasName ??
+                                    'Belum ditugaskan'
+                                }
                             />
-                            <Field label="Kelurahan" value={report.kelurahan ?? '-'} />
-                            <Field label="Kecamatan" value={report.kecamatan ?? '-'} />
-                            <Field label="Kota / Kabupaten" value={report.kota ?? '-'} />
+                            <Field
+                                label="Kelurahan"
+                                value={report.kelurahan ?? '-'}
+                            />
+                            <Field
+                                label="Kecamatan"
+                                value={report.kecamatan ?? '-'}
+                            />
+                            <Field
+                                label="Kota / Kabupaten"
+                                value={report.kota ?? '-'}
+                            />
                             <Field
                                 label="Titik Koordinat GPS"
                                 value={
-                                    report.latitude !== null && report.longitude !== null
+                                    report.latitude !== null &&
+                                    report.longitude !== null
                                         ? `${report.latitude.toFixed(6)}, ${report.longitude.toFixed(6)}`
                                         : 'Belum diisi'
                                 }
@@ -499,25 +656,31 @@ export default async function LaporanDetailPage({
                         </dl>
 
                         {/* Interactive mini-map showing investigation radius 100m */}
-                        {report.latitude !== null && report.longitude !== null && (
-                            <div className="mt-4 border-t border-[var(--rule)] pt-3.5 space-y-2">
-                                <div className="flex items-center justify-between text-[12px]">
-                                    <span className="flex items-center gap-1.5 font-semibold text-foreground">
-                                        <MapPin className="size-3.5 text-[#e11d48]" aria-hidden />
-                                        Peta Lokasi Domisili (Radius Penyelidikan 100m)
-                                    </span>
-                                    <span className="font-mono text-muted-foreground tabular-nums">
-                                        {report.latitude.toFixed(6)}, {report.longitude.toFixed(6)}
-                                    </span>
+                        {report.latitude !== null &&
+                            report.longitude !== null && (
+                                <div className="mt-4 space-y-2 border-t border-[var(--rule)] pt-3.5">
+                                    <div className="flex items-center justify-between text-[12px]">
+                                        <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                                            <MapPin
+                                                className="size-3.5 text-[#e11d48]"
+                                                aria-hidden
+                                            />
+                                            Peta Lokasi Domisili (Radius
+                                            Penyelidikan 100m)
+                                        </span>
+                                        <span className="font-mono text-muted-foreground tabular-nums">
+                                            {report.latitude.toFixed(6)},{' '}
+                                            {report.longitude.toFixed(6)}
+                                        </span>
+                                    </div>
+                                    <PatientMapPanel
+                                        lat={report.latitude}
+                                        lng={report.longitude}
+                                        interactive={false}
+                                        height="220px"
+                                    />
                                 </div>
-                                <PatientMapPanel
-                                    lat={report.latitude}
-                                    lng={report.longitude}
-                                    interactive={false}
-                                    height="220px"
-                                />
-                            </div>
-                        )}
+                            )}
                     </Panel>
                 </div>
 
@@ -526,7 +689,10 @@ export default async function LaporanDetailPage({
                     padded
                     title={
                         <span className="flex items-center gap-2">
-                            <Stethoscope className="size-4 text-[var(--accent)]" aria-hidden />
+                            <Stethoscope
+                                className="size-4 text-[var(--accent)]"
+                                aria-hidden
+                            />
                             Data Klinis & Hasil Laboratorium
                         </span>
                     }
@@ -540,45 +706,68 @@ export default async function LaporanDetailPage({
                         />
                         <Field
                             label="Mulai Onset Gejala"
-                            value={report.symptomOnsetDate ? formatDate(report.symptomOnsetDate) : '-'}
+                            value={
+                                report.symptomOnsetDate
+                                    ? formatDate(report.symptomOnsetDate)
+                                    : '-'
+                            }
                             numeric
                         />
                         <Field
                             label="Tanggal Diagnosis"
-                            value={report.diagnosisDate ? formatDate(report.diagnosisDate) : '-'}
+                            value={
+                                report.diagnosisDate
+                                    ? formatDate(report.diagnosisDate)
+                                    : '-'
+                            }
                             numeric
                         />
                         <div>
-                            <dt className="text-[12px] text-muted-foreground">Trombosit</dt>
-                            <dd className="mt-1 flex items-center gap-2 font-mono text-[14px] font-semibold tabular-nums text-foreground">
-                                {report.plateletCount ? formatNumber(report.plateletCount) : '-'}
-                                {report.plateletCount && report.plateletCount < 100000 && (
-                                    <span className="rounded bg-[var(--pill-negative-bg)] px-1.5 py-0.2 text-[10.5px] font-semibold text-[var(--negative)]">
-                                        &lt; 100.000 / &micro;L
-                                    </span>
-                                )}
+                            <dt className="text-[12px] text-muted-foreground">
+                                Trombosit
+                            </dt>
+                            <dd className="mt-1 flex items-center gap-2 font-mono text-[14px] font-semibold text-foreground tabular-nums">
+                                {report.plateletCount
+                                    ? formatNumber(report.plateletCount)
+                                    : '-'}
+                                {report.plateletCount &&
+                                    report.plateletCount < 100000 && (
+                                        <span className="py-0.2 rounded bg-[var(--pill-negative-bg)] px-1.5 text-[10.5px] font-semibold text-[var(--negative)]">
+                                            &lt; 100.000 / &micro;L
+                                        </span>
+                                    )}
                             </dd>
                         </div>
                         <Field
                             label="Hematokrit (Ht)"
-                            value={report.hematocrit ? `${report.hematocrit}%` : '-'}
+                            value={
+                                report.hematocrit
+                                    ? `${report.hematocrit}%`
+                                    : '-'
+                            }
                             numeric
                         />
                         <div>
-                            <dt className="text-[12px] text-muted-foreground">NS1 / IgM / IgG Blot</dt>
+                            <dt className="text-[12px] text-muted-foreground">
+                                NS1 / IgM / IgG Blot
+                            </dt>
                             <dd className="mt-1 flex items-center gap-1.5 font-mono text-[12.5px] font-medium">
-                                <span className="rounded bg-[var(--surface)] border px-1.5 py-0.5">
+                                <span className="rounded border bg-[var(--surface)] px-1.5 py-0.5">
                                     NS1: {report.dengueBlot ?? '-'}
                                 </span>
-                                <span className="rounded bg-[var(--surface)] border px-1.5 py-0.5">
+                                <span className="rounded border bg-[var(--surface)] px-1.5 py-0.5">
                                     IgM: {report.igm ?? '-'}
                                 </span>
-                                <span className="rounded bg-[var(--surface)] border px-1.5 py-0.5">
+                                <span className="rounded border bg-[var(--surface)] px-1.5 py-0.5">
                                     IgG: {report.igg ?? '-'}
                                 </span>
                             </dd>
                         </div>
-                        <Field label="Diagnosis Klinis" value={report.diagnosis ?? '-'} wide />
+                        <Field
+                            label="Diagnosis Klinis"
+                            value={report.diagnosis ?? '-'}
+                            wide
+                        />
                     </dl>
                 </Panel>
 
@@ -588,7 +777,10 @@ export default async function LaporanDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <Activity className="size-4 text-[var(--accent)]" aria-hidden />
+                                <Activity
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Hasil Penyelidikan Epidemiologi (PE)
                             </span>
                         }
@@ -597,18 +789,21 @@ export default async function LaporanDetailPage({
                             <div className="flex flex-wrap items-center gap-2">
                                 <StatusText
                                     tone={
-                                        report.pe.transmissionRisk === 'POSITIF_PENULARAN'
+                                        report.pe.transmissionRisk ===
+                                        'POSITIF_PENULARAN'
                                             ? 'bad'
                                             : 'good'
                                     }
                                 >
-                                    {report.pe.transmissionRisk === 'POSITIF_PENULARAN'
+                                    {report.pe.transmissionRisk ===
+                                    'POSITIF_PENULARAN'
                                         ? 'Positif Penularan (Wajib Fogging)'
                                         : 'Negatif Penularan'}
                                 </StatusText>
                                 {(actor.role === 'ADMIN' ||
                                     actor.role === 'DINKES' ||
-                                    actor.institutionId === report.assignedPuskesmasId) && (
+                                    actor.institutionId ===
+                                        report.assignedPuskesmasId) && (
                                     <PeActionToolbar
                                         peId={report.pe.id}
                                         reportNumber={report.reportNumber}
@@ -621,7 +816,9 @@ export default async function LaporanDetailPage({
                         {/* Entomology Metrics Grid */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
-                                <p className="text-[11px] font-medium text-muted-foreground">Angka Bebas Jentik (ABJ)</p>
+                                <p className="text-[11px] font-medium text-muted-foreground">
+                                    Angka Bebas Jentik (ABJ)
+                                </p>
                                 <p
                                     data-numeric
                                     className={`font-mono text-2xl font-bold tabular-nums ${
@@ -632,42 +829,67 @@ export default async function LaporanDetailPage({
                                 >
                                     {report.pe.abj ?? '-'}%
                                 </p>
-                                <p className="text-[10px] text-muted-foreground">Target Nasional &ge; 95%</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Target Nasional &ge; 95%
+                                </p>
                             </div>
 
                             <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
-                                <p className="text-[11px] font-medium text-muted-foreground">House Index (HI)</p>
-                                <p data-numeric className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                                <p className="text-[11px] font-medium text-muted-foreground">
+                                    House Index (HI)
+                                </p>
+                                <p
+                                    data-numeric
+                                    className="font-mono text-2xl font-bold text-foreground tabular-nums"
+                                >
                                     {report.pe.houseIndex ?? '-'}%
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
-                                    {report.pe.housesPositive} dari {report.pe.housesInspected} rumah (+)
+                                    {report.pe.housesPositive} dari{' '}
+                                    {report.pe.housesInspected} rumah (+)
                                 </p>
                             </div>
 
                             <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
-                                <p className="text-[11px] font-medium text-muted-foreground">Container Index (CI)</p>
-                                <p data-numeric className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                                <p className="text-[11px] font-medium text-muted-foreground">
+                                    Container Index (CI)
+                                </p>
+                                <p
+                                    data-numeric
+                                    className="font-mono text-2xl font-bold text-foreground tabular-nums"
+                                >
                                     {report.pe.containerIndex ?? '-'}%
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
-                                    {report.pe.containersPositive} dari {report.pe.containersInspected} kontainer (+)
+                                    {report.pe.containersPositive} dari{' '}
+                                    {report.pe.containersInspected} kontainer
+                                    (+)
                                 </p>
                             </div>
 
                             <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
-                                <p className="text-[11px] font-medium text-muted-foreground">Breteau Index (BI)</p>
-                                <p data-numeric className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                                <p className="text-[11px] font-medium text-muted-foreground">
+                                    Breteau Index (BI)
+                                </p>
+                                <p
+                                    data-numeric
+                                    className="font-mono text-2xl font-bold text-foreground tabular-nums"
+                                >
                                     {report.pe.breteauIndex ?? '-'}%
                                 </p>
-                                <p className="text-[10px] text-muted-foreground">Kontainer (+) per 100 rumah</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Kontainer (+) per 100 rumah
+                                </p>
                             </div>
                         </div>
 
                         <div className="mt-4 rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--raised)]/40 p-3 text-[13px]">
-                            <p className="font-semibold text-foreground">Rekomendasi Tindak Lanjut:</p>
+                            <p className="font-semibold text-foreground">
+                                Rekomendasi Tindak Lanjut:
+                            </p>
                             <p className="mt-0.5 text-muted-foreground">
-                                {report.pe.recommendation || 'Pemberantasan Sarang Nyamuk (PSN) 3M Plus dan penyuluhan lingkungan.'}
+                                {report.pe.recommendation ||
+                                    'Pemberantasan Sarang Nyamuk (PSN) 3M Plus dan penyuluhan lingkungan.'}
                             </p>
                         </div>
 
@@ -688,7 +910,10 @@ export default async function LaporanDetailPage({
                                     href={`/api/export/pe/${report.id}/excel`}
                                     download
                                 >
-                                    <FileSpreadsheet className="size-4 text-emerald-600" aria-hidden />
+                                    <FileSpreadsheet
+                                        className="size-4 text-emerald-600"
+                                        aria-hidden
+                                    />
                                     Export Excel (.xlsx)
                                 </a>
                             </Button>
@@ -732,8 +957,12 @@ export default async function LaporanDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <Flame className="size-4 text-[var(--accent)]" aria-hidden />
-                                Jadwal &amp; Pelaksanaan Fogging Fokus (2 Siklus)
+                                <Flame
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
+                                Jadwal &amp; Pelaksanaan Fogging Fokus (2
+                                Siklus)
                             </span>
                         }
                         aside={
@@ -753,15 +982,26 @@ export default async function LaporanDetailPage({
                                 >
                                     <div className="flex items-center justify-between">
                                         <span className="font-semibold text-foreground">
-                                            Siklus {c.cycleNumber} (H{c.cycleNumber === 1 ? '0' : '+7'})
+                                            Siklus {c.cycleNumber} (H
+                                            {c.cycleNumber === 1 ? '0' : '+7'})
                                         </span>
-                                        <StatusText tone={c.status === 'DONE' ? 'good' : 'warn'}>
-                                            {c.status === 'DONE' ? 'Selesai' : 'Terjadwal'}
+                                        <StatusText
+                                            tone={
+                                                c.status === 'DONE'
+                                                    ? 'good'
+                                                    : 'warn'
+                                            }
+                                        >
+                                            {c.status === 'DONE'
+                                                ? 'Selesai'
+                                                : 'Terjadwal'}
                                         </StatusText>
                                     </div>
-                                    <p className="mt-1 text-muted-foreground text-[12px]">
+                                    <p className="mt-1 text-[12px] text-muted-foreground">
                                         Jadwal: {formatDate(c.scheduledDate)}
-                                        {c.executedAt ? ` · Selesai: ${formatDate(c.executedAt)}` : ''}
+                                        {c.executedAt
+                                            ? ` · Selesai: ${formatDate(c.executedAt)}`
+                                            : ''}
                                     </p>
                                 </div>
                             ))}
@@ -775,7 +1015,10 @@ export default async function LaporanDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <MessageSquare className="size-4 text-[var(--accent)]" aria-hidden />
+                                <MessageSquare
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Riwayat Log Notifikasi WhatsApp
                             </span>
                         }
@@ -788,13 +1031,22 @@ export default async function LaporanDetailPage({
                                     className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--surface)] px-3 py-2"
                                 >
                                     <span className="flex items-center gap-2">
-                                        <MessageSquare className="size-3.5 text-[var(--accent)]" aria-hidden />
-                                        <span className="font-medium text-foreground">{w.eventKind}</span>
+                                        <MessageSquare
+                                            className="size-3.5 text-[var(--accent)]"
+                                            aria-hidden
+                                        />
+                                        <span className="font-medium text-foreground">
+                                            {w.eventKind}
+                                        </span>
                                         <span className="font-mono text-muted-foreground">
                                             {w.recipientPhone}
                                         </span>
                                     </span>
-                                    <StatusText tone={w.status === 'SENT' ? 'good' : 'bad'}>
+                                    <StatusText
+                                        tone={
+                                            w.status === 'SENT' ? 'good' : 'bad'
+                                        }
+                                    >
                                         {w.status}
                                     </StatusText>
                                 </li>
@@ -808,7 +1060,10 @@ export default async function LaporanDetailPage({
                     padded
                     title={
                         <span className="flex items-center gap-2">
-                            <Paperclip className="size-4 text-[var(--accent)]" aria-hidden />
+                            <Paperclip
+                                className="size-4 text-[var(--accent)]"
+                                aria-hidden
+                            />
                             Lampiran &amp; Berkas Pendukung Kasus
                         </span>
                     }

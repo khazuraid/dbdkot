@@ -48,6 +48,7 @@ type InstitutionItem = {
 
 type Props = {
     institutions?: InstitutionItem[];
+    institutionName?: string;
 };
 
 const ROLE_OPTIONS = [
@@ -73,7 +74,10 @@ const ROLE_OPTIONS = [
 
 const STEPS = ['Profil Instansi', 'Verifikasi OTP', 'Selesai'];
 
-export function RegisterForm({ institutions = [] }: Props) {
+export function RegisterForm({
+    institutions = [],
+    institutionName = 'Dinas Kesehatan',
+}: Props) {
     const router = useRouter();
 
     const [step, setStep] = useState<'FORM' | 'OTP' | 'SUCCESS'>('FORM');
@@ -83,6 +87,7 @@ export function RegisterForm({ institutions = [] }: Props) {
     );
 
     const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
@@ -132,6 +137,7 @@ export function RegisterForm({ institutions = [] }: Props) {
 
         const payload: RegisterInput = {
             name: name.trim(),
+            username: username.trim().toLowerCase() || undefined,
             email: email.trim(),
             password,
             confirm,
@@ -179,6 +185,7 @@ export function RegisterForm({ institutions = [] }: Props) {
 
         const payload: RegisterInput = {
             name: name.trim(),
+            username: username.trim().toLowerCase() || undefined,
             email: email.trim(),
             password,
             confirm,
@@ -215,6 +222,7 @@ export function RegisterForm({ institutions = [] }: Props) {
         try {
             const payload = {
                 name: name.trim(),
+                username: username.trim().toLowerCase() || undefined,
                 email: email.trim(),
                 password,
                 confirm,
@@ -257,7 +265,7 @@ export function RegisterForm({ institutions = [] }: Props) {
                     </h3>
                     <p className="mx-auto max-w-[36ch] text-[13px] leading-relaxed text-muted-foreground">
                         Email <strong className="font-medium text-foreground">{email}</strong> telah
-                        terverifikasi. Akun Anda sedang ditinjau administrator Dinas Kesehatan Kota Cirebon.
+                        terverifikasi. Akun Anda sedang ditinjau administrator {institutionName}.
                     </p>
                 </div>
 
@@ -457,6 +465,26 @@ export function RegisterForm({ institutions = [] }: Props) {
                         <User className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
                     </div>
                     {fieldErrors.name && <FieldError className="text-[11.5px]">{fieldErrors.name}</FieldError>}
+                </Field>
+
+                <Field className="space-y-1">
+                    <FieldLabel htmlFor="username" className="text-[12.5px] font-medium text-foreground">
+                        Username <span className="font-normal text-muted-foreground">(opsional, untuk masuk cepat)</span>
+                    </FieldLabel>
+                    <Input
+                        id="username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="contoh: petugas.pkm01"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        disabled={pending}
+                        aria-invalid={Boolean(fieldErrors.username)}
+                        className="h-10 bg-[var(--ground)] text-[13px]"
+                    />
+                    {fieldErrors.username && (
+                        <FieldError className="text-[11.5px]">{fieldErrors.username}</FieldError>
+                    )}
                 </Field>
 
                 <Field className="space-y-1">

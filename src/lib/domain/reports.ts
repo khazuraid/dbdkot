@@ -2,6 +2,7 @@ import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { reportsRS } from '@/db/schema';
 import type { Actor } from '@/lib/session';
+import { escapeLike } from '@/lib/security';
 import { scopeToInstitution } from '@/lib/session';
 import { STATUSES, needActionStatusesFor, type ReportListRow } from './report-labels';
 
@@ -100,7 +101,7 @@ function baseConditions(actor: Actor, filters: ReportListFilters): SQL[] {
 
     if (filters.search) {
         // Only non-PII columns are searchable: NIK and name are ciphertext.
-        const q = `%${filters.search.trim()}%`;
+        const q = `%${escapeLike(filters.search.trim())}%`;
         conditions.push(
             sql`(${reportsRS.reportNumber} ilike ${q} or ${reportsRS.kelurahan} ilike ${q})`,
         );

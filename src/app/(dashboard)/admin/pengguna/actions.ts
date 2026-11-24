@@ -96,6 +96,7 @@ export async function createAccountAction(
 
     const parsed = createAccountSchema.safeParse({
         name: formData.get('name'),
+        username: formData.get('username') || undefined,
         email: formData.get('email'),
         password: formData.get('password'),
         role: formData.get('role'),
@@ -128,6 +129,7 @@ export async function updateAccountAction(
     const parsed = updateAccountSchema.safeParse({
         userId: formData.get('userId'),
         name: formData.get('name'),
+        username: formData.get('username') || undefined,
         email: formData.get('email'),
         password: formData.get('password') || undefined,
         role: formData.get('role') || undefined,

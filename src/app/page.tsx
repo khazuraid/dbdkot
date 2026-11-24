@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getPublicSurveillanceSummary } from '@/lib/domain/reports';
 import { publicCasePoints } from '@/lib/domain/map-data';
+import { getPortalBranding } from '@/lib/branding';
 import { formatNumber } from '@/lib/format';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { PublicCaseMap } from '@/components/landing/public-case-map';
@@ -32,7 +33,9 @@ async function PublicStatsStrip() {
                 >
                     {formatNumber(summary.totalThisMonth)}
                 </p>
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">Kasus Klinis Terdaftar</p>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+                    Kasus Klinis Terdaftar
+                </p>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
                 <p className="text-[11.5px] font-medium text-muted-foreground">
@@ -40,11 +43,13 @@ async function PublicStatsStrip() {
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-teal-600 dark:text-teal-400 md:text-[28px]"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-teal-600 md:text-[28px] dark:text-teal-400"
                 >
                     {formatNumber(summary.peCompleted)}
                 </p>
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">Investigasi 72 Jam</p>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+                    Investigasi 72 Jam
+                </p>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
                 <p className="text-[11.5px] font-medium text-muted-foreground">
@@ -52,11 +57,13 @@ async function PublicStatsStrip() {
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-amber-600 dark:text-amber-400 md:text-[28px]"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-amber-600 md:text-[28px] dark:text-amber-400"
                 >
                     {formatNumber(summary.foggingActive)}
                 </p>
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">Siklus Fogging / PSN</p>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+                    Siklus Fogging / PSN
+                </p>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs">
                 <p className="text-[11.5px] font-medium text-muted-foreground">
@@ -64,11 +71,13 @@ async function PublicStatsStrip() {
                 </p>
                 <p
                     data-numeric
-                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-emerald-600 dark:text-emerald-400 md:text-[28px]"
+                    className="mt-1 font-mono text-[24px] font-bold tracking-tight text-emerald-600 md:text-[28px] dark:text-emerald-400"
                 >
                     {formatNumber(summary.closedCases)}
                 </p>
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">Siklus Surveilans Selesai</p>
+                <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+                    Siklus Surveilans Selesai
+                </p>
             </div>
         </div>
     );
@@ -110,12 +119,21 @@ const STEPS = [
 
 export default async function LandingPage() {
     await connection();
-    const cases = await publicCasePoints();
+    const [cases, branding] = await Promise.all([
+        publicCasePoints(),
+        getPortalBranding(),
+    ]);
 
     return (
-        <div className="min-h-[100dvh] bg-[var(--ground)] text-foreground flex flex-col">
+        <div className="flex min-h-[100dvh] flex-col bg-[var(--ground)] text-foreground">
             {/* Floating Island Navigation */}
-            <LandingNav />
+            <LandingNav
+                branding={{
+                    title: branding.title,
+                    tagline: branding.tagline,
+                    logoUrl: branding.logoUrl,
+                }}
+            />
 
             <main className="flex-1">
                 {/* Asymmetric Split Hero Section with Real Public Case Map */}
@@ -123,7 +141,7 @@ export default async function LandingPage() {
                     <div className="mx-auto max-w-6xl px-4 md:px-6">
                         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
                             {/* Left Text Block (6 Cols) */}
-                            <div className="lg:col-span-6 space-y-6">
+                            <div className="space-y-6 lg:col-span-6">
                                 {/* Eyebrow Badge */}
                                 <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/20 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-400">
                                     <Sparkles className="size-3.5 text-teal-600" />
@@ -131,11 +149,15 @@ export default async function LandingPage() {
                                 </div>
 
                                 <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:leading-[1.12]">
-                                    Surveilans DBD Cepat, Terarah, dan Terintegrasi
+                                    Surveilans DBD Cepat, Terarah, dan
+                                    Terintegrasi
                                 </h1>
 
                                 <p className="max-w-[54ch] text-base leading-relaxed text-muted-foreground sm:text-lg">
-                                    Menghubungkan notifikasi kasus Rumah Sakit, investigasi epidemiologi 72 jam Puskesmas, serta kendali operasional Dinas Kesehatan dalam satu sistem terpadu.
+                                    Menghubungkan notifikasi kasus Rumah Sakit,
+                                    investigasi epidemiologi 72 jam Puskesmas,
+                                    serta kendali operasional Dinas Kesehatan
+                                    dalam satu sistem terpadu.
                                 </p>
 
                                 {/* Action Buttons */}
@@ -179,10 +201,10 @@ export default async function LandingPage() {
 
                         {/* Live Telemetry Banner */}
                         <div className="mt-16 md:mt-20">
-                            <div className="mb-3 flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            <div className="mb-3 flex items-center justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                 <span>Status Surveilans Real-Time</span>
                                 <span className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
-                                    <span className="size-1.5 rounded-full bg-teal-500 animate-pulse" />
+                                    <span className="size-1.5 animate-pulse rounded-full bg-teal-500" />
                                     Data Terverifikasi
                                 </span>
                             </div>
@@ -194,17 +216,22 @@ export default async function LandingPage() {
                 </section>
 
                 {/* Workflow Section (Alur Kerja) */}
-                <section id="alur" className="border-t border-[var(--border)] bg-muted/15 py-20 md:py-24">
+                <section
+                    id="alur"
+                    className="border-t border-[var(--border)] bg-muted/15 py-20 md:py-24"
+                >
                     <div className="mx-auto max-w-6xl px-4 md:px-6">
                         <div className="max-w-2xl">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/20 bg-teal-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/20 bg-teal-500/10 px-3 py-1 text-[11px] font-semibold tracking-wider text-teal-700 uppercase dark:text-teal-400">
                                 Alur Kolaborasi
                             </span>
                             <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
                                 3 Pilar Pengendalian Demam Berdarah
                             </h2>
                             <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                                Setiap entitas memiliki peran spesifik dengan batas waktu respons (SLA) yang ketat untuk mencegah eskalasi kejadian luar biasa.
+                                Setiap entitas memiliki peran spesifik dengan
+                                batas waktu respons (SLA) yang ketat untuk
+                                mencegah eskalasi kejadian luar biasa.
                             </p>
                         </div>
 
@@ -232,7 +259,7 @@ export default async function LandingPage() {
                                             </p>
                                         </div>
 
-                                        <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center gap-1.5 text-[11px] font-medium text-teal-600 dark:text-teal-400">
+                                        <div className="mt-6 flex items-center gap-1.5 border-t border-[var(--border)] pt-4 text-[11px] font-medium text-teal-600 dark:text-teal-400">
                                             <CheckCircle2 className="size-3.5" />
                                             Alur Terstandarisasi
                                         </div>
@@ -247,43 +274,72 @@ export default async function LandingPage() {
                 <BentoFeatures />
 
                 {/* Prevention 3M Plus & Emergency Contacts */}
-                <PreventionSection />
+                <PreventionSection
+                    branding={{
+                        title: branding.title,
+                        institutionName: branding.institutionName,
+                        emergencyHotline: branding.emergencyHotline,
+                        supportEmail: branding.supportEmail,
+                    }}
+                />
             </main>
 
-            {/* High-End Minimalist Footer */}
+            {/* Footer */}
             <footer className="border-t border-[var(--border)] bg-[var(--surface)] py-10 text-xs text-muted-foreground">
-                <div className="mx-auto max-w-6xl px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-4 md:flex-row md:px-6">
                     <div className="flex items-center gap-3">
-                        <span className="grid size-7 place-items-center rounded-lg bg-teal-600 text-white font-bold text-xs">
-                            W
+                        <span className="grid size-7 place-items-center overflow-hidden rounded-lg bg-teal-600 text-xs font-bold text-white">
+                            {branding.logoUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={branding.logoUrl}
+                                    alt={branding.title}
+                                    className="size-7 object-contain"
+                                />
+                            ) : (
+                                branding.title.slice(0, 1).toUpperCase()
+                            )}
                         </span>
                         <div>
                             <p className="font-semibold text-foreground">
-                                WALI-EPI Surveillance Platform
+                                {branding.title} · {branding.tagline}
                             </p>
                             <p className="text-[11px]">
-                                Dinas Kesehatan Kota Bandung
+                                {branding.institutionName}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-6">
-                        <Link href="/masuk" className="hover:text-foreground transition-colors">
+                        <Link
+                            href="/masuk"
+                            className="transition-colors hover:text-foreground"
+                        >
                             Portal Masuk
                         </Link>
-                        <Link href="/daftar" className="hover:text-foreground transition-colors">
+                        <Link
+                            href="/daftar"
+                            className="transition-colors hover:text-foreground"
+                        >
                             Registrasi Instansi
                         </Link>
-                        <a href="#edukasi" className="hover:text-foreground transition-colors">
+                        <a
+                            href="#edukasi"
+                            className="transition-colors hover:text-foreground"
+                        >
                             Panduan 3M+
                         </a>
-                        <a href="#kontak" className="hover:text-foreground transition-colors">
+                        <a
+                            href="#kontak"
+                            className="transition-colors hover:text-foreground"
+                        >
                             Kontak Darurat
                         </a>
                     </div>
 
                     <p className="text-[11px]">
-                        © 2026 Pemerintah Kota Bandung. Hak Cipta Dilindungi.
+                        © {new Date().getFullYear()} {branding.institutionName}.{' '}
+                        {branding.footerText}
                     </p>
                 </div>
             </footer>

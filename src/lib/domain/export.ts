@@ -3,6 +3,7 @@ import { getDb } from '@/db';
 import { institutions, reportsPE, reportsRS } from '@/db/schema';
 import { decryptPii } from '@/lib/crypto';
 import { audit } from '@/lib/audit';
+import { sanitizeExcelCell } from '@/lib/security';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 
 export type ExportKind = 'reports-rs' | 'reports-pe' | 'dashboard';
@@ -118,17 +119,17 @@ export async function buildReportExport(
                 'RS',
             ],
             rows: rows.map((r) => ({
-                'No. Laporan': r.reportNumber,
-                'Nama Pasien': safeDecrypt(r.patientName ?? ''),
+                'No. Laporan': sanitizeExcelCell(r.reportNumber),
+                'Nama Pasien': sanitizeExcelCell(safeDecrypt(r.patientName ?? '')),
                 Umur: r.age,
-                JK: r.gender,
-                Klasifikasi: r.caseType,
-                Kelurahan: r.kelurahan,
-                Kecamatan: r.kecamatan,
-                Kota: r.kota,
-                Status: r.status,
+                JK: sanitizeExcelCell(r.gender),
+                Klasifikasi: sanitizeExcelCell(r.caseType),
+                Kelurahan: sanitizeExcelCell(r.kelurahan),
+                Kecamatan: sanitizeExcelCell(r.kecamatan),
+                Kota: sanitizeExcelCell(r.kota),
+                Status: sanitizeExcelCell(r.status),
                 'Tgl Masuk': r.admissionDate?.toISOString() ?? null,
-                RS: r.hospital,
+                RS: sanitizeExcelCell(r.hospital),
             })),
             total: Number(totals?.n ?? 0),
         };
@@ -156,6 +157,16 @@ export async function buildReportExport(
         .orderBy(desc(reportsPE.createdAt))
         .limit(EXPORT_ROW_LIMIT);
 
+    await audit({
+        actor,
+        action: 'READ',
+        entityType: 'REPORT_PE',
+        entityId: kind,
+        changes: {
+            rowCount: { from: null, to: rows.length },
+        },
+    });
+
     return {
         columns: [
             'ID Laporan RS',
@@ -169,11 +180,11 @@ export async function buildReportExport(
         rows: rows.map((r) => ({
             'ID Laporan RS': r.reportRSId,
             'Tgl PE': r.peDate?.toISOString() ?? null,
-            Petugas: r.officer,
+            Petugas: sanitizeExcelCell(r.officer),
             'House Index': r.houseIndex,
             'Container Index': r.containerIndex,
             'Breteau Index': r.breteauIndex,
-            Status: r.status,
+            Status: sanitizeExcelCell(r.status),
         })),
         total: Number(totals?.n ?? 0),
     };

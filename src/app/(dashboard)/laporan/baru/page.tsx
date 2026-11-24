@@ -10,12 +10,16 @@ import { ReportForm } from './report-form';
 export const instant = false;
 
 export default async function LaporanBaruPage() {
-    const [actor, kelurahanOptions] = await Promise.all([
-        requireRole('RUMAH_SAKIT', 'PUSKESMAS', 'DINKES', 'ADMIN'),
-        listKelurahanOptions(),
-    ]);
+    const actor = await requireRole(
+        'RUMAH_SAKIT',
+        'PUSKESMAS',
+        'DINKES',
+        'ADMIN',
+    );
+    const kelurahanOptions = await listKelurahanOptions();
 
     const isPuskesmas = actor.role === 'PUSKESMAS';
+    const isDinkes = actor.role === 'DINKES' || actor.role === 'ADMIN';
     const defaultAdmissionDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Jakarta',
         year: 'numeric',
@@ -29,17 +33,24 @@ export default async function LaporanBaruPage() {
                 title={
                     isPuskesmas
                         ? 'Formulir Kasus Poli / IGD Puskesmas'
-                        : 'Entri Laporan Kasus Baru (KDRS)'
+                        : isDinkes
+                          ? 'Entri Kasus Surveilans (Dinas Kesehatan)'
+                          : 'Entri Laporan Kasus Baru (KDRS)'
                 }
                 context={
                     isPuskesmas
                         ? 'Pelaporan kasus dengue langsung dari Poli/IGD Puskesmas. Berkas akan otomatis masuk ke antrian Penyelidikan Epidemiologi (PE) internal puskesmas Anda.'
-                        : 'Formulir Kewaspadaan Dini Rumah Sakit (KDRS). Sistem otomatis memetakan dan menugaskan Puskesmas wilayah sesuai kelurahan domisili pasien.'
+                        : isDinkes
+                          ? 'Pencatatan kasus rujukan luar daerah atau laporan manual oleh Dinas Kesehatan untuk diteruskan ke Puskesmas wilayah.'
+                          : 'Formulir Kewaspadaan Dini Rumah Sakit (KDRS). Sistem otomatis memetakan dan menugaskan Puskesmas wilayah sesuai kelurahan domisili pasien.'
                 }
                 aside={
                     <Button asChild variant="outline" size="sm">
                         <Link href="/laporan">
-                            <ArrowLeft className="mr-1.5 size-3.5" aria-hidden />
+                            <ArrowLeft
+                                className="mr-1.5 size-3.5"
+                                aria-hidden
+                            />
                             Kembali ke Daftar Kasus
                         </Link>
                     </Button>

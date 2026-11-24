@@ -5,6 +5,7 @@ import { audit } from '@/lib/audit';
 import { calculateEntomologyMetrics } from '@/lib/entomology-calculator';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import { decryptPii } from '@/lib/crypto';
+import { isValidUuid } from '@/lib/security';
 import { insertNotifications } from './notify';
 
 export {
@@ -152,7 +153,11 @@ export async function peCandidates(
     let candidates: PeCandidateDetail[] = rows.map(mapCandidate);
 
     // If a specific reportId is requested (e.g. from query param) and not present in candidate list, fetch directly
-    if (specificReportId && !candidates.some((c) => c.id === specificReportId)) {
+    if (
+        specificReportId &&
+        isValidUuid(specificReportId) &&
+        !candidates.some((c) => c.id === specificReportId)
+    ) {
         const [specificRow] = await db
             .select(selectFields)
             .from(reportsRS)
@@ -169,6 +174,18 @@ export async function peCandidates(
         if (specificRow) {
             candidates = [mapCandidate(specificRow), ...candidates];
         }
+    }
+
+    if (candidates.length > 0) {
+        await audit({
+            actor,
+            action: 'READ_PII',
+            entityType: 'REPORT_RS',
+            entityId: candidates[0].id,
+            changes: {
+                peCandidateCount: { from: null, to: candidates.length },
+            },
+        });
     }
 
     return { rows: candidates, total: candidates.length };
@@ -387,6 +404,7 @@ export async function createPe(
 }
 
 export async function peDetail(actor: Actor, id: string) {
+    if (!isValidUuid(id)) return null;
     const institutionId = scopeToInstitution(actor);
 
     const rows = await getDb()
@@ -431,18 +449,32 @@ export async function peDetail(actor: Actor, id: string) {
     return { ...row, households };
 }
 
+const LOCKED_REPORT_STATUSES = new Set([
+    'VERIFIED',
+    'FOGGING_REQUIRED',
+    'SIKLUS_1_DONE',
+    'SIKLUS_2_DONE',
+    'CLOSED',
+]);
+
 export async function deletePe(
     actor: Actor,
     peId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (!isValidUuid(peId)) {
+        return { ok: false, error: 'ID data PE tidak valid.' };
+    }
     const db = getDb();
     const [row] = await db
         .select({
             id: reportsPE.id,
             reportRSId: reportsPE.reportRSId,
             institutionId: reportsPE.institutionId,
+            peStatus: reportsPE.status,
+            reportStatus: reportsRS.status,
         })
         .from(reportsPE)
+        .innerJoin(reportsRS, eq(reportsRS.id, reportsPE.reportRSId))
         .where(eq(reportsPE.id, peId))
         .limit(1);
 
@@ -450,15 +482,26 @@ export async function deletePe(
         return { ok: false, error: 'Data PE tidak ditemukan.' };
     }
 
+    const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
-        actor.role === 'ADMIN' ||
-        actor.role === 'DINKES' ||
+        isPrivileged ||
         (actor.role === 'PUSKESMAS' && actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
         return {
             ok: false,
             error: 'Anda tidak memiliki hak untuk menghapus data PE faskes lain.',
+        };
+    }
+
+    if (
+        !isPrivileged &&
+        (row.peStatus === 'VERIFIED' ||
+            LOCKED_REPORT_STATUSES.has(row.reportStatus))
+    ) {
+        return {
+            ok: false,
+            error: 'Data PE yang sudah terverifikasi atau sedang dalam tahap fogging/penutupan tidak dapat dihapus.',
         };
     }
 
@@ -495,6 +538,9 @@ export async function updatePe(
     peId: string,
     input: Partial<CreatePeInput>,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+    if (!isValidUuid(peId)) {
+        return { ok: false, error: 'ID data PE tidak valid.' };
+    }
     const db = getDb();
     const [row] = await db
         .select({
@@ -502,8 +548,11 @@ export async function updatePe(
             reportRSId: reportsPE.reportRSId,
             institutionId: reportsPE.institutionId,
             formData: reportsPE.formData,
+            peStatus: reportsPE.status,
+            reportStatus: reportsRS.status,
         })
         .from(reportsPE)
+        .innerJoin(reportsRS, eq(reportsRS.id, reportsPE.reportRSId))
         .where(eq(reportsPE.id, peId))
         .limit(1);
 
@@ -511,15 +560,26 @@ export async function updatePe(
         return { ok: false, error: 'Data PE tidak ditemukan.' };
     }
 
+    const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
-        actor.role === 'ADMIN' ||
-        actor.role === 'DINKES' ||
+        isPrivileged ||
         (actor.role === 'PUSKESMAS' && actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
         return {
             ok: false,
             error: 'Anda tidak memiliki hak untuk mengubah data PE faskes lain.',
+        };
+    }
+
+    if (
+        !isPrivileged &&
+        (row.peStatus === 'VERIFIED' ||
+            LOCKED_REPORT_STATUSES.has(row.reportStatus))
+    ) {
+        return {
+            ok: false,
+            error: 'Data PE yang sudah terverifikasi atau sedang dalam tahap fogging/penutupan tidak dapat diubah.',
         };
     }
 

@@ -201,9 +201,25 @@ export const createPeSchema = z.object({
 export const needsInstitution = (role: string) =>
     role === 'PUSKESMAS' || role === 'RUMAH_SAKIT';
 
+const optionalUsername = z.preprocess(
+    (v) => {
+        if (typeof v !== 'string') return undefined;
+        const trimmed = v.trim().toLowerCase();
+        return trimmed === '' ? undefined : trimmed;
+    },
+    z
+        .string()
+        .regex(
+            /^[a-z0-9._-]{3,30}$/,
+            'Username 3–30 karakter (huruf kecil, angka, titik, _, atau -)',
+        )
+        .optional(),
+);
+
 export const createAccountSchema = z
     .object({
         name: z.string().trim().min(3, 'Nama minimal 3 karakter'),
+        username: optionalUsername,
         email: z.email('Email tidak valid').toLowerCase(),
         password: z.string().min(10, 'Password minimal 10 karakter'),
         role: z.enum(['ADMIN', 'DINKES', 'PUSKESMAS', 'RUMAH_SAKIT'], {
@@ -232,6 +248,7 @@ export const updateAccountSchema = z
     .object({
         userId: z.uuid({ error: 'Akun tidak valid' }),
         name: z.string().trim().min(3, 'Nama minimal 3 karakter'),
+        username: optionalUsername,
         email: z.email('Email tidak valid').toLowerCase(),
         password: z.preprocess(
             (v) => (v === '' || v === null || v === undefined ? undefined : v),
