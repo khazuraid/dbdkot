@@ -3,7 +3,7 @@ import type { StatusTone } from '@/lib/domain/account-labels';
 import { cn } from '@/lib/utils';
 
 /**
- * KPI stat card with tabular figure, muted label, and optional icon chip.
+ * KPI stat card with tabular mono figure, muted label, and quiet semantic dot.
  */
 export function Stat({
     label,
@@ -11,7 +11,6 @@ export function Stat({
     unit,
     signal,
     hint,
-    icon: Icon,
 }: {
     label: string;
     value: number | string;
@@ -29,41 +28,36 @@ export function Stat({
                 ? 'text-[var(--positive)]'
                 : 'text-foreground';
 
-    const chip =
+    const dot =
         signal === 'bad'
-            ? 'bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]'
+            ? 'bg-[var(--negative)]'
             : signal === 'warn'
-              ? 'bg-[var(--pill-warning-bg)] text-[var(--pill-warning-ink)]'
+              ? 'bg-[var(--warning)]'
               : signal === 'good'
-                ? 'bg-[var(--pill-positive-bg)] text-[var(--pill-positive-ink)]'
-                : 'bg-[var(--accent-soft)] text-[var(--accent)]';
+                ? 'bg-[var(--positive)]'
+                : null;
 
     return (
-        <div className="surface min-w-0 p-4">
-            <div className="flex items-start justify-between gap-3">
-                <dt className="eyebrow pt-1">{label}</dt>
-                {Icon && (
+        <div className="surface min-w-0 p-5">
+            <dt className="eyebrow flex items-center gap-2">
+                {dot && (
                     <span
                         aria-hidden
-                        className={cn(
-                            'grid size-8 shrink-0 place-items-center rounded-[9px]',
-                            chip,
-                        )}
-                    >
-                        <Icon className="size-4" strokeWidth={1.75} />
-                    </span>
+                        className={cn('size-1.5 shrink-0 rounded-full', dot)}
+                    />
                 )}
-            </div>
+                <span className="truncate">{label}</span>
+            </dt>
             <dd
                 data-numeric
                 className={cn(
-                    'mt-2.5 text-[28px] leading-none font-semibold tracking-[-0.03em] tabular-nums sm:text-[var(--fs-kpi)]',
+                    'mt-2 font-mono text-[28px] leading-none font-medium tracking-[-0.02em] tabular-nums sm:text-[var(--fs-kpi)]',
                     tone,
                 )}
             >
                 {typeof value === 'number' ? formatNumber(value) : value}
                 {unit && (
-                    <span className="ml-1.5 text-[14px] font-medium text-muted-foreground">
+                    <span className="ml-1.5 font-sans text-[14px] font-normal text-muted-foreground">
                         {unit}
                     </span>
                 )}
@@ -91,7 +85,7 @@ export function StatRow({
     return (
         <dl
             className={cn(
-                'grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4',
+                'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4',
                 className,
             )}
         >

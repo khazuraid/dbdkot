@@ -56,24 +56,28 @@ export default async function LaporanPage({
     const search = sp.search?.trim() || undefined;
 
     const rawPeriod = sp.period;
-    const period = ['weekly', 'monthly', 'quarterly', 'yearly'].includes(rawPeriod ?? '')
+    const period = ['weekly', 'monthly', 'quarterly', 'yearly'].includes(
+        rawPeriod ?? '',
+    )
         ? (rawPeriod as ReportPeriod)
         : undefined;
 
     const caseType = sp.caseType?.trim() || undefined;
 
     const rawGender = sp.gender;
-    const gender = rawGender === 'L' || rawGender === 'P' ? rawGender : undefined;
+    const gender =
+        rawGender === 'L' || rawGender === 'P' ? rawGender : undefined;
 
     const rawAgeGroup = sp.ageGroup;
-    const ageGroup = ['under_5', '5_14', '15_44', '45_plus'].includes(rawAgeGroup ?? '')
+    const ageGroup = ['under_5', '5_14', '15_44', '45_plus'].includes(
+        rawAgeGroup ?? '',
+    )
         ? (rawAgeGroup as ReportAgeGroup)
         : undefined;
 
     const rawSource = sp.sourceType;
-    const sourceType = rawSource === 'RS' || rawSource === 'PUSKESMAS'
-        ? rawSource
-        : undefined;
+    const sourceType =
+        rawSource === 'RS' || rawSource === 'PUSKESMAS' ? rawSource : undefined;
 
     const page = readPage(sp.page);
 
@@ -114,7 +118,13 @@ export default async function LaporanPage({
     const excelExportUrl = `/api/export/laporan/excel${exportParams.toString() ? `?${exportParams.toString()}` : ''}`;
 
     const hasActiveFilters = Boolean(
-        period || caseType || gender || ageGroup || sourceType || status || search,
+        period ||
+        caseType ||
+        gender ||
+        ageGroup ||
+        sourceType ||
+        status ||
+        search,
     );
 
     return (
@@ -143,19 +153,30 @@ export default async function LaporanPage({
                         {/* Periode Laporan Quick Selector */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <span className="mr-1 font-semibold text-foreground flex items-center gap-1.5">
-                                    <Filter className="size-3.5 text-primary" aria-hidden />
+                                <span className="mr-1 flex items-center gap-1.5 font-semibold text-foreground">
+                                    <Filter
+                                        className="size-3.5 text-primary"
+                                        aria-hidden
+                                    />
                                     Periode:
                                 </span>
                                 {[
                                     { id: '', label: 'Semua Waktu' },
-                                    { id: 'weekly', label: 'Mingguan (7 Hari)' },
-                                    { id: 'monthly', label: 'Bulanan (Bulan Ini)' },
+                                    {
+                                        id: 'weekly',
+                                        label: 'Mingguan (7 Hari)',
+                                    },
+                                    {
+                                        id: 'monthly',
+                                        label: 'Bulanan (Bulan Ini)',
+                                    },
                                     { id: 'quarterly', label: 'Triwulan (Q)' },
                                     { id: 'yearly', label: 'Tahunan' },
                                 ].map((p) => {
                                     const isActive = (period ?? '') === p.id;
-                                    const pParams = new URLSearchParams(exportParams);
+                                    const pParams = new URLSearchParams(
+                                        exportParams,
+                                    );
                                     if (p.id) pParams.set('period', p.id);
                                     else pParams.delete('period');
                                     pParams.delete('page');
@@ -186,7 +207,10 @@ export default async function LaporanPage({
                                     className="h-8 gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/30 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
                                 >
                                     <a href={excelExportUrl} download>
-                                        <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                                        <FileSpreadsheet
+                                            className="size-3.5 text-emerald-600 dark:text-emerald-400"
+                                            aria-hidden
+                                        />
                                         <span>Export Excel (.xlsx)</span>
                                     </a>
                                 </Button>
@@ -194,13 +218,18 @@ export default async function LaporanPage({
                         </div>
 
                         {/* Hidden input for current period when submitting custom form */}
-                        {period && <input type="hidden" name="period" value={period} />}
+                        {period && (
+                            <input type="hidden" name="period" value={period} />
+                        )}
 
                         {/* Grid Filter Kontrol Detail */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                             {/* 1. Diagnosa */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="caseType" className="text-[12px] font-medium text-muted-foreground">
+                                <Label
+                                    htmlFor="caseType"
+                                    className="text-[12px] font-medium text-muted-foreground"
+                                >
                                     Diagnosa
                                 </Label>
                                 <select
@@ -211,7 +240,9 @@ export default async function LaporanPage({
                                 >
                                     <option value="">Semua Diagnosa</option>
                                     <option value="DENGUE">DBD (Dengue)</option>
-                                    <option value="SUSPECTED_DENGUE">Suspek DBD</option>
+                                    <option value="SUSPECTED_DENGUE">
+                                        Suspek DBD
+                                    </option>
                                     <option value="DHF">DHF</option>
                                     <option value="DSS">DSS</option>
                                 </select>
@@ -219,7 +250,10 @@ export default async function LaporanPage({
 
                             {/* 2. Jenis Kelamin */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="gender" className="text-[12px] font-medium text-muted-foreground">
+                                <Label
+                                    htmlFor="gender"
+                                    className="text-[12px] font-medium text-muted-foreground"
+                                >
                                     Jenis Kelamin
                                 </Label>
                                 <select
@@ -236,7 +270,10 @@ export default async function LaporanPage({
 
                             {/* 3. Kelompok Umur */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="ageGroup" className="text-[12px] font-medium text-muted-foreground">
+                                <Label
+                                    htmlFor="ageGroup"
+                                    className="text-[12px] font-medium text-muted-foreground"
+                                >
                                     Kelompok Umur
                                 </Label>
                                 <select
@@ -246,16 +283,27 @@ export default async function LaporanPage({
                                     className="block h-9 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                                 >
                                     <option value="">Semua Umur</option>
-                                    <option value="under_5">Balita (&lt; 5 th)</option>
-                                    <option value="5_14">Anak (5 - 14 th)</option>
-                                    <option value="15_44">Dewasa (15 - 44 th)</option>
-                                    <option value="45_plus">Lansia (≥ 45 th)</option>
+                                    <option value="under_5">
+                                        Balita (&lt; 5 th)
+                                    </option>
+                                    <option value="5_14">
+                                        Anak (5 - 14 th)
+                                    </option>
+                                    <option value="15_44">
+                                        Dewasa (15 - 44 th)
+                                    </option>
+                                    <option value="45_plus">
+                                        Lansia (≥ 45 th)
+                                    </option>
                                 </select>
                             </div>
 
                             {/* 4. Sumber Lapor */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="sourceType" className="text-[12px] font-medium text-muted-foreground">
+                                <Label
+                                    htmlFor="sourceType"
+                                    className="text-[12px] font-medium text-muted-foreground"
+                                >
                                     Sumber Lapor
                                 </Label>
                                 <select
@@ -265,14 +313,21 @@ export default async function LaporanPage({
                                     className="block h-9 w-full rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[13px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                                 >
                                     <option value="">Semua Sumber</option>
-                                    <option value="RS">Rumah Sakit (KDRS)</option>
-                                    <option value="PUSKESMAS">Puskesmas (Poli/IGD)</option>
+                                    <option value="RS">
+                                        Rumah Sakit (KDRS)
+                                    </option>
+                                    <option value="PUSKESMAS">
+                                        Puskesmas (Poli/IGD)
+                                    </option>
                                 </select>
                             </div>
 
                             {/* 5. Status Laporan */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="status" className="text-[12px] font-medium text-muted-foreground">
+                                <Label
+                                    htmlFor="status"
+                                    className="text-[12px] font-medium text-muted-foreground"
+                                >
                                     Status Laporan
                                 </Label>
                                 <select
@@ -296,7 +351,10 @@ export default async function LaporanPage({
                             <div className="w-full sm:max-w-md">
                                 <InputGroup className="h-9 w-full">
                                     <InputGroupAddon>
-                                        <Search className="size-4 text-muted-foreground" aria-hidden />
+                                        <Search
+                                            className="size-4 text-muted-foreground"
+                                            aria-hidden
+                                        />
                                     </InputGroupAddon>
                                     <InputGroupInput
                                         id="search"
@@ -310,9 +368,17 @@ export default async function LaporanPage({
 
                             {hasActiveFilters && (
                                 <div className="flex items-center gap-2">
-                                    <Button asChild variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground">
+                                    <Button
+                                        asChild
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-9 text-muted-foreground hover:text-foreground"
+                                    >
                                         <Link href="/laporan">
-                                            <RefreshCw className="mr-1.5 size-3.5" aria-hidden />
+                                            <RefreshCw
+                                                className="mr-1.5 size-3.5"
+                                                aria-hidden
+                                            />
                                             Reset Filter
                                         </Link>
                                     </Button>
@@ -347,6 +413,7 @@ export default async function LaporanPage({
                     <ReportTable
                         rows={rows}
                         empty="Tidak ada laporan yang cocok dengan kombinasi filter ini."
+                        showStatusTabs
                     />
                     <Pager
                         info={{ page, perPage, total }}

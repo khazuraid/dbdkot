@@ -63,26 +63,31 @@ export function TopBar({
     }
 
     return (
-        <header className="hidden h-14 w-full shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/95 px-6 backdrop-blur-md md:flex z-20">
+        <header className="z-20 hidden h-14 w-full shrink-0 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/95 px-6 backdrop-blur-sm md:flex">
             {/* Breadcrumb path */}
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[13px]">
+            <nav
+                aria-label="Breadcrumb"
+                className="flex items-center gap-2 text-[13px]"
+            >
                 <Link
                     href="/dasbor"
-                    className="font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    className="font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
                 >
                     WALI-EPI
                 </Link>
                 {breadcrumbItems.map((item, index) => (
                     <span key={item.href} className="flex items-center gap-2">
-                        <span className="text-muted-foreground/40" aria-hidden>/</span>
+                        <span className="text-muted-foreground/40" aria-hidden>
+                            /
+                        </span>
                         {index === breadcrumbItems.length - 1 ? (
-                            <span className="font-semibold text-foreground">
+                            <span className="font-medium text-foreground">
                                 {item.label}
                             </span>
                         ) : (
                             <Link
                                 href={item.href}
-                                className="text-muted-foreground transition-colors hover:text-foreground"
+                                className="text-muted-foreground transition-colors duration-150 hover:text-foreground"
                             >
                                 {item.label}
                             </Link>
@@ -97,37 +102,29 @@ export function TopBar({
                 <button
                     type="button"
                     onClick={openCommandPalette}
-                    className="flex h-8 items-center gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-2.5 text-[12.5px] text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground"
+                    className="flex h-8 items-center gap-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)] px-3 text-[13px] text-muted-foreground transition-colors duration-150 hover:border-muted-foreground/40 hover:text-foreground"
                     aria-label="Pencarian cepat (Tekan Cmd+K)"
                 >
-                    <Search className="size-3.5" aria-hidden />
-                    <span className="hidden xl:inline">Cari kasus, faskes, kelurahan...</span>
-                    <span className="inline xl:hidden">Cari...</span>
-                    <kbd className="hidden rounded bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground shadow-xs sm:inline-block">
+                    <Search className="size-4" strokeWidth={1.5} aria-hidden />
+                    <span>Cari</span>
+                    <kbd className="hidden rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground sm:inline-block">
                         ⌘K
                     </kbd>
                 </button>
 
-                {/* Role & Faskes Badge */}
-                <div className="hidden items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--raised)] px-2.5 py-1 text-[11.5px] lg:flex">
-                    <span className="size-1.5 rounded-full bg-[var(--accent)]" aria-hidden />
-                    <span className="font-semibold text-foreground">
-                        {ROLE_LABEL[role] ?? role}
-                    </span>
-                    {institution && (
-                        <>
-                            <span className="text-muted-foreground/40">·</span>
-                            <span className="max-w-[140px] truncate text-muted-foreground" title={institution}>
-                                {institution}
-                            </span>
-                        </>
-                    )}
-                </div>
-
                 {/* Notification Bell */}
-                <Button asChild variant="ghost" size="icon-sm" className="relative text-muted-foreground hover:text-foreground">
+                <Button
+                    asChild
+                    variant="ghost"
+                    size="icon-sm"
+                    className="relative text-muted-foreground hover:text-foreground"
+                >
                     <Link href="/notifikasi" aria-label="Lihat notifikasi">
-                        <Bell className="size-4" aria-hidden />
+                        <Bell
+                            className="size-4"
+                            strokeWidth={1.5}
+                            aria-hidden
+                        />
                     </Link>
                 </Button>
 
@@ -140,8 +137,16 @@ export function TopBar({
                     className="text-muted-foreground hover:text-foreground"
                     aria-label="Ganti mode tampilan"
                 >
-                    <Sun className="size-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" aria-hidden />
-                    <Moon className="absolute size-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" aria-hidden />
+                    <Sun
+                        className="size-4 scale-100 rotate-0 transition-transform duration-150 dark:scale-0 dark:-rotate-90"
+                        strokeWidth={1.5}
+                        aria-hidden
+                    />
+                    <Moon
+                        className="absolute size-4 scale-0 rotate-90 transition-transform duration-150 dark:scale-100 dark:rotate-0"
+                        strokeWidth={1.5}
+                        aria-hidden
+                    />
                 </Button>
 
                 <div className="h-4 w-px bg-[var(--border)]" aria-hidden />

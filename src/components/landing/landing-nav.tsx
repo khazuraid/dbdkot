@@ -1,7 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Activity, ArrowRight } from 'lucide-react';
+import { Activity, Menu, X } from 'lucide-react';
+
+const NAV_LINKS = [
+    { href: '#alur', label: 'Alur kerja' },
+    { href: '#fitur', label: 'Kemampuan' },
+    { href: '#edukasi', label: 'Pencegahan 3M+' },
+    { href: '#kontak', label: 'Kontak darurat' },
+];
 
 export function LandingNav({
     branding,
@@ -9,18 +17,22 @@ export function LandingNav({
     branding?: { title: string; tagline: string; logoUrl: string | null };
 }) {
     const title = branding?.title || 'WALI-EPI';
+    const tagline = branding?.tagline || 'Surveilans DBD';
     const logoUrl = branding?.logoUrl ?? null;
+    const [menuOpen, setMenuOpen] = useState(false);
 
     return (
-        <header className="sticky top-4 z-40 px-4 md:px-6">
-            <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-[var(--border)] bg-[var(--surface)]/85 px-4 sm:px-6 shadow-sm backdrop-blur-xl">
-                {/* Brand */}
+        <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-sm">
+            <nav
+                aria-label="Navigasi utama"
+                className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-6 px-4 md:px-6"
+            >
                 <Link
                     href="/"
-                    className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
+                    className="flex items-center gap-3 transition-opacity duration-150 hover:opacity-85"
                     aria-label={`${title} Beranda`}
                 >
-                    <span className="grid size-8 place-items-center overflow-hidden rounded-lg bg-[var(--accent)] text-[var(--accent-ink)] shadow-xs">
+                    <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--accent)] text-[var(--accent-ink)]">
                         {logoUrl ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
@@ -29,49 +41,83 @@ export function LandingNav({
                                 className="size-8 object-contain"
                             />
                         ) : (
-                            <Activity className="size-4" strokeWidth={2.2} />
+                            <Activity className="size-4" strokeWidth={1.75} />
                         )}
                     </span>
                     <span className="flex flex-col">
-                        <span className="text-[14px] leading-tight font-bold tracking-tight text-foreground">
+                        <span className="text-[14px] leading-tight font-medium text-foreground">
                             {title}
                         </span>
-                        <span className="text-[10.5px] font-medium text-muted-foreground flex items-center gap-1">
-                            <span className="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Surveilans Aktif
+                        <span className="text-[12px] leading-tight text-muted-foreground">
+                            {tagline}
                         </span>
                     </span>
                 </Link>
 
-                {/* Quick Anchor Links (Desktop) */}
-                <div className="hidden md:flex items-center gap-6 text-[13px] font-medium text-muted-foreground">
-                    <a href="#alur" className="transition-colors hover:text-foreground">
-                        Alur Kerja
-                    </a>
-                    <a href="#fitur" className="transition-colors hover:text-foreground">
-                        Fitur Unggulan
-                    </a>
-                    <a href="#edukasi" className="transition-colors hover:text-foreground">
-                        Pencegahan 3M+
-                    </a>
-                    <a href="#kontak" className="transition-colors hover:text-foreground">
-                        Kontak Darurat
-                    </a>
+                <div className="hidden items-center gap-6 text-[13px] text-muted-foreground md:flex">
+                    {NAV_LINKS.map((item) => (
+                        <a
+                            key={item.href}
+                            href={item.href}
+                            className="transition-colors duration-150 hover:text-foreground"
+                        >
+                            {item.label}
+                        </a>
+                    ))}
                 </div>
 
-                {/* CTA Button */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    <Link
+                        href="/daftar"
+                        className="hidden text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground sm:inline-block"
+                    >
+                        Registrasi
+                    </Link>
                     <Link
                         href="/masuk"
-                        className="group inline-flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 text-[12.5px] font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 active:scale-[0.98]"
+                        className="inline-flex h-9 items-center justify-center rounded-[var(--radius-control)] bg-[var(--accent)] px-4 text-[13px] font-medium text-[var(--accent-ink)] transition-colors duration-150 hover:bg-[var(--accent)]/90 active:scale-[0.98]"
                     >
-                        <span>Portal Petugas</span>
-                        <span className="grid size-5 place-items-center rounded-full bg-primary-foreground/15 transition-transform group-hover:translate-x-0.5">
-                            <ArrowRight className="size-3" />
-                        </span>
+                        Masuk portal
                     </Link>
+                    <button
+                        type="button"
+                        onClick={() => setMenuOpen((prev) => !prev)}
+                        aria-expanded={menuOpen}
+                        aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'}
+                        className="inline-flex size-9 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border)] text-muted-foreground transition-colors duration-150 hover:bg-[var(--raised)] hover:text-foreground md:hidden"
+                    >
+                        {menuOpen ? (
+                            <X className="size-4" strokeWidth={1.5} />
+                        ) : (
+                            <Menu className="size-4" strokeWidth={1.5} />
+                        )}
+                    </button>
                 </div>
             </nav>
+
+            {menuOpen && (
+                <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 md:hidden">
+                    <div className="flex flex-col gap-1">
+                        {NAV_LINKS.map((item) => (
+                            <a
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setMenuOpen(false)}
+                                className="flex h-10 items-center rounded-[var(--radius-control)] px-3 text-[14px] text-muted-foreground transition-colors duration-150 hover:bg-[var(--raised)] hover:text-foreground"
+                            >
+                                {item.label}
+                            </a>
+                        ))}
+                        <Link
+                            href="/daftar"
+                            onClick={() => setMenuOpen(false)}
+                            className="flex h-10 items-center rounded-[var(--radius-control)] px-3 text-[14px] text-muted-foreground transition-colors duration-150 hover:bg-[var(--raised)] hover:text-foreground sm:hidden"
+                        >
+                            Registrasi instansi
+                        </Link>
+                    </div>
+                </div>
+            )}
         </header>
     );
 }

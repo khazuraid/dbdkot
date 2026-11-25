@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 
 import { Button } from '@/components/ui/button';
+import { getTriggerTransformOrigin } from '@/components/ui/dialog';
 
 function AlertDialog({
     ...props
@@ -42,7 +43,7 @@ function AlertDialogOverlay({
         <AlertDialogPrimitive.Overlay
             data-slot="alert-dialog-overlay"
             className={cn(
-                'fixed inset-0 z-50 bg-[var(--text)]/28 duration-150 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 supports-backdrop-filter:backdrop-blur-[2px]',
+                'data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 fixed inset-0 z-50 bg-[var(--text)]/28 duration-150 supports-backdrop-filter:backdrop-blur-[2px]',
                 className,
             )}
             {...props}
@@ -53,18 +54,24 @@ function AlertDialogOverlay({
 function AlertDialogContent({
     className,
     size = 'default',
+    style,
     ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
     size?: 'default' | 'sm';
 }) {
+    const [transformOrigin] = React.useState<string | undefined>(() =>
+        getTriggerTransformOrigin(),
+    );
+
     return (
         <AlertDialogPortal>
             <AlertDialogOverlay />
             <AlertDialogPrimitive.Content
                 data-slot="alert-dialog-content"
                 data-size={size}
+                style={transformOrigin ? { transformOrigin, ...style } : style}
                 className={cn(
-                    'group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-popover-foreground shadow-[var(--elev-pop)] duration-150 outline-none data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-[size=default]:max-w-sm data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-[420px]',
+                    'group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-popover-foreground shadow-[var(--elev-pop)] outline-none data-[size=default]:max-w-sm data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-[420px]',
                     className,
                 )}
                 {...props}

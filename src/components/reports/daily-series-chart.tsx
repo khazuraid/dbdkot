@@ -34,22 +34,20 @@ function ChartTooltip({
             : (label ?? '');
 
     return (
-        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--elev-pop)]">
+        <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--elev-pop)]">
             <p
                 data-numeric
-                className="text-[14px] leading-tight font-semibold text-foreground tabular-nums"
+                className="font-mono text-[14px] leading-tight font-medium text-foreground tabular-nums"
             >
                 {formatNumber(value)} laporan
             </p>
-            <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                {dateText}
-            </p>
+            <p className="mt-1 text-[12px] text-muted-foreground">{dateText}</p>
         </div>
     );
 }
 
 /**
- * 14-day submission volume bar chart with an accessible table view toggle and
+ * 14-day submission volume area chart with an accessible table view toggle and
  * clean empty state.
  */
 export function DailySeriesChart({ data }: { data: DayPoint[] }) {
@@ -62,28 +60,31 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
 
     if (data.length === 0 || total === 0) {
         return (
-            <div className="flex h-52 items-center justify-center rounded-[var(--radius-control)] border border-dashed border-[var(--border)] bg-[var(--raised)]/35 px-4 text-center">
+            <div className="flex h-[280px] items-center justify-center rounded-[var(--radius-control)] border border-dashed border-[var(--border)] bg-[var(--raised)]/35 px-4 text-center">
                 <p className="max-w-[38ch] text-[13px] text-muted-foreground">
                     Belum ada laporan masuk dalam 14 hari terakhir pada cakupan
-                    wilayah Anda.
+                    wilayah Anda
                 </p>
             </div>
         );
     }
 
     return (
-        <figure className="space-y-3">
+        <figure className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
                 <p data-numeric className="tabular-nums">
                     Total{' '}
-                    <span className="font-semibold text-foreground">
+                    <span className="font-mono font-medium text-foreground">
                         {formatNumber(total)}
                     </span>{' '}
-                    laporan, puncak{' '}
-                    <span className="font-semibold text-foreground">
+                    laporan · puncak{' '}
+                    <span className="font-mono font-medium text-foreground">
                         {formatNumber(peak.n)}
                     </span>{' '}
-                    pada {peak.day.slice(5)}
+                    pada{' '}
+                    <span className="font-mono text-foreground">
+                        {peak.day.slice(5)}
+                    </span>
                 </p>
 
                 <div
@@ -96,13 +97,17 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                         onClick={() => setView('chart')}
                         aria-pressed={view === 'chart'}
                         className={cn(
-                            'inline-flex h-8 sm:h-6 items-center gap-1.5 sm:gap-1 rounded-[6px] px-2.5 sm:px-2 text-[12px] sm:text-[11.5px] font-medium transition-colors touch-manipulation',
+                            'inline-flex h-8 touch-manipulation items-center gap-1.5 rounded-[6px] px-2 text-[12px] font-medium transition-colors duration-150 sm:h-7',
                             view === 'chart'
                                 ? 'bg-[var(--surface)] text-foreground shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground',
                         )}
                     >
-                        <AreaChartIcon className="size-3.5 sm:size-3" aria-hidden />
+                        <AreaChartIcon
+                            className="size-4"
+                            strokeWidth={1.5}
+                            aria-hidden
+                        />
                         Grafik
                     </button>
                     <button
@@ -110,20 +115,24 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                         onClick={() => setView('table')}
                         aria-pressed={view === 'table'}
                         className={cn(
-                            'inline-flex h-8 sm:h-6 items-center gap-1.5 sm:gap-1 rounded-[6px] px-2.5 sm:px-2 text-[12px] sm:text-[11.5px] font-medium transition-colors touch-manipulation',
+                            'inline-flex h-8 touch-manipulation items-center gap-1.5 rounded-[6px] px-2 text-[12px] font-medium transition-colors duration-150 sm:h-7',
                             view === 'table'
                                 ? 'bg-[var(--surface)] text-foreground shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground',
                         )}
                     >
-                        <Table2 className="size-3.5 sm:size-3" aria-hidden />
+                        <Table2
+                            className="size-4"
+                            strokeWidth={1.5}
+                            aria-hidden
+                        />
                         Tabel
                     </button>
                 </div>
             </div>
 
             {view === 'chart' ? (
-                <div className="h-56" aria-hidden>
+                <div className="h-[280px]" aria-hidden>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                             accessibilityLayer
@@ -140,12 +149,12 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                                 >
                                     <stop
                                         offset="5%"
-                                        stopColor="var(--viz-1)"
-                                        stopOpacity={0.2}
+                                        stopColor="var(--accent)"
+                                        stopOpacity={0.18}
                                     />
                                     <stop
                                         offset="95%"
-                                        stopColor="var(--viz-1)"
+                                        stopColor="var(--accent)"
                                         stopOpacity={0}
                                     />
                                 </linearGradient>
@@ -159,7 +168,12 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                                 tickFormatter={(v: string) => v.slice(5)}
                                 tickLine={false}
                                 axisLine={{ stroke: 'var(--border)' }}
-                                tick={{ fill: 'var(--muted)', fontSize: 12 }}
+                                tick={{
+                                    fill: 'var(--muted)',
+                                    fontSize: 11,
+                                    fontFamily:
+                                        'var(--font-geist-mono), monospace',
+                                }}
                                 interval="preserveStartEnd"
                                 minTickGap={24}
                             />
@@ -167,7 +181,12 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                                 allowDecimals={false}
                                 tickLine={false}
                                 axisLine={false}
-                                tick={{ fill: 'var(--muted)', fontSize: 12 }}
+                                tick={{
+                                    fill: 'var(--muted)',
+                                    fontSize: 11,
+                                    fontFamily:
+                                        'var(--font-geist-mono), monospace',
+                                }}
                                 width={48}
                             />
                             <Tooltip
@@ -181,12 +200,12 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                             <Area
                                 type="monotone"
                                 dataKey="n"
-                                stroke="var(--viz-1)"
+                                stroke="var(--accent)"
                                 strokeWidth={2}
                                 fill="url(#dailyGradient)"
                                 activeDot={{
-                                    r: 4.5,
-                                    fill: 'var(--viz-1)',
+                                    r: 4,
+                                    fill: 'var(--accent)',
                                     stroke: 'var(--surface)',
                                     strokeWidth: 2,
                                 }}
@@ -196,7 +215,7 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                     </ResponsiveContainer>
                 </div>
             ) : (
-                <div className="max-h-56 overflow-y-auto rounded-[var(--radius-control)] border border-[var(--border)]">
+                <div className="max-h-[280px] overflow-y-auto rounded-[var(--radius-control)] border border-[var(--border)]">
                     <table className="ledger">
                         <thead>
                             <tr>
@@ -209,10 +228,10 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
                         <tbody>
                             {data.map((d) => (
                                 <tr key={d.day}>
-                                    <td className="font-mono text-[12.5px]">
+                                    <td className="font-mono text-[12px]">
                                         {d.day}
                                     </td>
-                                    <td className="num font-medium">
+                                    <td className="num font-mono font-medium">
                                         {formatNumber(d.n)}
                                     </td>
                                 </tr>
@@ -223,7 +242,7 @@ export function DailySeriesChart({ data }: { data: DayPoint[] }) {
             )}
 
             <figcaption className="sr-only">
-                Grafik batang laporan masuk per hari selama 14 hari terakhir.
+                Grafik tren laporan masuk per hari selama 14 hari terakhir.
                 Total {total} laporan; puncak {peak.n} pada {peak.day}.
             </figcaption>
         </figure>

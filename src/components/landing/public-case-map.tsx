@@ -4,6 +4,9 @@ import React, { Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { AlertCircle, MapPin } from 'lucide-react';
 import type { PublicCaseGeoPoint } from '@/lib/domain/map-data';
+import type { PublicMapFocusMode } from './public-case-map-inner';
+
+export type { PublicMapFocusMode };
 
 class PublicMapErrorBoundary extends Component<
     { children: ReactNode; height?: number },
@@ -26,17 +29,18 @@ class PublicMapErrorBoundary extends Component<
         if (this.state.hasError) {
             return (
                 <div
-                    style={{ height: this.props.height ?? 420 }}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-xs text-muted-foreground"
+                    style={{ height: this.props.height ?? 440 }}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 text-center text-[13px] text-muted-foreground"
                 >
-                    <div className="flex size-9 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
-                        <AlertCircle className="size-4" />
-                    </div>
+                    <AlertCircle
+                        className="size-4 text-[var(--negative)]"
+                        strokeWidth={1.5}
+                    />
                     <p className="font-medium text-foreground">
                         Peta sebaran belum dapat ditampilkan
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
-                        Silakan muat ulang halaman atau periksa koneksi.
+                    <p className="text-[12px] text-muted-foreground">
+                        Muat ulang halaman atau periksa koneksi
                     </p>
                 </div>
             );
@@ -45,48 +49,65 @@ class PublicMapErrorBoundary extends Component<
     }
 }
 
-const PublicCaseMapInner = dynamic(
-    () => import('./public-case-map-inner'),
-    {
-        ssr: false,
-        loading: () => (
-            <div
-                className="flex w-full flex-col items-center justify-center gap-3 rounded-[calc(2rem-0.5rem)] border border-[var(--border)] bg-[var(--surface)] shadow-xs animate-pulse"
-                style={{ height: 420 }}
-                role="status"
-                aria-label="Memuat peta sebaran kasus"
-            >
-                <div className="grid size-10 place-items-center rounded-full bg-teal-500/10 text-teal-600">
-                    <MapPin className="size-5" />
+const PublicCaseMapInner = dynamic(() => import('./public-case-map-inner'), {
+    ssr: false,
+    loading: () => (
+        <div
+            className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-soft)]"
+            role="status"
+            aria-label="Memuat peta sebaran kasus"
+        >
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+                <div>
+                    <p className="text-[13px] font-medium text-foreground">
+                        Peta sebaran kasus DBD
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                        Koordinat wilayah anonim
+                    </p>
                 </div>
-                <p className="text-xs font-medium text-muted-foreground">
-                    Memuat peta sebaran kasus...
-                </p>
             </div>
-        ),
-    },
-);
+            <div
+                className="flex w-full flex-col items-center justify-center gap-2 bg-[var(--surface)] text-[12px] text-muted-foreground"
+                style={{ height: 440 }}
+            >
+                <MapPin
+                    className="size-4 text-[var(--accent)]"
+                    strokeWidth={1.5}
+                />
+                <p>Menyiapkan peta sebaran</p>
+            </div>
+            <div className="border-t border-[var(--border)] bg-[var(--ground)] px-4 py-2 text-[12px] text-muted-foreground">
+                Identitas pasien dianonimkan
+            </div>
+        </div>
+    ),
+});
 
 export function PublicCaseMap({
     cases,
-    height = 420,
+    height = 440,
+    focusMode = 'all',
+    focusLabel,
+    onResetFocus,
 }: {
     cases: PublicCaseGeoPoint[];
     height?: number;
+    focusMode?: PublicMapFocusMode;
+    focusLabel?: string;
+    onResetFocus?: () => void;
 }) {
     return (
         <div className="relative mx-auto w-full">
-            {/* Ambient Glow */}
-            <div
-                aria-hidden
-                className="absolute -inset-4 rounded-3xl bg-teal-500/10 blur-2xl dark:bg-teal-500/15 pointer-events-none"
-            />
-            {/* Double-Bezel Hardware Frame */}
-            <div className="relative rounded-[2rem] border border-[var(--border)] bg-muted/30 p-2 shadow-xl">
-                <PublicMapErrorBoundary height={height}>
-                    <PublicCaseMapInner cases={cases} height={height} />
-                </PublicMapErrorBoundary>
-            </div>
+            <PublicMapErrorBoundary height={height}>
+                <PublicCaseMapInner
+                    cases={cases}
+                    height={height}
+                    focusMode={focusMode}
+                    focusLabel={focusLabel}
+                    onResetFocus={onResetFocus}
+                />
+            </PublicMapErrorBoundary>
         </div>
     );
 }

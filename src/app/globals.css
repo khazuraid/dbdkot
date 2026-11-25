@@ -74,21 +74,28 @@
         0 2px 6px rgb(9 9 11 / 0.06),
         0 20px 44px -16px rgb(9 9 11 / 0.16);
 
-    /* Consistent shape & spatial scale */
-    --radius-card: 14px;
+    /* Consistent shape & spatial scale (4px grid) */
+    --radius-card: 12px;
     --radius-control: 8px;
     --radius-pill: 999px;
     --row-height: 44px;
     --sidebar-width: 248px;
-    --sidebar-collapsed: 68px;
+    --sidebar-collapsed: 64px;
+
+    /* Deliberate motion easing tokens */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring-pop: cubic-bezier(0.22, 1.12, 0.36, 1);
+    --ease-spring-modal: cubic-bezier(0.16, 1, 0.3, 1);
     --topbar-height: 56px;
     --gap: 16px;
     --pad: 24px;
-    --control-height: 38px;
+    --control-height: 36px;
 
     --fs-title: 24px;
     --fs-section: 14px;
-    --fs-kpi: 34px;
+    --fs-kpi: 32px;
     --fs-body: 14px;
     --fs-small: 12px;
 
@@ -342,6 +349,248 @@
     .bar-accent {
         background: var(--accent);
     }
+
+    /* Landing hero mount settle (compositor-only, non-blocking) */
+    @keyframes hero-settle {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes hero-fade {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .hero-settle {
+        animation: hero-settle 240ms var(--ease-out) both;
+        animation-delay: var(--settle-delay, 0ms);
+    }
+
+    /* Interactive surveillance stat cards: press feedback + pointer-fine hover */
+    .stat-card-interactive {
+        transition:
+            transform 140ms var(--ease-out),
+            border-color 150ms ease,
+            background-color 150ms ease;
+    }
+
+    .stat-card-interactive:active {
+        transform: scale(0.985);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .stat-card-interactive:hover {
+            transform: translateY(-2px);
+            border-color: var(--control);
+        }
+
+        .stat-card-interactive:active {
+            transform: translateY(0) scale(0.985);
+        }
+    }
+
+    /* Contextual summary reveal below stat cards */
+    .summary-reveal {
+        transition:
+            opacity 180ms var(--ease-out),
+            transform 180ms var(--ease-out);
+    }
+
+    @starting-style {
+        .summary-reveal {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+    }
+
+    /* Smooth map hydration crossfade */
+    .map-stage {
+        transition:
+            opacity 260ms var(--ease-out),
+            transform 260ms var(--ease-out);
+    }
+
+    .map-stage[data-ready='false'] {
+        opacity: 0;
+        transform: scale(0.992);
+    }
+
+    .map-stage[data-ready='true'] {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    .map-skeleton-overlay {
+        transition: opacity 220ms var(--ease-out);
+    }
+
+    /* Tactile press feedback for full-width quick action rows */
+    .action-row-press {
+        transition:
+            background-color 150ms ease,
+            transform 140ms var(--ease-out);
+    }
+
+    .action-row-press:active {
+        transform: scale(0.992);
+    }
+
+    /* Origin-aware spring animations for Radix overlays (modals, dropdowns, popovers, selects) */
+    @keyframes overlay-fade-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes overlay-fade-out {
+        from {
+            opacity: 1;
+        }
+        to {
+            opacity: 0;
+        }
+    }
+
+    @keyframes spring-pop-in {
+        from {
+            opacity: 0;
+            transform: translate3d(var(--pop-x, 0px), var(--pop-y, -4px), 0)
+                scale(0.93);
+        }
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+    }
+
+    @keyframes spring-pop-out {
+        from {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: translate3d(var(--pop-x, 0px), var(--pop-y, -3px), 0)
+                scale(0.96);
+        }
+    }
+
+    @keyframes spring-modal-in {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 6px, 0) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+    }
+
+    @keyframes spring-modal-out {
+        from {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: translate3d(0, 3px, 0) scale(0.97);
+        }
+    }
+
+    [data-slot='dialog-overlay'][data-state='open'],
+    [data-slot='alert-dialog-overlay'][data-state='open'],
+    [data-slot='sheet-overlay'][data-state='open'],
+    [data-slot='drawer-overlay'][data-state='open'] {
+        animation: overlay-fade-in 180ms var(--ease-out) both;
+    }
+
+    [data-slot='dialog-overlay'][data-state='closed'],
+    [data-slot='alert-dialog-overlay'][data-state='closed'],
+    [data-slot='sheet-overlay'][data-state='closed'],
+    [data-slot='drawer-overlay'][data-state='closed'] {
+        animation: overlay-fade-out 140ms var(--ease-out) both;
+    }
+
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'] {
+        animation: spring-modal-in 220ms var(--ease-spring-modal) both;
+    }
+
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'] {
+        animation: spring-modal-out 145ms var(--ease-out) both;
+    }
+
+    [data-slot='dropdown-menu-content'],
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='popover-content'],
+    [data-slot='select-content'][data-align-trigger='false'],
+    [data-slot='tooltip-content'] {
+        --pop-x: 0px;
+        --pop-y: -4px;
+    }
+
+    [data-slot='dropdown-menu-content'][data-side='top'],
+    [data-slot='dropdown-menu-sub-content'][data-side='top'],
+    [data-slot='popover-content'][data-side='top'],
+    [data-slot='select-content'][data-side='top'],
+    [data-slot='tooltip-content'][data-side='top'] {
+        --pop-x: 0px;
+        --pop-y: 4px;
+    }
+
+    [data-slot='dropdown-menu-content'][data-side='left'],
+    [data-slot='dropdown-menu-sub-content'][data-side='left'],
+    [data-slot='popover-content'][data-side='left'],
+    [data-slot='select-content'][data-side='left'],
+    [data-slot='tooltip-content'][data-side='left'] {
+        --pop-x: 4px;
+        --pop-y: 0px;
+    }
+
+    [data-slot='dropdown-menu-content'][data-side='right'],
+    [data-slot='dropdown-menu-sub-content'][data-side='right'],
+    [data-slot='popover-content'][data-side='right'],
+    [data-slot='select-content'][data-side='right'],
+    [data-slot='tooltip-content'][data-side='right'] {
+        --pop-x: -4px;
+        --pop-y: 0px;
+    }
+
+    [data-slot='dropdown-menu-content'][data-state='open'],
+    [data-slot='dropdown-menu-sub-content'][data-state='open'],
+    [data-slot='popover-content'][data-state='open'],
+    [data-slot='select-content'][data-align-trigger='false'][data-state='open'],
+    [data-slot='tooltip-content'][data-state='delayed-open'],
+    [data-slot='tooltip-content'][data-state='instant-open'] {
+        animation: spring-pop-in 190ms var(--ease-spring-pop) both;
+    }
+
+    [data-slot='dropdown-menu-content'][data-state='closed'],
+    [data-slot='dropdown-menu-sub-content'][data-state='closed'],
+    [data-slot='popover-content'][data-state='closed'],
+    [data-slot='select-content'][data-align-trigger='false'][data-state='closed'],
+    [data-slot='tooltip-content'][data-state='closed'] {
+        animation: spring-pop-out 130ms var(--ease-out) both;
+    }
+
+    /* Vaul bottom drawer spring-like deceleration curve */
+    [data-vaul-drawer] {
+        transition-timing-function: var(--ease-drawer) !important;
+    }
 }
 
 /* Targeted reduced-motion: disable decorative/ambient motion while keeping
@@ -351,8 +600,71 @@
         scroll-behavior: auto;
     }
 
+    [data-slot='button']:active,
+    .action-row-press:active {
+        transform: none;
+    }
+
+    [data-slot='dialog-content'][data-state='open'],
+    [data-slot='alert-dialog-content'][data-state='open'],
+    [data-slot='dropdown-menu-content'][data-state='open'],
+    [data-slot='dropdown-menu-sub-content'][data-state='open'],
+    [data-slot='popover-content'][data-state='open'],
+    [data-slot='select-content'][data-align-trigger='false'][data-state='open'],
+    [data-slot='tooltip-content'][data-state='delayed-open'],
+    [data-slot='tooltip-content'][data-state='instant-open'] {
+        animation: overlay-fade-in 120ms ease both;
+    }
+
+    [data-slot='dialog-content'][data-state='closed'],
+    [data-slot='alert-dialog-content'][data-state='closed'],
+    [data-slot='dropdown-menu-content'][data-state='closed'],
+    [data-slot='dropdown-menu-sub-content'][data-state='closed'],
+    [data-slot='popover-content'][data-state='closed'],
+    [data-slot='select-content'][data-align-trigger='false'][data-state='closed'],
+    [data-slot='tooltip-content'][data-state='closed'] {
+        animation: overlay-fade-out 100ms ease both;
+    }
+
+    .hero-settle {
+        animation-name: hero-fade;
+        animation-duration: 140ms;
+        animation-delay: 0ms;
+    }
+
+    .stat-card-interactive:hover,
+    .stat-card-interactive:active {
+        transform: none;
+    }
+
+    .summary-reveal {
+        transition: opacity 120ms ease;
+    }
+
+    @starting-style {
+        .summary-reveal {
+            opacity: 0;
+            transform: none;
+        }
+    }
+
+    .map-stage[data-ready='false'] {
+        transform: none;
+    }
+
+    .map-stage {
+        transition: opacity 140ms ease;
+    }
+
     .animate-pulse,
     .animate-ping {
         animation: none !important;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    [data-translucent='true'] {
+        background: var(--surface) !important;
+        backdrop-filter: none !important;
     }
 }

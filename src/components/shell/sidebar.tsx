@@ -111,31 +111,31 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                 {!collapsed && (
                     <Link
                         href="/dasbor"
-                        className="flex min-w-0 items-center gap-2.5 rounded-[var(--radius-control)] py-1 pr-1"
+                        className="flex min-w-0 items-center gap-3 rounded-[var(--radius-control)] py-1 pr-1"
                     >
                         <span
                             aria-hidden
-                            className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-[var(--accent)] text-[var(--accent-ink)]"
+                            className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[var(--accent)] text-[var(--accent-ink)]"
                         >
                             {brandLogo ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                     src={brandLogo}
                                     alt={brandTitle}
-                                    className="size-8 rounded-[8px] object-contain"
+                                    className="size-8 rounded-[var(--radius-control)] object-contain"
                                 />
                             ) : (
                                 <Activity
                                     className="size-4"
-                                    strokeWidth={2.2}
+                                    strokeWidth={1.5}
                                 />
                             )}
                         </span>
                         <span className="min-w-0">
-                            <span className="block truncate text-[14px] leading-tight font-semibold tracking-[-0.01em] text-foreground">
+                            <span className="block truncate text-[14px] leading-tight font-medium text-foreground">
                                 {brandTitle}
                             </span>
-                            <span className="block truncate text-[11px] text-muted-foreground">
+                            <span className="block truncate text-[12px] text-muted-foreground">
                                 {brandTagline}
                             </span>
                         </span>
@@ -152,18 +152,18 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                     title={
                         collapsed ? 'Perluas bilah sisi' : 'Ciutkan bilah sisi'
                     }
-                    className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors hover:bg-[var(--raised)] hover:text-foreground"
+                    className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors duration-150 hover:bg-[var(--raised)] hover:text-foreground"
                 >
                     {collapsed ? (
                         <PanelLeftOpen
                             className="size-4"
-                            strokeWidth={1.75}
+                            strokeWidth={1.5}
                             aria-hidden
                         />
                     ) : (
                         <PanelLeftClose
                             className="size-4"
-                            strokeWidth={1.75}
+                            strokeWidth={1.5}
                             aria-hidden
                         />
                     )}
@@ -171,11 +171,11 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
             </div>
 
             {!collapsed && (
-                <div className="border-b border-[var(--rule)] bg-[var(--raised)]/45 px-3.5 py-2.5">
+                <div className="border-b border-[var(--rule)] bg-[var(--raised)]/45 px-4 py-3">
                     <div className="flex items-center gap-2">
                         <Building2
-                            className="size-3.5 shrink-0 text-[var(--accent)]"
-                            strokeWidth={1.75}
+                            className="size-4 shrink-0 text-muted-foreground"
+                            strokeWidth={1.5}
                             aria-hidden
                         />
                         <div className="min-w-0">
@@ -187,8 +187,7 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                                           ? 'Pusat Administrator'
                                           : 'Fasilitas Kesehatan')}
                             </p>
-                            <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-                                <span className="inline-block size-1.5 rounded-full bg-[var(--accent)]" />
+                            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                                 {ROLE_LABEL[role] ?? role}
                             </p>
                         </div>
@@ -196,41 +195,43 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                 </div>
             )}
 
-            <div className="px-2 pt-2.5">
+            <div className="px-3 pt-3">
                 <button
                     type="button"
                     onClick={() =>
                         window.dispatchEvent(new Event('wali-epi:open-command'))
                     }
                     className={cn(
-                        'flex w-full items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)]/65 text-[12.5px] text-muted-foreground transition-colors hover:bg-[var(--raised)] hover:text-foreground',
-                        collapsed
-                            ? 'h-9 justify-center'
-                            : 'h-9 justify-between px-2.5',
+                        'flex h-9 w-full items-center rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)]/65 text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-[var(--raised)] hover:text-foreground',
+                        collapsed ? 'justify-center' : 'justify-between px-3',
                     )}
                     title="Pencarian cepat (Ctrl+K)"
                 >
                     <span className="flex items-center gap-2">
-                        <Search className="size-3.5 shrink-0" aria-hidden />
-                        {!collapsed && <span>Cari cepat…</span>}
+                        <Search
+                            className="size-4 shrink-0"
+                            strokeWidth={1.5}
+                            aria-hidden
+                        />
+                        {!collapsed && <span>Cari</span>}
                     </span>
                     {!collapsed && (
-                        <kbd className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <kbd className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                             ⌘K
                         </kbd>
                     )}
                 </button>
             </div>
 
-            <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-2.5 py-3.5">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
                 {groups.map((group) => (
-                    <div key={group.label}>
+                    <div key={group.label} className="mt-6 first:mt-0">
                         {!collapsed && (
-                            <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-[0.02em] text-faint">
+                            <p className="mb-2 px-3 text-[12px] font-medium text-muted-foreground">
                                 {group.label}
                             </p>
                         )}
-                        <ul className="space-y-0.5">
+                        <ul className="space-y-1">
                             {group.items.map((item) => {
                                 const active = isNavActive(
                                     pathname,
@@ -256,19 +257,19 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                                                 active ? 'page' : undefined
                                             }
                                             className={cn(
-                                                'relative flex h-9 items-center gap-2.5 rounded-[var(--radius-control)] text-[13.5px] whitespace-nowrap transition-colors',
+                                                'relative flex h-9 items-center gap-3 rounded-[var(--radius-control)] text-[13px] whitespace-nowrap transition-colors duration-150',
                                                 collapsed
                                                     ? 'justify-center px-0'
-                                                    : 'px-2.5',
+                                                    : 'px-3',
                                                 active
-                                                    ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent)]'
-                                                    : 'font-medium text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground',
+                                                    ? 'bg-[var(--active)] font-medium text-[var(--accent)]'
+                                                    : 'font-normal text-muted-foreground hover:bg-[var(--raised)] hover:text-foreground',
                                             )}
                                         >
                                             {active && !collapsed && (
                                                 <span
                                                     aria-hidden
-                                                    className="absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-r-full bg-[var(--accent)]"
+                                                    className="absolute top-2 bottom-2 left-0 w-[2px] rounded-r-full bg-[var(--accent)]"
                                                 />
                                             )}
                                             {Icon && (
@@ -279,9 +280,7 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                                                             ? 'text-[var(--accent)]'
                                                             : 'text-muted-foreground',
                                                     )}
-                                                    strokeWidth={
-                                                        active ? 2 : 1.75
-                                                    }
+                                                    strokeWidth={1.5}
                                                     aria-hidden
                                                 />
                                             )}
@@ -299,7 +298,7 @@ export function Sidebar({ role, name, email, institution, branding }: Props) {
                 ))}
             </div>
 
-            <div className="shrink-0 border-t border-[var(--rule)] p-2">
+            <div className="shrink-0 border-t border-[var(--rule)] p-3">
                 <UserMenu
                     name={name}
                     email={email}

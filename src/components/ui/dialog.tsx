@@ -7,9 +7,48 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { XIcon } from 'lucide-react';
 
+// Tracks the most recent pointer interaction so centered modals can subtly bias
+// transform-origin toward their triggering button without shifting off-center.
+let lastTriggerPoint: { x: number; y: number; at: number } | null = null;
+let trackingAttached = false;
+
+function ensureTriggerTracking() {
+    if (trackingAttached || typeof window === 'undefined') return;
+    trackingAttached = true;
+    window.addEventListener(
+        'pointerdown',
+        (e) => {
+            lastTriggerPoint = { x: e.clientX, y: e.clientY, at: Date.now() };
+        },
+        { capture: true, passive: true },
+    );
+}
+
+export function getTriggerTransformOrigin(): string | undefined {
+    if (
+        typeof window === 'undefined' ||
+        !lastTriggerPoint ||
+        Date.now() - lastTriggerPoint.at > 800
+    ) {
+        return undefined;
+    }
+    const vw = window.innerWidth || 1;
+    const vh = window.innerHeight || 1;
+    const ox = Math.min(
+        76,
+        Math.max(24, Math.round((lastTriggerPoint.x / vw) * 100)),
+    );
+    const oy = Math.min(
+        76,
+        Math.max(24, Math.round((lastTriggerPoint.y / vh) * 100)),
+    );
+    return `${ox}% ${oy}%`;
+}
+
 function Dialog({
     ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
+    ensureTriggerTracking();
     return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
@@ -39,7 +78,7 @@ function DialogOverlay({
         <DialogPrimitive.Overlay
             data-slot="dialog-overlay"
             className={cn(
-                'fixed inset-0 isolate z-50 bg-[var(--text)]/28 duration-150 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 supports-backdrop-filter:backdrop-blur-[2px]',
+                'data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0 fixed inset-0 isolate z-50 bg-[var(--text)]/28 duration-150 supports-backdrop-filter:backdrop-blur-[2px]',
                 className,
             )}
             {...props}
@@ -51,17 +90,23 @@ function DialogContent({
     className,
     children,
     showCloseButton = true,
+    style,
     ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
     showCloseButton?: boolean;
 }) {
+    const [transformOrigin] = React.useState<string | undefined>(() =>
+        getTriggerTransformOrigin(),
+    );
+
     return (
         <DialogPortal>
             <DialogOverlay />
             <DialogPrimitive.Content
                 data-slot="dialog-content"
+                style={transformOrigin ? { transformOrigin, ...style } : style}
                 className={cn(
-                    'fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-popover-foreground shadow-[var(--elev-pop)] duration-150 outline-none data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 sm:max-w-sm',
+                    'fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 text-[13px] text-popover-foreground shadow-[var(--elev-pop)] outline-none sm:max-w-sm',
                     className,
                 )}
                 {...props}

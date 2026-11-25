@@ -38,8 +38,8 @@ export function PageHeader({
         <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface)]/92 px-4 py-4 backdrop-blur-md md:px-[var(--pad)]">
             <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
                 <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <h1 className="text-[20px] leading-tight font-semibold tracking-[-0.02em] text-foreground md:text-[var(--fs-title)]">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="text-[20px] leading-tight font-medium tracking-[-0.02em] text-foreground md:text-[var(--fs-title)]">
                             {title}
                         </h1>
                         {aside}
@@ -56,7 +56,7 @@ export function PageHeader({
                     </Button>
                 )}
             </div>
-            {children && <div className="mt-3.5">{children}</div>}
+            {children && <div className="mt-4">{children}</div>}
         </header>
     );
 }
@@ -71,7 +71,7 @@ export function PageContent({
     return (
         <div
             className={cn(
-                'mx-auto w-full max-w-[1440px] space-y-5 px-4 py-5 pb-16 md:px-[var(--pad)]',
+                'mx-auto w-full max-w-[1440px] space-y-6 px-4 py-6 pb-16 md:px-[var(--pad)]',
                 className,
             )}
         >
@@ -101,18 +101,12 @@ export function Panel({
     className?: string;
 }) {
     return (
-        <section
-            id={id}
-            className={cn(
-                'surface overflow-hidden',
-                className,
-            )}
-        >
+        <section id={id} className={cn('surface overflow-hidden', className)}>
             {(title || aside) && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--rule)] px-4 py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--rule)] px-4 py-3">
                     <div className="min-w-0">
                         {title && (
-                            <h2 className="text-[var(--fs-section)] leading-snug font-semibold tracking-[-0.01em] text-foreground">
+                            <h2 className="leading-snug font-medium text-[var(--fs-section)] text-foreground">
                                 {title}
                             </h2>
                         )}
