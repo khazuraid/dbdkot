@@ -64,7 +64,7 @@ export function ReportAction({
             <Button
                 type="button"
                 variant={primary ? 'default' : 'outline'}
-                className="h-9 px-3"
+                className="h-9 px-3 transition-[transform,background-color,border-color,color] duration-150 ease-[var(--ease-out)] active:scale-[0.97]"
                 disabled={pending}
                 onClick={() => {
                     if (needsNote) {
@@ -75,7 +75,15 @@ export function ReportAction({
                     }
                 }}
             >
-                {pending ? 'Memproses…' : label}
+                <span
+                    className={
+                        pending
+                            ? 'opacity-70 blur-[1.5px] transition-[filter,opacity] duration-150 ease-out'
+                            : 'blur-0 opacity-100 transition-[filter,opacity] duration-150 ease-out'
+                    }
+                >
+                    {pending ? 'Memproses…' : label}
+                </span>
             </Button>
             {error && !open && (
                 <span className="text-[12px] text-[var(--negative)]">

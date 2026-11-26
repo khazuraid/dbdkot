@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
@@ -33,6 +33,17 @@ export async function generateMetadata(): Promise<Metadata> {
             : {}),
     };
 }
+
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+    interactiveWidget: 'resizes-content',
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+        { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+    ],
+};
 
 // Per-request CSP nonce (src/proxy.ts) requires dynamic rendering on all routes.
 export const instant = false;

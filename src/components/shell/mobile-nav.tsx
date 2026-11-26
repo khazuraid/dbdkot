@@ -79,7 +79,7 @@ export function MobileNav({
 
     return (
         <div className="md:hidden">
-            <header className="sticky top-0 z-20 flex h-[var(--topbar-height)] items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)]/95 px-4 backdrop-blur-md">
+            <header className="sticky top-0 z-20 flex h-[calc(var(--topbar-height)+env(safe-area-inset-top,0px))] items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)]/95 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
                 <div className="flex min-w-0 items-center gap-2.5">
                     <Button
                         type="button"

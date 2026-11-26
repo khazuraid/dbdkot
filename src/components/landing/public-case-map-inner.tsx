@@ -7,7 +7,7 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import '@/app/map.css';
-import { LocateFixed, MapPin, X } from 'lucide-react';
+import { Hand, LocateFixed, Lock, MapPin, X } from 'lucide-react';
 import type { PublicCaseGeoPoint } from '@/lib/domain/map-data';
 import { escapeHtml } from '@/lib/security';
 
@@ -24,12 +24,14 @@ function prefersReducedMotion(): boolean {
 export default function PublicCaseMapInner({
     cases,
     height = 420,
+    fill = false,
     focusMode = 'all',
     focusLabel,
     onResetFocus,
 }: {
     cases: PublicCaseGeoPoint[];
     height?: number;
+    fill?: boolean;
     focusMode?: PublicMapFocusMode;
     focusLabel?: string;
     onResetFocus?: () => void;
@@ -42,6 +44,9 @@ export default function PublicCaseMapInner({
     } | null>(null);
     const hasMountedLayersRef = useRef(false);
     const [ready, setReady] = useState(false);
+    const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+    const [panUnlocked, setPanUnlocked] = useState(false);
+    const panLocked = isCoarsePointer && !panUnlocked;
 
     const clusterCount = cases.filter((c) => Boolean(c.clusterId)).length;
     const focusedCount =
@@ -101,8 +106,32 @@ export default function PublicCaseMapInner({
         };
         hasMountedLayersRef.current = false;
 
+        const resizeObserver =
+            typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(() => {
+                      map.invalidateSize({ animate: false });
+                  })
+                : null;
+        resizeObserver?.observe(el);
+
+        const coarseMq = window.matchMedia('(pointer: coarse)');
+        const syncPointer = () => {
+            const coarse = coarseMq.matches;
+            setIsCoarsePointer(coarse);
+            if (!coarse) {
+                map.dragging.enable();
+            }
+        };
+        syncPointer();
+        if (coarseMq.matches) {
+            map.dragging.disable();
+        }
+        coarseMq.addEventListener('change', syncPointer);
+
         return () => {
             settled = true;
+            coarseMq.removeEventListener('change', syncPointer);
+            resizeObserver?.disconnect();
             try {
                 map.remove();
             } catch {}
@@ -111,6 +140,17 @@ export default function PublicCaseMapInner({
             hasMountedLayersRef.current = false;
         };
     }, []);
+
+    // Keep Leaflet dragging synchronized with touch pan lock state
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        if (panLocked) {
+            map.dragging.disable();
+        } else {
+            map.dragging.enable();
+        }
+    }, [panLocked]);
 
     // 2. Sync markers, cluster rings, and camera focus without recreating Leaflet
     useEffect(() => {
@@ -251,7 +291,13 @@ export default function PublicCaseMapInner({
     }
 
     return (
-        <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-soft)]">
+        <div
+            className={
+                fill
+                    ? 'relative flex h-full min-h-[340px] flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-soft)]'
+                    : 'relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-soft)]'
+            }
+        >
             {/* Top Bar inside Map Frame */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                 <div className="min-w-0">
@@ -295,13 +341,55 @@ export default function PublicCaseMapInner({
             </div>
 
             {/* Native Leaflet Map Container with smooth loading crossfade */}
-            <div className="relative" style={{ height }}>
+            <div
+                className={fill ? 'relative min-h-0 flex-1' : 'relative'}
+                style={fill ? undefined : { height }}
+            >
                 <div
                     ref={containerRef}
-                    style={{ height }}
+                    style={fill ? undefined : { height }}
                     data-ready={ready ? 'true' : 'false'}
-                    className="map-stage w-full bg-[var(--ground)] focus:outline-none"
+                    data-pan-locked={panLocked ? 'true' : 'false'}
+                    className={
+                        fill
+                            ? 'map-stage h-full w-full bg-[var(--ground)] focus:outline-none'
+                            : 'map-stage w-full bg-[var(--ground)] focus:outline-none'
+                    }
                 />
+
+                {/* Touch-only scroll vs pan toggle: keeps 1-finger vertical scroll conflict-free until unlocked */}
+                {isCoarsePointer ? (
+                    <button
+                        type="button"
+                        onClick={() => setPanUnlocked((prev) => !prev)}
+                        aria-pressed={panUnlocked}
+                        className={
+                            panUnlocked
+                                ? 'absolute right-3 bottom-3 z-[400] inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-full border border-[var(--accent)] bg-[var(--accent)] px-3.5 text-[12px] font-medium text-[var(--accent-ink)] shadow-[var(--elev-pop)] transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.97]'
+                                : 'absolute right-3 bottom-3 z-[400] inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)]/95 px-3.5 text-[12px] font-medium text-foreground shadow-[var(--elev-pop)] backdrop-blur-sm transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.97]'
+                        }
+                    >
+                        {panUnlocked ? (
+                            <>
+                                <Lock
+                                    className="size-3.5 shrink-0"
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                />
+                                Kunci gulir
+                            </>
+                        ) : (
+                            <>
+                                <Hand
+                                    className="size-3.5 shrink-0 text-[var(--accent)]"
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                />
+                                Geser peta
+                            </>
+                        )}
+                    </button>
+                ) : null}
 
                 {/* Crossfade loading veil while Leaflet & tiles settle */}
                 <div

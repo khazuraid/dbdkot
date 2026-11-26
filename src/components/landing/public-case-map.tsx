@@ -87,22 +87,31 @@ const PublicCaseMapInner = dynamic(() => import('./public-case-map-inner'), {
 export function PublicCaseMap({
     cases,
     height = 440,
+    fill = false,
     focusMode = 'all',
     focusLabel,
     onResetFocus,
 }: {
     cases: PublicCaseGeoPoint[];
     height?: number;
+    fill?: boolean;
     focusMode?: PublicMapFocusMode;
     focusLabel?: string;
     onResetFocus?: () => void;
 }) {
     return (
-        <div className="relative mx-auto w-full">
+        <div
+            className={
+                fill
+                    ? 'relative flex h-full min-h-[340px] w-full flex-col'
+                    : 'relative mx-auto w-full'
+            }
+        >
             <PublicMapErrorBoundary height={height}>
                 <PublicCaseMapInner
                     cases={cases}
                     height={height}
+                    fill={fill}
                     focusMode={focusMode}
                     focusLabel={focusLabel}
                     onResetFocus={onResetFocus}

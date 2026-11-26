@@ -10,10 +10,10 @@ import type {
 } from '@/lib/domain/map-data';
 
 class FacilityMapErrorBoundary extends Component<
-    { children: ReactNode; height?: number },
+    { children: ReactNode; height?: number | string },
     { hasError: boolean }
 > {
-    constructor(props: { children: ReactNode; height?: number }) {
+    constructor(props: { children: ReactNode; height?: number | string }) {
         super(props);
         this.state = { hasError: false };
     }
@@ -41,7 +41,8 @@ class FacilityMapErrorBoundary extends Component<
                             Peta sebaran belum dapat ditampilkan
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                            Data surveilans tetap aman. Silakan muat ulang halaman.
+                            Data surveilans tetap aman. Silakan muat ulang
+                            halaman.
                         </p>
                     </div>
                 </div>
@@ -68,7 +69,9 @@ export function FacilityMapPanel(props: {
     points: FacilityPoint[];
     zones?: KelurahanZone[];
     cases?: CaseGeoPoint[];
-    height?: number;
+    height?: number | string;
+    selectedCaseId?: string | null;
+    onSelectCase?: (caseId: string) => void;
 }) {
     return (
         <FacilityMapErrorBoundary height={props.height}>

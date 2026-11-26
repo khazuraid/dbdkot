@@ -4,7 +4,11 @@ import { reportsRS } from '@/db/schema';
 import type { Actor } from '@/lib/session';
 import { escapeLike } from '@/lib/security';
 import { scopeToInstitution } from '@/lib/session';
-import { STATUSES, needActionStatusesFor, type ReportListRow } from './report-labels';
+import {
+    STATUSES,
+    needActionStatusesFor,
+    type ReportListRow,
+} from './report-labels';
 
 export type ReportStatus = (typeof STATUSES)[number];
 
@@ -32,6 +36,8 @@ export type ReportListFilters = {
     gender?: 'L' | 'P';
     ageGroup?: ReportAgeGroup;
     sourceType?: 'RS' | 'PUSKESMAS';
+    clusterOnly?: boolean;
+    slaOverdueOnly?: boolean;
     page?: number;
     perPage?: number;
 };
@@ -61,13 +67,21 @@ function baseConditions(actor: Actor, filters: ReportListFilters): SQL[] {
 
     if (filters.period) {
         if (filters.period === 'weekly') {
-            conditions.push(sql`${reportsRS.createdAt} >= now() - interval '7 days'`);
+            conditions.push(
+                sql`${reportsRS.createdAt} >= now() - interval '7 days'`,
+            );
         } else if (filters.period === 'monthly') {
-            conditions.push(sql`${reportsRS.createdAt} >= date_trunc('month', now())`);
+            conditions.push(
+                sql`${reportsRS.createdAt} >= date_trunc('month', now())`,
+            );
         } else if (filters.period === 'quarterly') {
-            conditions.push(sql`${reportsRS.createdAt} >= date_trunc('quarter', now())`);
+            conditions.push(
+                sql`${reportsRS.createdAt} >= date_trunc('quarter', now())`,
+            );
         } else if (filters.period === 'yearly') {
-            conditions.push(sql`${reportsRS.createdAt} >= date_trunc('year', now())`);
+            conditions.push(
+                sql`${reportsRS.createdAt} >= date_trunc('year', now())`,
+            );
         }
     }
 
@@ -83,9 +97,13 @@ function baseConditions(actor: Actor, filters: ReportListFilters): SQL[] {
         if (filters.ageGroup === 'under_5') {
             conditions.push(sql`${reportsRS.patientAge} < 5`);
         } else if (filters.ageGroup === '5_14') {
-            conditions.push(sql`${reportsRS.patientAge} >= 5 and ${reportsRS.patientAge} <= 14`);
+            conditions.push(
+                sql`${reportsRS.patientAge} >= 5 and ${reportsRS.patientAge} <= 14`,
+            );
         } else if (filters.ageGroup === '15_44') {
-            conditions.push(sql`${reportsRS.patientAge} >= 15 and ${reportsRS.patientAge} <= 44`);
+            conditions.push(
+                sql`${reportsRS.patientAge} >= 15 and ${reportsRS.patientAge} <= 44`,
+            );
         } else if (filters.ageGroup === '45_plus') {
             conditions.push(sql`${reportsRS.patientAge} >= 45`);
         }
@@ -93,10 +111,27 @@ function baseConditions(actor: Actor, filters: ReportListFilters): SQL[] {
 
     if (filters.sourceType) {
         if (filters.sourceType === 'PUSKESMAS') {
-            conditions.push(sql`(${reportsRS.sourceType} = 'PUSKESMAS_POLI' or ${reportsRS.sourceType} = 'PUSKESMAS')`);
+            conditions.push(
+                sql`(${reportsRS.sourceType} = 'PUSKESMAS_POLI' or ${reportsRS.sourceType} = 'PUSKESMAS')`,
+            );
         } else if (filters.sourceType === 'RS') {
             conditions.push(eq(reportsRS.sourceType, 'RS'));
         }
+    }
+
+    if (filters.clusterOnly) {
+        conditions.push(
+            sql`(${reportsRS.clusterId} is not null and ${reportsRS.status} not in ('CLOSED', 'REJECTED', 'ARCHIVED_CROSS_BORDER'))`,
+        );
+    }
+
+    if (filters.slaOverdueOnly) {
+        conditions.push(
+            sql`(
+                (${reportsRS.status} = 'ASSIGNED' and ${reportsRS.puskesmasReviewedAt} is null and coalesce(${reportsRS.assignedAt}, ${reportsRS.createdAt}) < now() - interval '24 hours')
+                or (${reportsRS.status} in ('ASSIGNED_ACCEPTED', 'PE_IN_PROGRESS') and coalesce(${reportsRS.acceptedAt}, ${reportsRS.puskesmasReviewedAt}, ${reportsRS.createdAt}) < now() - interval '72 hours')
+            )`,
+        );
     }
 
     if (filters.search) {

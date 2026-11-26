@@ -45,7 +45,7 @@ const PILLARS: PillarStep[] = [
         ],
         handoffTo: 'Puskesmas Wilayah',
         handoffAction:
-            'Disposisi otomatis ke antrian PE Puskesmas sesuai kelurahan domisili',
+            'Disposisi otomatis ke antrean PE Puskesmas sesuai kelurahan domisili',
     },
     {
         id: 'puskesmas',
@@ -102,7 +102,7 @@ const contentVariants = {
     }),
 };
 
-export function WorkflowPillars() {
+export function WorkflowPillars({ className }: { className?: string } = {}) {
     const reduce = Boolean(useReducedMotion());
     const [selection, setSelection] = useState<{
         index: number;
@@ -166,7 +166,7 @@ export function WorkflowPillars() {
     const swapDuration = reduce ? 0.12 : heightDuration;
 
     return (
-        <div className="mt-12">
+        <div className={cn('mt-12', className)}>
             {/* 3 Pillar Selector Cards (Tablist) */}
             <div
                 role="tablist"

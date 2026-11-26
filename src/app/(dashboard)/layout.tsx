@@ -68,7 +68,7 @@ export default async function DashboardLayout({
     };
 
     return (
-        <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:fixed md:inset-0 md:h-dvh md:max-h-dvh md:overflow-hidden md:flex-row md:gap-3 md:p-3">
+        <div className="flex min-h-dvh flex-col bg-[var(--ground)] md:fixed md:inset-0 md:h-dvh md:max-h-dvh md:flex-row md:gap-3 md:overflow-hidden md:p-3">
             <a href="#main-content" className="skip-link">
                 Lewati ke konten utama
             </a>
@@ -102,7 +102,7 @@ export default async function DashboardLayout({
                 <main
                     id="main-content"
                     tabIndex={-1}
-                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none pb-20 md:pb-0"
+                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] outline-none md:pb-0"
                 >
                     {children}
                 </main>

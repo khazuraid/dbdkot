@@ -59,11 +59,15 @@ export default function FacilityMap({
     zones = [],
     cases = [],
     height = 380,
+    selectedCaseId,
+    onSelectCase,
 }: {
     points: FacilityPoint[];
     zones?: KelurahanZone[];
     cases?: CaseGeoPoint[];
-    height?: number;
+    height?: number | string;
+    selectedCaseId?: string | null;
+    onSelectCase?: (caseId: string) => void;
 }) {
     const reduce = Boolean(useReducedMotion());
     const [view, setView] = useState<'map' | 'table'>('map');
@@ -119,15 +123,36 @@ export default function FacilityMap({
         (zones.length > 0 && !showZones ? 1 : 0) +
         (selectedZoneId ? 1 : 0);
 
-    const openCasePopover = useCallback((c: CaseGeoPoint) => {
-        setActiveCase(c);
+    const openCasePopover = useCallback(
+        (c: CaseGeoPoint) => {
+            setActiveCase(c);
+            onSelectCase?.(c.id);
+            const map = mapRef.current;
+            if (map) {
+                const pt = map.latLngToContainerPoint([c.lat, c.lng]);
+                const sz = map.getSize();
+                setPopoverAnchor({ x: pt.x, y: pt.y, w: sz.x, h: sz.y });
+            }
+        },
+        [onSelectCase],
+    );
+
+    // Sync external selectedCaseId (from queue drawer) to map focus
+    useEffect(() => {
+        if (!selectedCaseId || view !== 'map') return;
+        const found = cases.find((c) => c.id === selectedCaseId);
+        if (!found) return;
         const map = mapRef.current;
-        if (map) {
-            const pt = map.latLngToContainerPoint([c.lat, c.lng]);
-            const sz = map.getSize();
-            setPopoverAnchor({ x: pt.x, y: pt.y, w: sz.x, h: sz.y });
-        }
-    }, []);
+        if (!map) return;
+        map.setView([found.lat, found.lng], Math.max(map.getZoom(), 15), {
+            animate: !reduce,
+            duration: 0.25,
+        });
+        setActiveCase(found);
+        const pt = map.latLngToContainerPoint([found.lat, found.lng]);
+        const sz = map.getSize();
+        setPopoverAnchor({ x: pt.x, y: pt.y, w: sz.x, h: sz.y });
+    }, [selectedCaseId, cases, view, reduce]);
 
     const countsByType = useMemo(() => {
         const counts = new Map<string, number>();
@@ -987,7 +1012,12 @@ export default function FacilityMap({
 
                     <div
                         className="overflow-y-auto rounded-[var(--radius-control)] border border-[var(--border)]"
-                        style={{ maxHeight: height - 38 }}
+                        style={{
+                            maxHeight:
+                                typeof height === 'number'
+                                    ? height - 38
+                                    : `calc(${height} - 38px)`,
+                        }}
                     >
                         {tableTab === 'faskes' && (
                             <table className="ledger">

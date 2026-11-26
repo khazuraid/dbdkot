@@ -6,6 +6,16 @@
     z-index: 0;
 }
 
+/* Prevent single-finger page-scroll conflict on touch devices until user unlocks map pan */
+.leaflet-container[data-pan-locked='true'] {
+    touch-action: pan-y !important;
+}
+
+.leaflet-container[data-pan-locked='false'] {
+    touch-action: none !important;
+    overscroll-behavior: none;
+}
+
 .leaflet-control-attribution {
     background: color-mix(in oklab, var(--surface) 86%, transparent) !important;
     color: var(--muted) !important;
@@ -20,11 +30,25 @@
     background: var(--surface);
     color: var(--text);
     border-bottom-color: var(--border);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
-.leaflet-bar a:hover {
-    background: var(--active);
-    color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+    .leaflet-bar a:hover {
+        background: var(--active);
+        color: var(--text);
+    }
+}
+
+@media (pointer: coarse) {
+    .leaflet-bar a {
+        width: 44px;
+        height: 44px;
+        line-height: 44px;
+        font-size: 18px;
+    }
 }
 
 .leaflet-tooltip {

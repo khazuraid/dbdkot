@@ -67,7 +67,7 @@ function DrawerContent({
             <DrawerPrimitive.Content
                 data-slot="drawer-content"
                 className={cn(
-                    'group/drawer-content fixed z-50 flex h-auto flex-col bg-popover text-sm text-popover-foreground data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-xl data-[vaul-drawer-direction=bottom]:border-t data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm',
+                    'group/drawer-content fixed z-50 flex h-auto flex-col bg-popover text-sm text-popover-foreground data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[85dvh] data-[vaul-drawer-direction=bottom]:rounded-t-xl data-[vaul-drawer-direction=bottom]:border-t data-[vaul-drawer-direction=bottom]:pb-[env(safe-area-inset-bottom,0px)] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[85dvh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm',
                     className,
                 )}
                 {...props}
@@ -340,7 +340,7 @@ function SpringSheet({
                                     type="button"
                                     onClick={() => onOpenChange(false)}
                                     aria-label="Tutup panel"
-                                    className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-[color,background-color,transform] duration-150 ease-[var(--ease-out)] hover:bg-[var(--raised)] hover:text-foreground active:scale-[0.95]"
+                                    className="relative grid size-8 shrink-0 cursor-pointer place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-[color,background-color,transform] duration-150 ease-[var(--ease-out)] before:absolute before:-inset-1.5 before:content-[''] hover:bg-[var(--raised)] hover:text-foreground active:scale-[0.95]"
                                 >
                                     <X
                                         className="size-4"
@@ -351,7 +351,7 @@ function SpringSheet({
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-3.5">
+                        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-3.5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
                             {children}
                         </div>
                     </motion.div>

@@ -237,11 +237,48 @@ Hybrid hairline-first elevation: structural separation relies primarily on `1px 
 - **Desktop:** `248px` / `68px` sidebar + `56px` top bar + `⌘K` command palette.
 - **Mobile:** Top `MobileNav` drawer + bottom `MobileBottomDock` highlighting one role-specific primary action (`Lapor`, `Buat PE`, `Verifikasi`, `Admin`).
 
-### Status Pill (`StatusText`, `src/components/shell/status-text.tsx`)
-- **Style:** `24px` height, `999px` radius, `1px` semantic border, `6px` dot indicator, `11.5px` medium text across `neutral`, `good`, `warn`, `bad` tones.
+### Status Indicator (`StatusText`, `src/components/shell/status-text.tsx`)
+- **Routine (`neutral`, `good`):** Calm `6px` dot + `12px` medium text (no tinted pill border) so routine states do not compete with SLA alerts.
+- **Urgent (`warn`, `bad`):** `24px` height, `999px` radius, `1px` semantic border (`--pill-warning-*` / `--pill-negative-*`), `6px` dot, `12px` medium text.
+<!-- 2026-11-25: "esekusi semua" (plan-revamp-dasbor.md) -->
 
 ### Clinical Ledger Table (`.ledger`, `src/app/globals.css`)
-- **Style:** Sticky `38px` `--raised` header, `44px` body rows separated by `1px solid var(--rule)`, `--raised` row hover, right-aligned tabular `.num` cells.
+- **Style:** Sticky `36px` `--raised` header (strict 4px grid), `44px` body rows separated by `1px solid var(--rule)`, hover gated behind `@media (hover: hover) and (pointer: fine)` (`120ms ease`), right-aligned tabular `.num` cells.
+<!-- 2026-11-25: "esekusi semua" (plan-revamp-dasbor.md) -->
+
+## Learned Taste & Operational Standards
+
+### Surfaces & Layout
+- **Operational triage pages use Hybrid B+C (`ResizablePanelGroup` ~36% SLA queue | ~64% inline `ReportDossierContent`) with an opt-in `?view=map` command toggle; `RUMAH_SAKIT` stays on Variant B table + `SpringSheet` without the map toggle.**
+  Why: keeps active cases and inline actions above the fold while reserving full-height Leaflet maps for geospatial workflows and avoiding redundant spatial queries.
+  <!-- 2026-11-25: "esekusi semua" + "/learn-taste fix all and write all" -->
+- **Never auto-select row 0 on list/triage routes; load patient PII (`getReport`) strictly opt-in when `?selected=<uuid>` is explicitly in the URL.**
+  Why: preserves `READ_PII` audit trail integrity and prevents mobile `SpringSheet` from auto-opening on page load.
+  <!-- 2026-11-25: "esekusi semua" (plan-revamp-dasbor.md) -->
+- **One-page mobile-first command screens lock to `h-dvh` (`100dvh`) with bottom thumb-reachable navigation (`env(safe-area-inset-bottom)`), `SpringSheet` for secondary panels (`<lg`), and pan-locked Leaflet maps on coarse pointers until explicitly unlocked.**
+  Why: prevents mobile browser chrome clipping, keeps primary navigation in thumb reach, and eliminates scroll-vs-map drag conflicts.
+  <!-- 2026-11-25: "/mobile-native sesuaikan landing page one-page ini untuk viewport HP (iOS & Android)" -->
+
+### Color & Signals
+- **Use a 2px left SLA ribbon (`border-l-2` with `--negative`, `--warning`, `--accent`) plus monospaced `tabular-nums` countdown instead of full-fill colored SLA pills.**
+  Why: separates urgent 24h/72h breaches cleanly without turning the queue into rainbow badge noise.
+  <!-- 2026-11-25: "esekusi semua" (plan-revamp-dasbor.md) -->
+
+### Motion & Interaction
+- **Use compositor-only CSS transitions (`transform`, `opacity`, `clip-path`, color) with `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`) under `300ms`; never use `transition-all` or Motion `layoutId` on tabs.**
+  Why: prevents main-thread frame drops during RSC/URL updates; tab indicators must snap in `0ms` (`data-instant="true"`) on keyboard navigation (`ArrowLeft`/`ArrowRight`/`Home`/`End`) and under `prefers-reduced-motion`.
+  <!-- 2026-11-25: "esekusi semua" (Emil Kowalski motion polish) -->
+- **Every tappable control uses immediate press feedback (`active:scale-[0.97]`, `150ms var(--ease-out)`); action buttons use subtle `opacity-70 blur-[1.5px]` crossfade while pending; all `:hover` effects are gated by `@media (hover: hover) and (pointer: fine)`.**
+  Why: gives tactile response on pointer-down without sticky phantom hovers on touch devices.
+  <!-- 2026-11-25: "/mobile-native" + "esekusi semua" -->
+- **Mobile drawers and case-detail sheets always use `SpringSheet` (`src/components/ui/drawer.tsx`) with 1:1 drag tracking and velocity-based swipe-to-dismiss.**
+  Why: native touch feel across `< 768px` viewports without custom drag jitter.
+  <!-- 2026-11-25: "/gestures ubah panel detail kasus dan filter peta di dashboard baru menjadi drawer/sheet yang bisa di-drag" -->
+
+### Copy & Resilience
+- **Keep Indonesian UI copy in EYD V / KBBI standard (`antrean`, `Perdarahan`, `keberapa`, `antinyamuk`), never hardcode regional names or `119` where `branding.*` applies, and always guard long branding/URLs/emails with `min-w-0`, `[overflow-wrap:anywhere]`, `title` on `truncate`, and `onError` logo fallback.**
+  Why: keeps white-label deployments resilient at `320px`, `1280×720`, and `200%` zoom without clipped CTAs or broken images.
+  <!-- 2026-11-25: "/break-ui landing page & penulisan" + "/learn-taste fix all and write all" -->
 
 ## Do's and Don'ts
 

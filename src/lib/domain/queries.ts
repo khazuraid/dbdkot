@@ -38,9 +38,11 @@ export async function queueCounts(actor: Actor) {
         .select({
             submitted: sql<number>`count(*) filter (where ${reportsRS.status} = 'SUBMITTED')`,
             assigned: sql<number>`count(*) filter (where ${reportsRS.status} = 'ASSIGNED')`,
+            peActive: sql<number>`count(*) filter (where ${reportsRS.status} in ('ASSIGNED_ACCEPTED', 'PE_IN_PROGRESS'))`,
             peCompleted: sql<number>`count(*) filter (where ${reportsRS.status} = 'PE_COMPLETED')`,
             crossBorderPending: sql<number>`count(*) filter (where ${reportsRS.status} = 'CROSS_BORDER_PENDING')`,
             foggingRequired: sql<number>`count(*) filter (where ${reportsRS.status} in ('FOGGING_REQUIRED', 'SIKLUS_1_DONE', 'SIKLUS_2_SCHEDULED'))`,
+            clusteredActive: sql<number>`count(*) filter (where ${reportsRS.clusterId} is not null and ${reportsRS.status} not in ('CLOSED', 'REJECTED', 'ARCHIVED_CROSS_BORDER'))`,
         })
         .from(reportsRS)
         .where(sql`true ${scope}`);
@@ -48,9 +50,11 @@ export async function queueCounts(actor: Actor) {
     return {
         submitted: Number(row?.submitted ?? 0),
         assigned: Number(row?.assigned ?? 0),
+        peActive: Number(row?.peActive ?? 0),
         peCompleted: Number(row?.peCompleted ?? 0),
         crossBorderPending: Number(row?.crossBorderPending ?? 0),
         foggingRequired: Number(row?.foggingRequired ?? 0),
+        clusteredActive: Number(row?.clusteredActive ?? 0),
     };
 }
 
@@ -255,10 +259,7 @@ export async function listPeTasks(
             )
             .limit(size)
             .offset(offset),
-        db
-            .select({ n: count() })
-            .from(reportsRS)
-            .where(scope),
+        db.select({ n: count() }).from(reportsRS).where(scope),
     ]);
 
     return {

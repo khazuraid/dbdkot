@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -10,8 +9,10 @@ import {
     CheckCircle2,
     ExternalLink,
     FileText,
+    Flame,
     MapPin,
     Phone,
+    Radar,
     Stethoscope,
     User,
     X,
@@ -21,13 +22,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import {
-    Drawer,
-    DrawerContent,
-    DrawerHeader,
-    DrawerTitle,
-    DrawerDescription,
-} from '@/components/ui/drawer';
+import { SpringSheet } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { StatusText } from '@/components/shell/status-text';
 import { ReportTable } from '@/components/reports/report-table';
@@ -74,22 +69,19 @@ export function ReportSplitView({
     empty: string;
 }) {
     const [filters, setFilters] = useReportFilters();
-    const [snap, setSnap] = useState<number | string | null>(0.5);
     const selectedId = filters.selected || selectedDetail?.id || '';
 
     function selectReport(id: string) {
-        setSnap(0.5);
         void setFilters({ selected: id === selectedId ? '' : id });
     }
 
     function clearSelection() {
-        setSnap(0.5);
         void setFilters({ selected: '' });
     }
 
     return (
         <>
-            {/* Mobile Feed + Vaul Bottom Drawer */}
+            {/* Mobile Feed + SpringSheet Bottom Drawer */}
             <div className="block lg:hidden">
                 <div className="space-y-3">
                     <p className="text-[12px] text-muted-foreground">
@@ -103,37 +95,27 @@ export function ReportSplitView({
                     />
                 </div>
 
-                <Drawer
+                <SpringSheet
                     open={Boolean(selectedDetail)}
-                    snapPoints={[0.5, 0.92]}
-                    activeSnapPoint={snap}
-                    setActiveSnapPoint={setSnap}
                     onOpenChange={(open) => {
                         if (!open) clearSelection();
                     }}
+                    title={selectedDetail?.reportNumber ?? 'Detail Laporan'}
+                    description={
+                        selectedDetail
+                            ? `${selectedDetail.patient.name} (${selectedDetail.patient.age} th) · ${selectedDetail.kelurahan ?? '-'}`
+                            : undefined
+                    }
+                    className="lg:hidden"
                 >
-                    <DrawerContent className="flex max-h-[92vh] flex-col">
-                        <div className="flex-1 overflow-y-auto px-4 pb-4">
-                            <DrawerHeader className="px-0 text-left">
-                                <DrawerTitle className="font-mono text-[15px]">
-                                    {selectedDetail?.reportNumber ??
-                                        'Detail Laporan'}
-                                </DrawerTitle>
-                                <DrawerDescription>
-                                    {selectedDetail
-                                        ? `${selectedDetail.patient.name} (${selectedDetail.patient.age} th) · ${selectedDetail.kelurahan ?? '-'}`
-                                        : ''}
-                                </DrawerDescription>
-                            </DrawerHeader>
-                            {selectedDetail && (
-                                <InspectorContent
-                                    detail={selectedDetail}
-                                    role={role}
-                                />
-                            )}
-                        </div>
-                    </DrawerContent>
-                </Drawer>
+                    {selectedDetail ? (
+                        <ReportDossierContent
+                            detail={selectedDetail}
+                            role={role}
+                            onSelectReport={selectReport}
+                        />
+                    ) : null}
+                </SpringSheet>
             </div>
 
             {/* Desktop Split-Pane */}
@@ -191,9 +173,10 @@ export function ReportSplitView({
                                     </Button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto pt-3">
-                                    <InspectorContent
+                                    <ReportDossierContent
                                         detail={selectedDetail}
                                         role={role}
+                                        onSelectReport={selectReport}
                                     />
                                 </div>
                             </div>
@@ -212,12 +195,14 @@ export function ReportSplitView({
     );
 }
 
-function InspectorContent({
+export function ReportDossierContent({
     detail,
     role,
+    onSelectReport,
 }: {
     detail: ReportDetail;
     role?: Role;
+    onSelectReport?: (id: string) => void;
 }) {
     const isCriticalPlatelet =
         detail.plateletCount !== null && detail.plateletCount < 100000;
@@ -225,12 +210,28 @@ function InspectorContent({
         ? detail.patient.phone.replace(/\D/g, '').replace(/^0/, '62')
         : null;
 
+    // ADMIN is strictly read-only per transitionReport domain invariant
+    const isAdminReadOnly = role === 'ADMIN';
     const canPuskesmasAccept =
-        role === 'PUSKESMAS' && detail.status === 'ASSIGNED';
+        !isAdminReadOnly &&
+        role === 'PUSKESMAS' &&
+        detail.status === 'ASSIGNED';
     const canPuskesmasStartPe =
-        role === 'PUSKESMAS' && detail.status === 'ASSIGNED_ACCEPTED';
+        !isAdminReadOnly &&
+        role === 'PUSKESMAS' &&
+        detail.status === 'ASSIGNED_ACCEPTED';
     const canDinkesVerify =
-        role === 'DINKES' && detail.status === 'PE_COMPLETED';
+        !isAdminReadOnly &&
+        role === 'DINKES' &&
+        detail.status === 'PE_COMPLETED';
+    const canDinkesClose =
+        !isAdminReadOnly &&
+        role === 'DINKES' &&
+        (detail.status === 'VERIFIED' || detail.status === 'SIKLUS_2_DONE');
+    const needsFogging =
+        detail.status === 'FOGGING_REQUIRED' ||
+        detail.status === 'SIKLUS_1_DONE' ||
+        detail.status === 'SIKLUS_2_SCHEDULED';
 
     return (
         <div className="flex flex-col gap-4 text-[12.5px]">
@@ -352,6 +353,59 @@ function InspectorContent({
                             transition="REJECT_BY_DINKES"
                             label="Minta PE Ulang"
                         />
+                    </div>
+                </div>
+            )}
+
+            {canDinkesClose && (
+                <div className="space-y-2.5 rounded-[var(--radius-control)] border border-[var(--accent)]/35 bg-[var(--accent-soft)] p-3">
+                    <div className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" />
+                        <div>
+                            <p className="font-semibold text-foreground">
+                                Siap Ditutup & Diarsipkan
+                            </p>
+                            <p className="text-[12px] text-muted-foreground">
+                                Seluruh tahapan PE dan tindak lanjut lapangan
+                                telah selesai. Tutup kasus untuk pengarsipan
+                                surveilans.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <ReportAction
+                            id={detail.id}
+                            transition="MARK_CLOSED"
+                            label="Tutup & Arsipkan Kasus"
+                            primary
+                        />
+                    </div>
+                </div>
+            )}
+
+            {needsFogging && !isAdminReadOnly && (
+                <div className="space-y-2 rounded-[var(--radius-control)] border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                            <Flame className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
+                            <div>
+                                <p className="font-semibold text-foreground">
+                                    Tindak Lanjut Fogging Fokus (2 Siklus)
+                                </p>
+                                <p className="text-[12px] text-muted-foreground">
+                                    Catat realisasi fogging siklus 1 &amp; 2
+                                    beserta pemakaian bahan dan logistik.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0"
+                        >
+                            <Link href="/tindak-lanjut">Kelola Fogging</Link>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -639,6 +693,106 @@ function InspectorContent({
                             pada {formatDate(detail.pe.peDate)}
                         </p>
                     </div>
+                </div>
+            )}
+
+            {/* Section 5: Fogging Fokus 2 Siklus */}
+            {detail.foggingCycles.length > 0 && (
+                <div className="space-y-2 rounded-[var(--radius-control)] border border-[var(--border)] p-3">
+                    <div className="flex items-center justify-between border-b border-[var(--rule)] pb-2">
+                        <span className="flex items-center gap-2 font-semibold text-foreground">
+                            <Flame className="size-3.5 text-[var(--warning)]" />
+                            Realisasi Fogging 2 Siklus
+                        </span>
+                        <Link
+                            href="/tindak-lanjut"
+                            className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+                        >
+                            Buka modul
+                        </Link>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {detail.foggingCycles.map((cycle) => (
+                            <div
+                                key={cycle.id}
+                                className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/40 p-2.5"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-[12px] font-semibold text-foreground tabular-nums">
+                                        Siklus {cycle.cycleNumber}
+                                    </span>
+                                    <StatusText
+                                        tone={
+                                            cycle.executedAt ? 'good' : 'warn'
+                                        }
+                                    >
+                                        {cycle.executedAt
+                                            ? 'Selesai'
+                                            : 'Terjadwal'}
+                                    </StatusText>
+                                </div>
+                                <p className="mt-1 font-mono text-[11px] text-muted-foreground tabular-nums">
+                                    Jadwal: {formatDate(cycle.scheduledDate)}
+                                </p>
+                                {cycle.executedAt ? (
+                                    <p className="font-mono text-[11px] text-foreground tabular-nums">
+                                        Eksekusi: {formatDate(cycle.executedAt)}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Section 6: Kasus Klaster Radius 100m */}
+            {detail.clusterSiblings.length > 0 && (
+                <div className="space-y-2 rounded-[var(--radius-control)] border border-[var(--negative)]/30 bg-[var(--negative)]/[0.04] p-3">
+                    <div className="flex items-center justify-between border-b border-[var(--negative)]/20 pb-2">
+                        <span className="flex items-center gap-2 font-semibold text-foreground">
+                            <Radar className="size-3.5 text-[var(--negative)]" />
+                            Klaster 100 m ({detail.clusterSiblings.length} kasus
+                            terkait)
+                        </span>
+                    </div>
+                    <ul className="divide-y divide-[var(--rule)]">
+                        {detail.clusterSiblings.map((sib) => (
+                            <li
+                                key={sib.id}
+                                className="flex items-center justify-between gap-2 py-1.5"
+                            >
+                                <div className="min-w-0">
+                                    {onSelectReport ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                onSelectReport(sib.id)
+                                            }
+                                            className="cursor-pointer font-mono text-[12px] font-medium text-[var(--accent)] hover:underline"
+                                        >
+                                            {sib.reportNumber}
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            href={`/laporan/${sib.id}`}
+                                            className="font-mono text-[12px] font-medium text-[var(--accent)] hover:underline"
+                                        >
+                                            {sib.reportNumber}
+                                        </Link>
+                                    )}
+                                    <p className="truncate text-[11px] text-muted-foreground">
+                                        {sib.kelurahan ?? '-'} ·{' '}
+                                        {formatDate(sib.createdAt)}
+                                    </p>
+                                </div>
+                                <StatusText
+                                    tone={STATUS_TONE[sib.status] ?? 'neutral'}
+                                >
+                                    {STATUS_LABEL[sib.status] ?? sib.status}
+                                </StatusText>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
 

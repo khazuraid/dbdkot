@@ -1,6 +1,14 @@
 'use client';
 
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type KeyboardEvent,
+} from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'motion/react';
@@ -128,11 +136,37 @@ export function ReportTable({
     showStatusTabs?: boolean;
 }) {
     const reduce = Boolean(useReducedMotion());
-    const pillId = `status-pill-${useId()}`;
     const [stage, setStage] = useState<StageKey>('all');
+    const [instantTab, setInstantTab] = useState(true);
+    const [indicator, setIndicator] = useState<{
+        left: number;
+        width: number;
+    } | null>(null);
     const [hasInteracted, setHasInteracted] = useState(false);
     const [previewRow, setPreviewRow] = useState<ReportListRow | null>(null);
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+    const syncIndicator = useCallback((key: StageKey) => {
+        const idx = STAGE_TABS.findIndex((t) => t.key === key);
+        const btn = tabRefs.current[idx];
+        if (!btn) return;
+        setIndicator({ left: btn.offsetLeft, width: btn.offsetWidth });
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!showStatusTabs) return;
+        syncIndicator(stage);
+    }, [showStatusTabs, stage, rows.length, syncIndicator]);
+
+    useEffect(() => {
+        if (!showStatusTabs) return;
+        const onResize = () => {
+            setInstantTab(true);
+            syncIndicator(stage);
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, [showStatusTabs, stage, syncIndicator]);
 
     const stageCounts = useMemo(() => {
         const counts: Record<StageKey, number> = {
@@ -160,8 +194,9 @@ export function ReportTable({
         return rows.filter((row) => activeTab.statuses!.includes(row.status));
     }, [rows, showStatusTabs, stage]);
 
-    function selectStage(next: StageKey) {
+    function selectStage(next: StageKey, instant = false) {
         if (next === stage) return;
+        setInstantTab(instant);
         setHasInteracted(true);
         setStage(next);
     }
@@ -179,7 +214,7 @@ export function ReportTable({
 
         if (nextIdx !== null) {
             e.preventDefault();
-            selectStage(STAGE_TABS[nextIdx]!.key);
+            selectStage(STAGE_TABS[nextIdx]!.key, true);
             tabRefs.current[nextIdx]?.focus();
         }
     }
@@ -395,8 +430,21 @@ export function ReportTable({
                     <div
                         role="tablist"
                         aria-label="Filter tahap status kasus"
-                        className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] p-0.5"
+                        className="relative inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--ground)] p-0.5"
                     >
+                        {indicator ? (
+                            <span
+                                aria-hidden
+                                data-instant={
+                                    instantTab || reduce ? 'true' : 'false'
+                                }
+                                style={{
+                                    transform: `translateX(${indicator.left}px)`,
+                                    width: indicator.width,
+                                }}
+                                className="tab-slide-indicator pointer-events-none absolute top-0.5 bottom-0.5 left-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_2px_rgb(9_9_11/0.06)]"
+                            />
+                        ) : null}
                         {STAGE_TABS.map((tab, idx) => {
                             const isActive = stage === tab.key;
                             const count = stageCounts[tab.key];
@@ -410,7 +458,7 @@ export function ReportTable({
                                     role="tab"
                                     aria-selected={isActive}
                                     tabIndex={isActive ? 0 : -1}
-                                    onClick={() => selectStage(tab.key)}
+                                    onClick={() => selectStage(tab.key, false)}
                                     onKeyDown={(e) => handleTabKeyDown(e, idx)}
                                     className={cn(
                                         'relative inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] font-medium whitespace-nowrap transition-[color,transform] duration-150 ease-[var(--ease-out)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:outline-none active:scale-[0.97]',
@@ -419,21 +467,6 @@ export function ReportTable({
                                             : 'text-muted-foreground hover:text-foreground',
                                     )}
                                 >
-                                    {isActive ? (
-                                        <motion.span
-                                            layoutId={pillId}
-                                            aria-hidden
-                                            transition={
-                                                reduce
-                                                    ? { duration: 0 }
-                                                    : {
-                                                          duration: 0.2,
-                                                          ease: EASE_OUT,
-                                                      }
-                                            }
-                                            className="absolute inset-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_2px_rgb(9_9_11/0.06)]"
-                                        />
-                                    ) : null}
                                     <span className="relative z-10">
                                         {tab.label}
                                     </span>

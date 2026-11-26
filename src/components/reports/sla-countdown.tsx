@@ -10,13 +10,22 @@ type Props = {
     assignedAt: string | Date | null;
     acceptedAt: string | Date | null;
     createdAt: string | Date;
+    compact?: boolean;
 };
+
+const ID_INT = new Intl.NumberFormat('id-ID');
+const DEADLINE_FMT = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+});
 
 function formatRemaining(ms: number) {
     const abs = Math.abs(ms);
     const totalHours = Math.floor(abs / 3_600_000);
     const mins = Math.floor((abs % 3_600_000) / 60_000);
-    return `${totalHours}j ${mins}m`;
+    return `${ID_INT.format(totalHours)}j ${mins}m`;
 }
 
 export function SlaCountdown({
@@ -24,6 +33,7 @@ export function SlaCountdown({
     assignedAt,
     acceptedAt,
     createdAt,
+    compact = false,
 }: Props) {
     const [now, setNow] = useState(() => Date.now());
 
@@ -33,16 +43,19 @@ export function SlaCountdown({
     }, []);
 
     let label: string | null = null;
+    let shortLabel: string | null = null;
     let deadlineMs: number | null = null;
 
     if (status === 'ASSIGNED') {
         const start = new Date(assignedAt ?? createdAt).getTime();
         deadlineMs = start + 24 * 3_600_000;
-        label = 'SLA Terima Puskesmas (24j)';
+        label = 'SLA Terima (24j)';
+        shortLabel = '24j';
     } else if (status === 'ASSIGNED_ACCEPTED' || status === 'PE_IN_PROGRESS') {
         const start = new Date(acceptedAt ?? createdAt).getTime();
         deadlineMs = start + 72 * 3_600_000;
-        label = 'SLA Penyelidikan Epidemiologi (72j)';
+        label = 'SLA PE (72j)';
+        shortLabel = '72j';
     }
 
     if (!label || !deadlineMs) return null;
@@ -50,21 +63,27 @@ export function SlaCountdown({
     const diff = deadlineMs - now;
     const overdue = diff < 0;
     const warning = !overdue && diff < 6 * 3_600_000;
+    const deadlineText = DEADLINE_FMT.format(new Date(deadlineMs));
 
     return (
         <div
+            title={`Batas waktu ${label}: ${deadlineText} WIB`}
             className={cn(
-                'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-medium tabular-nums',
+                'inline-flex max-w-full items-center gap-1.5 rounded-r-[4px] border-l-2 py-0.5 pr-2 pl-2 text-[12px] font-medium transition-colors duration-200 ease-out',
                 overdue
-                    ? 'border-[var(--pill-negative-border)] bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]'
+                    ? 'border-l-[var(--negative)] bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]'
                     : warning
-                      ? 'border-[var(--pill-warning-border)] bg-[var(--pill-warning-bg)] text-[var(--pill-warning-ink)]'
-                      : 'border-[var(--pill-info-border)] bg-[var(--pill-info-bg)] text-[var(--pill-info-ink)]',
+                      ? 'border-l-[var(--warning)] bg-[var(--pill-warning-bg)] text-[var(--pill-warning-ink)]'
+                      : 'border-l-[var(--accent)] bg-[var(--raised)] text-muted-foreground',
             )}
         >
-            <Clock className="size-3.5 shrink-0" aria-hidden />
-            <span>
-                {label}:{' '}
+            <Clock
+                className="size-3.5 shrink-0"
+                strokeWidth={1.5}
+                aria-hidden
+            />
+            <span className="font-mono text-[12px] whitespace-nowrap tabular-nums">
+                {compact ? `${shortLabel} · ` : `${label}: `}
                 {overdue
                     ? `Lewat ${formatRemaining(diff)}`
                     : `Sisa ${formatRemaining(diff)}`}
