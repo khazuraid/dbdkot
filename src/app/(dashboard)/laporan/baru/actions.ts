@@ -12,6 +12,7 @@ export type FormState = {
     ok?: boolean;
     id?: string;
     isDraft?: boolean;
+    crossBorder?: boolean;
 };
 
 export async function submitReport(
@@ -44,6 +45,7 @@ export async function submitReport(
             ok: true,
             id: result.id,
             isDraft: result.isDraft,
+            crossBorder: result.crossBorder,
         };
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -95,7 +97,8 @@ export async function geocodePatientAddress(params: {
     }
 
     const NOMINATIM_SEARCH =
-        process.env.NOMINATIM_URL ?? 'https://nominatim.openstreetmap.org/search';
+        process.env.NOMINATIM_URL ??
+        'https://nominatim.openstreetmap.org/search';
 
     const clean = (s?: string) => (s ?? '').trim();
     // Do not transmit full patient street address (PII) to third-party Nominatim;
@@ -108,7 +111,9 @@ export async function geocodePatientAddress(params: {
 
     if (kel && (kec || kota)) {
         queries.push({
-            q: [`Kelurahan ${kel}`, kec, kota, 'Indonesia'].filter(Boolean).join(', '),
+            q: [`Kelurahan ${kel}`, kec, kota, 'Indonesia']
+                .filter(Boolean)
+                .join(', '),
             isFallback: false,
         });
         queries.push({
@@ -119,7 +124,9 @@ export async function geocodePatientAddress(params: {
 
     if (kec && kota) {
         queries.push({
-            q: [`Kecamatan ${kec}`, kota, 'Indonesia'].filter(Boolean).join(', '),
+            q: [`Kecamatan ${kec}`, kota, 'Indonesia']
+                .filter(Boolean)
+                .join(', '),
             isFallback: true,
         });
     } else if (kota) {

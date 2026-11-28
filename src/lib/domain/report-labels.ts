@@ -9,6 +9,7 @@
  * so this file stays safe on both sides of the boundary.
  */
 
+import type { Role } from '@/lib/roles';
 import type { StatusTone } from './account-labels';
 
 export const STATUSES = [
@@ -140,4 +141,81 @@ export function validateTransitionNote(
         return { ok: true, note: trimmed };
     }
     return { ok: true, note: trimmed || null };
+}
+
+export type ManualNotifyContext = 'REPORT' | 'PE' | 'FOGGING';
+export type ManualNotifyTarget =
+    'DINKES' | 'PUSKESMAS' | 'FASKES' | 'PUSKESMAS_AND_DINKES';
+
+export type ManualNotifyTargetOption = {
+    value: ManualNotifyTarget;
+    label: string;
+};
+
+export function buildManualNotifyTargets(params: {
+    actorRole: Role;
+    actorInstitutionId: string | null;
+    reportInstitutionId: string;
+    reportInstitutionName: string | null;
+    puskesmasId: string | null;
+    puskesmasName: string | null;
+}): ManualNotifyTargetOption[] {
+    const options: ManualNotifyTargetOption[] = [];
+    const pkmLabel = `Puskesmas Wilayah (${params.puskesmasName ?? 'Puskesmas'})`;
+    const faskesLabel = `Faskes Pelapor (${params.reportInstitutionName ?? 'Faskes'})`;
+
+    if (params.actorRole === 'DINKES' || params.actorRole === 'ADMIN') {
+        if (params.puskesmasId) {
+            options.push({ value: 'PUSKESMAS', label: pkmLabel });
+        }
+        if (params.reportInstitutionId !== params.puskesmasId) {
+            options.push({ value: 'FASKES', label: faskesLabel });
+        }
+        options.push({ value: 'DINKES', label: 'Tim Dinas Kesehatan' });
+        if (params.puskesmasId) {
+            options.push({
+                value: 'PUSKESMAS_AND_DINKES',
+                label: 'Puskesmas Wilayah & Dinkes',
+            });
+        }
+        return options;
+    }
+
+    if (params.actorRole === 'PUSKESMAS') {
+        options.push({ value: 'DINKES', label: 'Dinas Kesehatan' });
+        if (params.reportInstitutionId !== params.actorInstitutionId) {
+            options.push({ value: 'FASKES', label: faskesLabel });
+        }
+        return options;
+    }
+
+    options.push({ value: 'DINKES', label: 'Dinas Kesehatan' });
+    if (params.puskesmasId) {
+        options.push({ value: 'PUSKESMAS', label: pkmLabel });
+        options.push({
+            value: 'PUSKESMAS_AND_DINKES',
+            label: 'Puskesmas Wilayah & Dinkes',
+        });
+    }
+    return options;
+}
+
+export function buildDefaultManualNotifyMessage(params: {
+    context: ManualNotifyContext;
+    reportId: string;
+    reportNumber: string;
+    kelurahan: string | null;
+    locationUnconfirmed?: boolean;
+}): string {
+    const kelLabel = params.kelurahan ?? '-';
+    if (params.context === 'PE') {
+        return `[WALI-EPI] Pengingat Penyelidikan Epidemiologi (PE) kasus ${params.reportNumber} (Kel. ${kelLabel}). Mohon cek detail di /laporan/${params.reportId}.`;
+    }
+    if (params.context === 'FOGGING') {
+        return `[WALI-EPI] Pengingat pelaksanaan Fogging Fokus kasus ${params.reportNumber} (Kel. ${kelLabel}). Mohon cek jadwal di /tindak-lanjut.`;
+    }
+    if (params.locationUnconfirmed) {
+        return `[WALI-EPI] Mohon konfirmasi lokasi/koordinat pasien untuk laporan ${params.reportNumber} (Kel. ${kelLabel}). Cek detail di /laporan/${params.reportId}.`;
+    }
+    return `[WALI-EPI] Pengingat tindak lanjut laporan ${params.reportNumber} (Kel. ${kelLabel}). Cek detail di /laporan/${params.reportId}.`;
 }

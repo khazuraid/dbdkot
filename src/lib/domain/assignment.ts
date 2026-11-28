@@ -9,6 +9,31 @@ export type AssignmentResult =
       }
     | { assigned: true; puskesmasId: string; officerId: string | null };
 
+export async function findPuskesmasByKelurahan(
+    kelurahanName: string | null | undefined,
+): Promise<{ id: string; name: string } | null> {
+    if (!kelurahanName?.trim()) return null;
+    const [puskesmas] = await getDb()
+        .select({ id: institutions.id, name: institutions.name })
+        .from(institutions)
+        .where(
+            and(
+                eq(institutions.type, 'PUSKESMAS'),
+                eq(institutions.isActive, true),
+                // Array containment: the institution's coverage list holds
+                // this kelurahan. Case- and whitespace-insensitive so ' Cilodong ' matches.
+                sql`exists (
+                    select 1 from unnest(${institutions.kelurahanList}) as k
+                    where lower(btrim(k)) = lower(btrim(${kelurahanName}))
+                )`,
+            ),
+        )
+        .orderBy(asc(institutions.id))
+        .limit(1);
+
+    return puskesmas ?? null;
+}
+
 /**
  * Auto-assign by kelurahan. The prototype resolved the Puskesmas in the browser
  * (`reports-rs.service.ts:213` — "the matched Puskesmas ID from kelurahan
@@ -39,27 +64,7 @@ export async function assignReportByKelurahan(
         return { assigned: false, reason: 'ALREADY_ASSIGNED' };
     }
 
-    if (!report.kelurahan) {
-        return { assigned: false, reason: 'NO_MATCH' };
-    }
-
-    const [puskesmas] = await db
-        .select({ id: institutions.id })
-        .from(institutions)
-        .where(
-            and(
-                eq(institutions.type, 'PUSKESMAS'),
-                eq(institutions.isActive, true),
-                // Array containment: the institution's coverage list holds
-                // this kelurahan. Case- and whitespace-insensitive so ' Cilodong ' matches.
-                sql`exists (
-                    select 1 from unnest(${institutions.kelurahanList}) as k
-                    where lower(btrim(k)) = lower(btrim(${report.kelurahan}))
-                )`,
-            ),
-        )
-        .orderBy(asc(institutions.id))
-        .limit(1);
+    const puskesmas = await findPuskesmasByKelurahan(report.kelurahan);
 
     if (!puskesmas) {
         return { assigned: false, reason: 'NO_MATCH' };

@@ -28,10 +28,13 @@ import { StatusText } from '@/components/shell/status-text';
 import { Button } from '@/components/ui/button';
 import { getReport } from '@/lib/domain/report-detail';
 import {
+    buildManualNotifyTargets,
     CASE_TYPE_LABEL,
     STATUS_LABEL,
     STATUS_TONE,
 } from '@/lib/domain/report-labels';
+import { findPuskesmasByKelurahan } from '@/lib/domain/assignment';
+import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
 import { formatDate, formatNumber } from '@/lib/format';
 import { ReportAction } from './report-action';
 import { Field } from './field';
@@ -101,6 +104,22 @@ export default async function LaporanDetailPage({
         actor.role === 'DINKES' ||
         actor.institutionId === report.institutionId;
 
+    const fallbackPuskesmas = report.assignedPuskesmasId
+        ? null
+        : await findPuskesmasByKelurahan(report.kelurahan);
+    const locationUnconfirmed =
+        report.latitude === null || report.longitude === null;
+    const manualNotifyTargets = buildManualNotifyTargets({
+        actorRole: actor.role,
+        actorInstitutionId: actor.institutionId,
+        reportInstitutionId: report.institutionId,
+        reportInstitutionName: report.institutionName,
+        puskesmasId:
+            report.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null,
+        puskesmasName:
+            report.assignedPuskesmasName ?? fallbackPuskesmas?.name ?? null,
+    });
+
     return (
         <PageBody>
             <PageHeader
@@ -144,7 +163,15 @@ export default async function LaporanDetailPage({
                     </div>
                 }
                 aside={
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <ManualNotifyButton
+                            reportId={id}
+                            reportNumber={report.reportNumber}
+                            kelurahan={report.kelurahan}
+                            context="REPORT"
+                            targets={manualNotifyTargets}
+                            locationUnconfirmed={locationUnconfirmed}
+                        />
                         {canManageReport && (
                             <DraftActionToolbar
                                 reportId={id}
@@ -655,6 +682,29 @@ export default async function LaporanDetailPage({
                             />
                         </dl>
 
+                        {locationUnconfirmed && (
+                            <div className="mt-4 flex flex-col gap-2.5 rounded-[var(--radius-control)] border border-amber-500/40 bg-amber-500/10 p-3 text-[12.5px] text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:text-amber-100">
+                                <p className="leading-relaxed">
+                                    Koordinat lokasi pasien belum dikonfirmasi.
+                                    Anda tetap dapat mengirim notifikasi
+                                    WhatsApp &amp; in-app ke Dinas Kesehatan
+                                    atau Puskesmas wilayah untuk verifikasi
+                                    lapangan.
+                                </p>
+                                <ManualNotifyButton
+                                    reportId={id}
+                                    reportNumber={report.reportNumber}
+                                    kelurahan={report.kelurahan}
+                                    context="REPORT"
+                                    targets={manualNotifyTargets}
+                                    locationUnconfirmed={true}
+                                    label="Kirim WA & Notif"
+                                    size="xs"
+                                    className="shrink-0"
+                                />
+                            </div>
+                        )}
+
                         {/* Interactive mini-map showing investigation radius 100m */}
                         {report.latitude !== null &&
                             report.longitude !== null && (
@@ -810,6 +860,15 @@ export default async function LaporanDetailPage({
                                         showDetail={true}
                                     />
                                 )}
+                                <ManualNotifyButton
+                                    reportId={id}
+                                    reportNumber={report.reportNumber}
+                                    kelurahan={report.kelurahan}
+                                    context="PE"
+                                    targets={manualNotifyTargets}
+                                    label="Kirim Notif PE"
+                                    size="xs"
+                                />
                             </div>
                         }
                     >
@@ -966,12 +1025,23 @@ export default async function LaporanDetailPage({
                             </span>
                         }
                         aside={
-                            <Link
-                                href="/tindak-lanjut"
-                                className="text-[12.5px] font-medium text-[var(--accent)] hover:underline"
-                            >
-                                Kelola Tindak Lanjut →
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <ManualNotifyButton
+                                    reportId={id}
+                                    reportNumber={report.reportNumber}
+                                    kelurahan={report.kelurahan}
+                                    context="FOGGING"
+                                    targets={manualNotifyTargets}
+                                    label="Kirim Notif Fogging"
+                                    size="xs"
+                                />
+                                <Link
+                                    href="/tindak-lanjut"
+                                    className="text-[12.5px] font-medium text-[var(--accent)] hover:underline"
+                                >
+                                    Kelola Tindak Lanjut →
+                                </Link>
+                            </div>
                         }
                     >
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -1010,7 +1080,8 @@ export default async function LaporanDetailPage({
                 )}
 
                 {/* WhatsApp Dispatch Logs */}
-                {report.waDispatches.length > 0 && (
+                {(report.waDispatches.length > 0 ||
+                    manualNotifyTargets.length > 0) && (
                     <Panel
                         padded
                         title={
@@ -1022,40 +1093,60 @@ export default async function LaporanDetailPage({
                                 Riwayat Log Notifikasi WhatsApp
                             </span>
                         }
-                        subtitle="Pemberitahuan otomatis ke petugas penanggung jawab"
+                        subtitle="Pemberitahuan otomatis sesuai wilayah & pengiriman manual ke petugas"
+                        aside={
+                            <ManualNotifyButton
+                                reportId={id}
+                                reportNumber={report.reportNumber}
+                                kelurahan={report.kelurahan}
+                                context="REPORT"
+                                targets={manualNotifyTargets}
+                                locationUnconfirmed={locationUnconfirmed}
+                                size="xs"
+                            />
+                        }
                     >
-                        <ul className="flex flex-col gap-2 text-[12.5px]">
-                            {report.waDispatches.map((w) => (
-                                <li
-                                    key={w.id}
-                                    className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--surface)] px-3 py-2"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <MessageSquare
-                                            className="size-3.5 text-[var(--accent)]"
-                                            aria-hidden
-                                        />
-                                        <span className="font-medium text-foreground">
-                                            {w.eventKind}
-                                        </span>
-                                        <span className="font-mono text-muted-foreground">
-                                            {w.recipientPhone}
-                                        </span>
-                                    </span>
-                                    <StatusText
-                                        tone={
-                                            w.status === 'SENT'
-                                                ? 'good'
-                                                : w.status === 'FALLBACK_LOGGED'
-                                                  ? 'warn'
-                                                  : 'bad'
-                                        }
+                        {report.waDispatches.length === 0 ? (
+                            <p className="text-[12.5px] text-muted-foreground">
+                                Belum ada riwayat pengiriman WhatsApp untuk
+                                laporan ini. Gunakan tombol Kirim WA &amp; Notif
+                                untuk mengirim pemberitahuan manual.
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col gap-2 text-[12.5px]">
+                                {report.waDispatches.map((w) => (
+                                    <li
+                                        key={w.id}
+                                        className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--surface)] px-3 py-2"
                                     >
-                                        {w.status}
-                                    </StatusText>
-                                </li>
-                            ))}
-                        </ul>
+                                        <span className="flex items-center gap-2">
+                                            <MessageSquare
+                                                className="size-3.5 text-[var(--accent)]"
+                                                aria-hidden
+                                            />
+                                            <span className="font-medium text-foreground">
+                                                {w.eventKind}
+                                            </span>
+                                            <span className="font-mono text-muted-foreground">
+                                                {w.recipientPhone}
+                                            </span>
+                                        </span>
+                                        <StatusText
+                                            tone={
+                                                w.status === 'SENT'
+                                                    ? 'good'
+                                                    : w.status ===
+                                                        'FALLBACK_LOGGED'
+                                                      ? 'warn'
+                                                      : 'bad'
+                                            }
+                                        >
+                                            {w.status}
+                                        </StatusText>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </Panel>
                 )}
 

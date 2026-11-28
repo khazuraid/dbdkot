@@ -1,4 +1,5 @@
 import { Queue } from 'bullmq';
+import type { WaEventKind } from '../whatsapp';
 import { QUEUE_NAMES, redisConnection, type QueueName } from './connection';
 
 /**
@@ -38,23 +39,18 @@ export type AssignJob = { reportId: string };
 /** Report id is absent on the nightly sweep, present on the per-report reminder. */
 export type SlaJob = {
     reportId?: string;
-    phase?: 'ASSIGN_WARNING_6H' | 'ASSIGN_BREACH_24H' | 'PE_WARNING_48H' | 'PE_BREACH_72H';
+    phase?:
+        | 'ASSIGN_WARNING_6H'
+        | 'ASSIGN_BREACH_24H'
+        | 'PE_WARNING_48H'
+        | 'PE_BREACH_72H';
 };
 export type WhatsAppDispatchJob = {
     recipientPhone: string;
     recipientRole?: string | null;
     institutionId?: string | null;
     reportRSId?: string | null;
-    eventKind:
-        | 'ASSIGNMENT'
-        | 'SLA_WARNING_6H'
-        | 'SLA_ESCALATION_24H'
-        | 'PE_SLA_WARNING'
-        | 'FOGGING_REQUIRED'
-        | 'FOGGING_H_MINUS_1'
-        | 'FOGGING_DAY_0'
-        | 'CROSS_BORDER'
-        | 'TEST';
+    eventKind: WaEventKind;
     message: string;
 };
 export type ClusterDetectorJob = { reportId: string };

@@ -11,15 +11,12 @@ import {
 import { decryptPii, encryptPii, hashPii } from '@/lib/crypto';
 import { audit } from '@/lib/audit';
 import { isValidUuid, maskPhone } from '@/lib/security';
+import { enqueuePeSla } from '@/lib/queue';
 import {
-    enqueueAssign,
-    enqueueClusterDetector,
-    enqueuePeSla,
-    enqueueSla,
-    enqueueWhatsAppDispatch,
-} from '@/lib/queue';
-import { insertNotifications } from './notify';
-import { assignReportByKelurahan } from './assignment';
+    enqueueWaSafe,
+    insertNotifications,
+    notifySubmittedReport,
+} from './notify';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { ReportStatus } from './reports';
 import { validateTransitionNote, type Transition } from './report-labels';
@@ -451,6 +448,12 @@ export async function transitionReport(
         const rejectReasonText = noteCheck.note
             ? ` Alasan: ${noteCheck.note}`
             : '';
+        const reporterRole =
+            current.institutionType === 'PUSKESMAS'
+                ? 'PUSKESMAS'
+                : current.institutionType === 'DINAS_KESEHATAN'
+                  ? 'DINKES'
+                  : 'RUMAH_SAKIT';
         await Promise.all([
             insertNotifications(
                 { kind: 'INSTITUTION', institutionId: current.institutionId },
@@ -472,20 +475,47 @@ export async function transitionReport(
                     entityId: id,
                 },
             ),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: reporterRole,
+                institutionId: current.institutionId,
+                reportRSId: id,
+                eventKind: 'REPORT_REJECTED',
+                message: `[WALI-EPI] Laporan ${current.reportNumber} ditolak Puskesmas.${rejectReasonText}`,
+            }),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'DINKES',
+                reportRSId: id,
+                eventKind: 'REPORT_REJECTED',
+                message: `[WALI-EPI] Laporan ${current.reportNumber} (Kel. ${current.kelurahan ?? '-'}) ditolak Puskesmas dan perlu disposisi ulang.${rejectReasonText}`,
+            }),
         ]);
     }
 
     if (transition === 'REJECT_BY_DINKES') {
+        const rejectTargetId =
+            current.assignedPuskesmasId ?? current.institutionId;
         await insertNotifications(
-            { kind: 'INSTITUTION', institutionId: current.institutionId },
+            { kind: 'INSTITUTION', institutionId: rejectTargetId },
             {
-                title: 'Laporan ditolak Dinas Kesehatan',
-                message: `Hasil PE untuk ${current.reportNumber} ditolak Dinkes.`,
-                type: 'REJECTED',
+                title: 'Hasil PE ditolak Dinas Kesehatan',
+                message: `Hasil PE untuk ${current.reportNumber} ditolak Dinkes.${noteCheck.note ? ` Alasan: ${noteCheck.note}` : ''}`,
+                type: 'PE_REJECTED',
                 entityType: 'REPORT_RS',
                 entityId: id,
             },
         );
+        if (current.assignedPuskesmasId) {
+            await enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'PUSKESMAS',
+                institutionId: current.assignedPuskesmasId,
+                reportRSId: id,
+                eventKind: 'PE_REJECTED',
+                message: `[WALI-EPI] Hasil PE ${current.reportNumber} (${current.kelurahan ?? '-'}) ditolak Dinkes.${noteCheck.note ? ` Alasan: ${noteCheck.note}` : ''}`,
+            });
+        }
     }
 
     if (transition === 'VERIFY' || transition === 'REJECT_BY_DINKES') {
@@ -497,6 +527,34 @@ export async function transitionReport(
                 updatedAt: now,
             })
             .where(eq(reportsPE.reportRSId, id));
+    }
+
+    if (
+        transition === 'VERIFY' &&
+        targetStatus === 'VERIFIED' &&
+        current.assignedPuskesmasId
+    ) {
+        await insertNotifications(
+            {
+                kind: 'INSTITUTION',
+                institutionId: current.assignedPuskesmasId,
+            },
+            {
+                title: 'Hasil PE terverifikasi Dinkes',
+                message: `PE ${current.reportNumber} telah diverifikasi Dinkes (tidak memerlukan fogging fokus).`,
+                type: 'PE_VERIFIED',
+                entityType: 'REPORT_RS',
+                entityId: id,
+            },
+        );
+        await enqueueWaSafe({
+            recipientPhone: '',
+            recipientRole: 'PUSKESMAS',
+            institutionId: current.assignedPuskesmasId,
+            reportRSId: id,
+            eventKind: 'PE_VERIFIED',
+            message: `[WALI-EPI] Hasil PE ${current.reportNumber} (${current.kelurahan ?? '-'}) telah diverifikasi Dinkes (negatif penularan / tanpa fogging).`,
+        });
     }
 
     if (
@@ -531,18 +589,14 @@ export async function transitionReport(
             },
         );
 
-        try {
-            await enqueueWhatsAppDispatch({
-                recipientPhone: '',
-                recipientRole: 'PUSKESMAS',
-                institutionId: current.assignedPuskesmasId,
-                reportRSId: id,
-                eventKind: 'FOGGING_REQUIRED',
-                message: `[WALI-EPI] PE ${current.reportNumber} (${current.kelurahan ?? '-'}) terverifikasi POSITIF PENULARAN. Segera laksanakan Fogging Fokus Siklus 1.`,
-            });
-        } catch {
-            // Non-blocking
-        }
+        await enqueueWaSafe({
+            recipientPhone: '',
+            recipientRole: 'PUSKESMAS',
+            institutionId: current.assignedPuskesmasId,
+            reportRSId: id,
+            eventKind: 'FOGGING_REQUIRED',
+            message: `[WALI-EPI] PE ${current.reportNumber} (${current.kelurahan ?? '-'}) terverifikasi POSITIF PENULARAN. Segera laksanakan Fogging Fokus Siklus 1.`,
+        });
     }
 
     await audit({
@@ -746,6 +800,14 @@ export async function submitDraftReport(
         .update(reportsRS)
         .set({
             status: targetStatus,
+            ...(!isCrossBorder && isPuskesmasPoli && !row.assignedPuskesmasId
+                ? {
+                      assignedPuskesmasId: row.institutionId,
+                      assignedToId: actor.userId,
+                      assignedAt: now,
+                      acceptedAt: now,
+                  }
+                : {}),
             updatedById: actor.userId,
             updatedAt: now,
         })
@@ -761,93 +823,17 @@ export async function submitDraftReport(
         },
     });
 
-    if (isCrossBorder) {
-        await insertNotifications(
-            { kind: 'ROLE', role: 'DINKES' },
-            {
-                title: 'Kasus luar wilayah terdeteksi',
-                message: `Laporan ${row.reportNumber} berdomisili di ${row.kota} dan menunggu disposisi Dinkes.`,
-                type: 'CROSS_BORDER',
-                entityType: 'REPORT_RS',
-                entityId: id,
-            },
-        );
-    } else if (!isPuskesmasPoli) {
-        try {
-            const assignRes = await assignReportByKelurahan(id);
-            if (assignRes.assigned) {
-                await insertNotifications(
-                    {
-                        kind: 'INSTITUTION',
-                        institutionId: assignRes.puskesmasId,
-                    },
-                    {
-                        title: 'Laporan kasus baru masuk',
-                        message: `Laporan ${row.reportNumber} (${row.caseType}) di Kel. ${row.kelurahan} menunggu verifikasi Puskesmas (SLA 24 jam).`,
-                        type: 'ASSIGNMENT',
-                        entityType: 'REPORT_RS',
-                        entityId: id,
-                    },
-                );
-            }
-        } catch (err) {
-            console.error('[laporan] auto-assign inline error:', err);
-        }
-
-        try {
-            await insertNotifications(
-                { kind: 'ROLE', role: 'DINKES' },
-                {
-                    title: 'Laporan kasus DBD baru',
-                    message: `Laporan ${row.reportNumber} (${row.caseType}) diterima dari faskes di Kel. ${row.kelurahan}, Kec. ${row.kecamatan}.`,
-                    type: 'STATUS_CHANGE',
-                    entityType: 'REPORT_RS',
-                    entityId: id,
-                },
-            );
-        } catch (err) {
-            console.error('[laporan] dinkes notification error:', err);
-        }
-    } else {
-        try {
-            await insertNotifications(
-                { kind: 'ROLE', role: 'DINKES' },
-                {
-                    title: 'Laporan kasus DBD baru (Puskesmas Poli)',
-                    message: `Laporan ${row.reportNumber} (${row.caseType}) dibuat langsung oleh Puskesmas di Kel. ${row.kelurahan}.`,
-                    type: 'STATUS_CHANGE',
-                    entityType: 'REPORT_RS',
-                    entityId: id,
-                },
-            );
-        } catch (err) {
-            console.error('[laporan] poli dinkes notification error:', err);
-        }
-    }
-
-    try {
-        if (!isCrossBorder && !isPuskesmasPoli) {
-            await enqueueAssign(id);
-            await enqueueSla(id);
-        }
-        if (row.latitude !== null && row.longitude !== null) {
-            await enqueueClusterDetector(id);
-        }
-        if (isCrossBorder) {
-            await enqueueWhatsAppDispatch({
-                recipientPhone: process.env.DINKES_ALERT_PHONE ?? '',
-                recipientRole: 'DINKES',
-                reportRSId: id,
-                eventKind: 'CROSS_BORDER',
-                message: `[WALI-EPI] Kasus luar wilayah ${row.reportNumber} (${row.kelurahan}, ${row.kota}) menunggu disposisi Dinkes di /laporan/lintas-wilayah.`,
-            });
-        }
-    } catch (error) {
-        console.error('[laporan] gagal enqueue ke Redis', {
-            reportId: id,
-            error,
-        });
-    }
+    await notifySubmittedReport({
+        reportId: id,
+        reportNumber: row.reportNumber,
+        caseType: row.caseType,
+        kelurahan: row.kelurahan,
+        kecamatan: row.kecamatan,
+        kota: row.kota,
+        isCrossBorder,
+        isPuskesmasPoli,
+        hasCoordinates: row.latitude !== null && row.longitude !== null,
+    });
 
     return { ok: true, status: targetStatus };
 }
@@ -940,16 +926,35 @@ export async function updateReport(
         updates.diagnosis = input.diagnosis ?? null;
 
     // Handle status toggling: kirim (terkirim) vs draf
+    let promotedSubmission: {
+        isCrossBorder: boolean;
+        isPuskesmasPoli: boolean;
+        kelurahan: string | null;
+        kecamatan: string | null;
+        kota: string | null;
+        caseType: string;
+        hasCoordinates: boolean;
+    } | null = null;
+
     if (input.isDraft === true) {
         updates.status = 'DRAFT';
     } else if (input.isDraft === false && row.status === 'DRAFT') {
+        const nextKelurahan = input.kelurahan ?? row.kelurahan;
+        const nextKecamatan = input.kecamatan ?? row.kecamatan;
+        const nextKota = input.kota ?? row.kota;
+        const nextCaseType = input.caseType ?? row.caseType;
+        const nextLat =
+            input.latitude !== undefined ? input.latitude : row.latitude;
+        const nextLng =
+            input.longitude !== undefined ? input.longitude : row.longitude;
+
         const [{ localMatches }] = await db
             .select({ localMatches: sql<number>`count(*)::int` })
             .from(kelurahan)
             .where(
                 and(
-                    sql`lower(${kelurahan.name}) = lower(${input.kelurahan ?? row.kelurahan ?? ''})`,
-                    sql`lower(${kelurahan.kota}) = lower(${input.kota ?? row.kota ?? ''})`,
+                    sql`lower(${kelurahan.name}) = lower(${nextKelurahan ?? ''})`,
+                    sql`lower(${kelurahan.kota}) = lower(${nextKota ?? ''})`,
                 ),
             );
         const [{ totalKelurahan }] = await db
@@ -963,6 +968,22 @@ export async function updateReport(
             : isPuskesmasPoli
               ? 'ASSIGNED_ACCEPTED'
               : 'SUBMITTED';
+        if (!isCrossBorder && isPuskesmasPoli && !row.assignedPuskesmasId) {
+            const now = new Date();
+            updates.assignedPuskesmasId = row.institutionId;
+            updates.assignedToId = actor.userId;
+            updates.assignedAt = now;
+            updates.acceptedAt = now;
+        }
+        promotedSubmission = {
+            isCrossBorder,
+            isPuskesmasPoli,
+            kelurahan: nextKelurahan,
+            kecamatan: nextKecamatan,
+            kota: nextKota,
+            caseType: nextCaseType,
+            hasCoordinates: nextLat !== null && nextLng !== null,
+        };
     }
 
     await db.update(reportsRS).set(updates).where(eq(reportsRS.id, id));
@@ -977,6 +998,14 @@ export async function updateReport(
             updatedFields: { from: null, to: Object.keys(updates) },
         },
     });
+
+    if (promotedSubmission) {
+        await notifySubmittedReport({
+            reportId: id,
+            reportNumber: row.reportNumber,
+            ...promotedSubmission,
+        });
+    }
 
     return { ok: true };
 }

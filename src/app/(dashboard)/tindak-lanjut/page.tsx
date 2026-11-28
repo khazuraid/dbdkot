@@ -17,8 +17,7 @@ export default async function TindakLanjutPage() {
     const actor = await requireRole('ADMIN', 'DINKES', 'PUSKESMAS');
     const items = await listFoggingQueue(actor);
 
-    const canExecute =
-        actor.role === 'DINKES' || actor.role === 'PUSKESMAS';
+    const canExecute = actor.role === 'DINKES' || actor.role === 'PUSKESMAS';
 
     const waitingCycle1 = items.filter((i) => {
         const c1 = i.cycles.find((c) => c.cycleNumber === 1);
@@ -57,14 +56,22 @@ export default async function TindakLanjutPage() {
                         label="Menunggu Siklus 1 (H0)"
                         value={waitingCycle1}
                         signal={waitingCycle1 > 0 ? 'warn' : 'good'}
-                        hint={waitingCycle1 > 0 ? 'Prioritas penyemprotan pertama' : 'Semua H0 terlaksana'}
+                        hint={
+                            waitingCycle1 > 0
+                                ? 'Prioritas penyemprotan pertama'
+                                : 'Semua H0 terlaksana'
+                        }
                         icon={Clock}
                     />
                     <Stat
                         label="Menunggu Siklus 2 (H+7)"
                         value={waitingCycle2}
                         signal={waitingCycle2 > 0 ? 'warn' : 'good'}
-                        hint={waitingCycle2 > 0 ? 'Jadwal putaran kedua' : 'Nol antrian H+7'}
+                        hint={
+                            waitingCycle2 > 0
+                                ? 'Jadwal putaran kedua'
+                                : 'Nol antrian H+7'
+                        }
                         icon={CalendarCheck}
                     />
                     <Stat
@@ -78,7 +85,12 @@ export default async function TindakLanjutPage() {
 
                 {items.length === 0 ? (
                     <Panel title="Antrian Fogging Fokus">
-                        <Empty action={{ href: '/laporan', label: 'Lihat semua laporan' }}>
+                        <Empty
+                            action={{
+                                href: '/laporan',
+                                label: 'Lihat semua laporan',
+                            }}
+                        >
                             Belum ada kasus yang memerlukan tindak lanjut
                             fogging fokus saat ini.
                         </Empty>
@@ -90,6 +102,8 @@ export default async function TindakLanjutPage() {
                                 key={item.reportId}
                                 item={item}
                                 canExecute={canExecute}
+                                actorRole={actor.role}
+                                actorInstitutionId={actor.institutionId}
                             />
                         ))}
                     </div>

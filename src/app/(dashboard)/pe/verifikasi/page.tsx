@@ -31,7 +31,7 @@ export default async function VerifikasiPePage({
     searchParams: Promise<{ page?: string }>;
 }) {
     const sp = await searchParams;
-    await requireRole('DINKES', 'ADMIN');
+    const actor = await requireRole('DINKES', 'ADMIN');
     const page = readPage(sp.page);
     const { rows, perPage, total } = await listPendingVerifications(page, 25);
 
@@ -83,7 +83,8 @@ export default async function VerifikasiPePage({
                                 cell: (r) => (
                                     <div className="space-y-0.5">
                                         <p className="font-medium text-foreground">
-                                            {CASE_TYPE_LABEL[r.caseType] ?? r.caseType}
+                                            {CASE_TYPE_LABEL[r.caseType] ??
+                                                r.caseType}
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
                                             {r.kelurahan ?? <Dash />}
@@ -100,7 +101,9 @@ export default async function VerifikasiPePage({
                                             {r.officerName || '-'}
                                         </p>
                                         <p className="text-[11px] text-muted-foreground">
-                                            {r.peDate ? formatDate(r.peDate) : '-'}
+                                            {r.peDate
+                                                ? formatDate(r.peDate)
+                                                : '-'}
                                         </p>
                                     </div>
                                 ),
@@ -110,7 +113,8 @@ export default async function VerifikasiPePage({
                                 header: 'Hasil ABJ & Jentik',
                                 cell: (r) => {
                                     const abjNum = r.abj ? Number(r.abj) : null;
-                                    const isAbjSafe = abjNum !== null && abjNum >= 95;
+                                    const isAbjSafe =
+                                        abjNum !== null && abjNum >= 95;
                                     return (
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-1.5">
@@ -121,11 +125,19 @@ export default async function VerifikasiPePage({
                                                             : 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-300'
                                                     }`}
                                                 >
-                                                    ABJ: {r.abj ? `${r.abj}%` : '-'}
+                                                    ABJ:{' '}
+                                                    {r.abj ? `${r.abj}%` : '-'}
                                                 </span>
                                             </div>
                                             <p className="text-[10.5px] text-muted-foreground">
-                                                HI: {r.houseIndex ? `${r.houseIndex}%` : '-'} | CI: {r.containerIndex ? `${r.containerIndex}%` : '-'}
+                                                HI:{' '}
+                                                {r.houseIndex
+                                                    ? `${r.houseIndex}%`
+                                                    : '-'}{' '}
+                                                | CI:{' '}
+                                                {r.containerIndex
+                                                    ? `${r.containerIndex}%`
+                                                    : '-'}
                                             </p>
                                         </div>
                                     );
@@ -142,7 +154,9 @@ export default async function VerifikasiPePage({
                                                 : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
                                         }`}
                                     >
-                                        {r.foggingRecommended ? 'Perlu Fogging' : 'Tidak Perlu'}
+                                        {r.foggingRecommended
+                                            ? 'Perlu Fogging'
+                                            : 'Tidak Perlu'}
                                     </span>
                                 ),
                             },
@@ -171,6 +185,12 @@ export default async function VerifikasiPePage({
                                     <VerifyControl
                                         reportId={r.id}
                                         reportNumber={r.reportNumber}
+                                        kelurahan={r.kelurahan}
+                                        institutionId={r.institutionId}
+                                        puskesmasId={r.puskesmasId}
+                                        puskesmasName={r.puskesmasName}
+                                        actorRole={actor.role}
+                                        actorInstitutionId={actor.institutionId}
                                         peSummary={{
                                             peId: r.peId,
                                             officerName: r.officerName,
@@ -178,8 +198,10 @@ export default async function VerifikasiPePage({
                                             abj: r.abj,
                                             houseIndex: r.houseIndex,
                                             containerIndex: r.containerIndex,
-                                            transmissionRisk: r.transmissionRisk,
-                                            foggingRecommended: r.foggingRecommended,
+                                            transmissionRisk:
+                                                r.transmissionRisk,
+                                            foggingRecommended:
+                                                r.foggingRecommended,
                                             conclusion: r.conclusion,
                                         }}
                                     />

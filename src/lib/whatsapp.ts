@@ -12,13 +12,21 @@ export type WaProvider = 'openwa' | 'generic';
 
 export type WaEventKind =
     | 'ASSIGNMENT'
+    | 'NEW_REPORT'
+    | 'REPORT_REJECTED'
     | 'SLA_WARNING_6H'
     | 'SLA_ESCALATION_24H'
     | 'PE_SLA_WARNING'
+    | 'PE_COMPLETED'
+    | 'PE_VERIFIED'
+    | 'PE_REJECTED'
     | 'FOGGING_REQUIRED'
+    | 'FOGGING_SCHEDULED'
     | 'FOGGING_H_MINUS_1'
     | 'FOGGING_DAY_0'
+    | 'FOGGING_COMPLETED'
     | 'CROSS_BORDER'
+    | 'MANUAL_ALERT'
     | 'TEST';
 
 export type DispatchWhatsAppInput = {
@@ -68,7 +76,7 @@ export function normalizeIndonesianPhone(raw: string): string {
 }
 
 export function getCooldownMs(eventKind: WaEventKind): number {
-    if (eventKind === 'TEST') return 0;
+    if (eventKind === 'TEST' || eventKind === 'MANUAL_ALERT') return 0;
     if (
         eventKind === 'SLA_WARNING_6H' ||
         eventKind === 'SLA_ESCALATION_24H' ||

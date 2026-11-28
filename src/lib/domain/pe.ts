@@ -6,7 +6,7 @@ import { calculateEntomologyMetrics } from '@/lib/entomology-calculator';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import { decryptPii } from '@/lib/crypto';
 import { isValidUuid } from '@/lib/security';
-import { insertNotifications } from './notify';
+import { enqueueWaSafe, insertNotifications } from './notify';
 
 export {
     householdSchema,
@@ -16,8 +16,7 @@ export {
 import type { CreatePeInput } from './form-contracts';
 
 export type CreatePeResult =
-    | { ok: true; id: string }
-    | { ok: false; error: string };
+    { ok: true; id: string } | { ok: false; error: string };
 
 export type PeCandidateDetail = {
     id: string;
@@ -115,7 +114,7 @@ export async function peCandidates(
         .orderBy(desc(reportsRS.createdAt))
         .limit(100);
 
-    const mapCandidate = (r: typeof rows[number]): PeCandidateDetail => ({
+    const mapCandidate = (r: (typeof rows)[number]): PeCandidateDetail => ({
         id: r.id,
         reportNumber: r.reportNumber,
         patientName: decryptOrDash(r.patientNameEncrypted),
@@ -134,14 +133,12 @@ export async function peCandidates(
         latitude: r.latitude ? Number(r.latitude) : null,
         longitude: r.longitude ? Number(r.longitude) : null,
         dengueBlot:
-            (r.dengueBlot as 'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ??
-            null,
+            (r.dengueBlot as
+                'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ?? null,
         igm:
-            (r.igm as 'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ??
-            null,
+            (r.igm as 'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ?? null,
         igg:
-            (r.igg as 'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ??
-            null,
+            (r.igg as 'POSITIF' | 'NEGATIF' | 'TIDAK_DIPERIKSA' | null) ?? null,
         plateletCount: r.plateletCount,
         hematocrit: r.hematocrit ? Number(r.hematocrit) : null,
         admissionDate: r.admissionDate,
@@ -210,6 +207,8 @@ export async function createPe(
     const [report] = await getDb()
         .select({
             id: reportsRS.id,
+            reportNumber: reportsRS.reportNumber,
+            kelurahan: reportsRS.kelurahan,
             status: reportsRS.status,
             assignedPuskesmasId: reportsRS.assignedPuskesmasId,
         })
@@ -386,16 +385,27 @@ export async function createPe(
     });
 
     try {
+        const riskLabel =
+            metrics.transmissionRisk === 'POSITIF_PENULARAN'
+                ? 'Positif Penularan · Rekomendasi Fogging'
+                : 'Negatif Penularan';
         await insertNotifications(
             { kind: 'ROLE', role: 'DINKES' },
             {
                 title: 'Hasil PE selesai dilaporkan',
-                message: `Penyelidikan epidemiologi (PE) telah selesai disubmit (${metrics.transmissionRisk === 'POSITIF_PENULARAN' ? 'Positif Penularan · Rekomendasi Fogging' : 'Negatif Penularan'}) dan menunggu verifikasi Dinkes.`,
+                message: `PE ${report.reportNumber} (Kel. ${report.kelurahan ?? '-'}) telah disubmit (${riskLabel}) dan menunggu verifikasi Dinkes.`,
                 type: 'PE_COMPLETED',
                 entityType: 'REPORT_RS',
                 entityId: input.reportRSId,
             },
         );
+        await enqueueWaSafe({
+            recipientPhone: '',
+            recipientRole: 'DINKES',
+            reportRSId: input.reportRSId,
+            eventKind: 'PE_COMPLETED',
+            message: `[WALI-EPI] Hasil PE ${report.reportNumber} (Kel. ${report.kelurahan ?? '-'}) selesai dilaporkan (${riskLabel}) dan menunggu verifikasi Dinkes.`,
+        });
     } catch (err) {
         console.error('[pe] notify dinkes error:', err);
     }
@@ -412,6 +422,9 @@ export async function peDetail(actor: Actor, id: string) {
             pe: reportsPE,
             reportNumber: reportsRS.reportNumber,
             reportRSId: reportsRS.id,
+            kelurahan: reportsRS.kelurahan,
+            institutionId: reportsRS.institutionId,
+            assignedPuskesmasId: reportsRS.assignedPuskesmasId,
         })
         .from(reportsPE)
         .innerJoin(reportsRS, eq(reportsRS.id, reportsPE.reportRSId))
@@ -485,7 +498,8 @@ export async function deletePe(
     const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
         isPrivileged ||
-        (actor.role === 'PUSKESMAS' && actor.institutionId === row.institutionId);
+        (actor.role === 'PUSKESMAS' &&
+            actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
         return {
@@ -563,7 +577,8 @@ export async function updatePe(
     const isPrivileged = actor.role === 'ADMIN' || actor.role === 'DINKES';
     const isAuthorized =
         isPrivileged ||
-        (actor.role === 'PUSKESMAS' && actor.institutionId === row.institutionId);
+        (actor.role === 'PUSKESMAS' &&
+            actor.institutionId === row.institutionId);
 
     if (!isAuthorized) {
         return {
@@ -588,7 +603,8 @@ export async function updatePe(
         const metrics = calculateEntomologyMetrics(
             input.households.map((h, idx) => {
                 const containersChecked =
-                    h.containersChecked ?? Math.max(h.houseCount * 2, h.larvaCount);
+                    h.containersChecked ??
+                    Math.max(h.houseCount * 2, h.larvaCount);
                 const positiveContainers = h.positiveContainers ?? h.larvaCount;
                 const isPositive =
                     Boolean(h.insidePositive) ||
@@ -628,25 +644,57 @@ export async function updatePe(
         ...existingFormData,
         ...(input.rt !== undefined ? { rt: input.rt } : {}),
         ...(input.rw !== undefined ? { rw: input.rw } : {}),
-        ...(input.clinicalSymptoms ? { clinicalSymptoms: input.clinicalSymptoms } : {}),
+        ...(input.clinicalSymptoms
+            ? { clinicalSymptoms: input.clinicalSymptoms }
+            : {}),
         ...(input.labRdtNs1 ? { labRdtNs1: input.labRdtNs1 } : {}),
         ...(input.labIgm ? { labIgm: input.labIgm } : {}),
         ...(input.labIgg ? { labIgg: input.labIgg } : {}),
-        ...(input.labPlatelet !== undefined ? { labPlatelet: input.labPlatelet } : {}),
-        ...(input.labHematocrit !== undefined ? { labHematocrit: input.labHematocrit } : {}),
-        ...(input.hasOtherDenguePatients !== undefined ? { hasOtherDenguePatients: Boolean(input.hasOtherDenguePatients) } : {}),
-        ...(input.respondentAge !== undefined ? { respondentAge: input.respondentAge } : {}),
-        ...(input.respondentAddress !== undefined ? { respondentAddress: input.respondentAddress } : {}),
-        ...(input.respondentJob !== undefined ? { respondentJob: input.respondentJob } : {}),
-        ...(input.patientJob !== undefined ? { patientJob: input.patientJob } : {}),
-        ...(input.mainComplaint !== undefined ? { mainComplaint: input.mainComplaint } : {}),
-        ...(input.symptomOnsetDate !== undefined ? { symptomOnsetDate: input.symptomOnsetDate } : {}),
-        ...(input.firstActionTaken !== undefined ? { firstActionTaken: input.firstActionTaken } : {}),
-        ...(input.dengueAttackOrder !== undefined ? { dengueAttackOrder: input.dengueAttackOrder } : {}),
-        ...(input.comorbidity !== undefined ? { comorbidity: input.comorbidity } : {}),
-        ...(input.treatmentGiven !== undefined ? { treatmentGiven: input.treatmentGiven } : {}),
-        ...(input.currentPatientCondition !== undefined ? { currentPatientCondition: input.currentPatientCondition } : {}),
-        ...(input.additionalNotes !== undefined ? { additionalNotes: input.additionalNotes } : {}),
+        ...(input.labPlatelet !== undefined
+            ? { labPlatelet: input.labPlatelet }
+            : {}),
+        ...(input.labHematocrit !== undefined
+            ? { labHematocrit: input.labHematocrit }
+            : {}),
+        ...(input.hasOtherDenguePatients !== undefined
+            ? { hasOtherDenguePatients: Boolean(input.hasOtherDenguePatients) }
+            : {}),
+        ...(input.respondentAge !== undefined
+            ? { respondentAge: input.respondentAge }
+            : {}),
+        ...(input.respondentAddress !== undefined
+            ? { respondentAddress: input.respondentAddress }
+            : {}),
+        ...(input.respondentJob !== undefined
+            ? { respondentJob: input.respondentJob }
+            : {}),
+        ...(input.patientJob !== undefined
+            ? { patientJob: input.patientJob }
+            : {}),
+        ...(input.mainComplaint !== undefined
+            ? { mainComplaint: input.mainComplaint }
+            : {}),
+        ...(input.symptomOnsetDate !== undefined
+            ? { symptomOnsetDate: input.symptomOnsetDate }
+            : {}),
+        ...(input.firstActionTaken !== undefined
+            ? { firstActionTaken: input.firstActionTaken }
+            : {}),
+        ...(input.dengueAttackOrder !== undefined
+            ? { dengueAttackOrder: input.dengueAttackOrder }
+            : {}),
+        ...(input.comorbidity !== undefined
+            ? { comorbidity: input.comorbidity }
+            : {}),
+        ...(input.treatmentGiven !== undefined
+            ? { treatmentGiven: input.treatmentGiven }
+            : {}),
+        ...(input.currentPatientCondition !== undefined
+            ? { currentPatientCondition: input.currentPatientCondition }
+            : {}),
+        ...(input.additionalNotes !== undefined
+            ? { additionalNotes: input.additionalNotes }
+            : {}),
     };
 
     await db.transaction(async (tx) => {
@@ -654,20 +702,38 @@ export async function updatePe(
             .update(reportsPE)
             .set({
                 ...(input.peDate ? { peDate: input.peDate } : {}),
-                ...(input.officerName ? { officerName: input.officerName } : {}),
-                ...(input.officerNip !== undefined ? { officerNip: input.officerNip || null } : {}),
-                ...(input.headOfPuskesmasName !== undefined ? { headOfPuskesmasName: input.headOfPuskesmasName || null } : {}),
-                ...(input.headOfPuskesmasNip !== undefined ? { headOfPuskesmasNip: input.headOfPuskesmasNip || null } : {}),
-                ...(input.respondentName !== undefined ? { respondentName: input.respondentName || null } : {}),
-                ...(input.respondentRelation !== undefined ? { respondentRelation: input.respondentRelation || null } : {}),
-                ...(input.travelHistory14d !== undefined ? { travelHistory14d: input.travelHistory14d || null } : {}),
-                ...(input.otherFeverCasesCount !== undefined ? { otherFeverCasesCount: input.otherFeverCasesCount } : {}),
+                ...(input.officerName
+                    ? { officerName: input.officerName }
+                    : {}),
+                ...(input.officerNip !== undefined
+                    ? { officerNip: input.officerNip || null }
+                    : {}),
+                ...(input.headOfPuskesmasName !== undefined
+                    ? { headOfPuskesmasName: input.headOfPuskesmasName || null }
+                    : {}),
+                ...(input.headOfPuskesmasNip !== undefined
+                    ? { headOfPuskesmasNip: input.headOfPuskesmasNip || null }
+                    : {}),
+                ...(input.respondentName !== undefined
+                    ? { respondentName: input.respondentName || null }
+                    : {}),
+                ...(input.respondentRelation !== undefined
+                    ? { respondentRelation: input.respondentRelation || null }
+                    : {}),
+                ...(input.travelHistory14d !== undefined
+                    ? { travelHistory14d: input.travelHistory14d || null }
+                    : {}),
+                ...(input.otherFeverCasesCount !== undefined
+                    ? { otherFeverCasesCount: input.otherFeverCasesCount }
+                    : {}),
                 ...(input.rt !== undefined ? { rt: input.rt || null } : {}),
                 ...(input.rw !== undefined ? { rw: input.rw || null } : {}),
                 ...(input.sourceLocation !== undefined
                     ? {
                           sourceLocation: input.sourceLocation || null,
-                          sourceInvestigationDone: Boolean(input.sourceLocation),
+                          sourceInvestigationDone: Boolean(
+                              input.sourceLocation,
+                          ),
                       }
                     : {}),
                 ...metricsUpdates,
@@ -678,7 +744,9 @@ export async function updatePe(
             .where(eq(reportsPE.id, peId));
 
         if (input.households && input.households.length > 0) {
-            await tx.delete(peHouseholdSurveys).where(eq(peHouseholdSurveys.reportPEId, peId));
+            await tx
+                .delete(peHouseholdSurveys)
+                .where(eq(peHouseholdSurveys.reportPEId, peId));
             await tx.insert(peHouseholdSurveys).values(
                 input.households.map((h) => ({
                     reportPEId: peId,

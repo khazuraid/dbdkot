@@ -15,6 +15,12 @@ import {
     setNotificationRead,
     decideVerification,
 } from '@/lib/domain/actions';
+import {
+    sendManualNotification,
+    type ManualNotifyContext,
+    type ManualNotifyResult,
+    type ManualNotifyTarget,
+} from '@/lib/domain/notify';
 
 /**
  * Server actions for the surfaces that gained writes. Each re-reads the actor:
@@ -251,4 +257,29 @@ export async function deleteConversationAction(
 
     revalidatePath('/pesan');
     return { ok: true };
+}
+
+/* ── notifikasi manual (In-App + WhatsApp) ─────────────────────────────── */
+
+export async function sendManualNotificationAction(input: {
+    reportId: string;
+    context: ManualNotifyContext;
+    target: ManualNotifyTarget;
+    message?: string;
+    sendInApp?: boolean;
+    sendWhatsApp?: boolean;
+}): Promise<ManualNotifyResult> {
+    try {
+        const actor = await requireActor();
+        const result = await sendManualNotification(actor, input);
+        if (result.ok) {
+            revalidatePath(`/laporan/${input.reportId}`);
+            revalidatePath('/notifikasi');
+            revalidatePath('/pe/verifikasi');
+            revalidatePath('/tindak-lanjut');
+        }
+        return result;
+    } catch {
+        return { ok: false, error: 'Sesi berakhir. Masuk ulang.' };
+    }
 }

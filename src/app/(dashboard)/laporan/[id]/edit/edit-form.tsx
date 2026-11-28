@@ -104,9 +104,11 @@ export function EditReportForm({
                     </span>
                 }
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-1.5 sm:col-span-2">
-                        <Label htmlFor="patientName">Nama Lengkap Pasien *</Label>
+                        <Label htmlFor="patientName">
+                            Nama Lengkap Pasien *
+                        </Label>
                         <Input
                             id="patientName"
                             name="patientName"
@@ -116,7 +118,9 @@ export function EditReportForm({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="patientNik">NIK Pasien (16 digit) *</Label>
+                        <Label htmlFor="patientNik">
+                            NIK Pasien (16 digit) *
+                        </Label>
                         <Input
                             id="patientNik"
                             name="patientNik"
@@ -127,7 +131,9 @@ export function EditReportForm({
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-3">
-                        <Label htmlFor="patientAddress">Alamat Lengkap Domisili *</Label>
+                        <Label htmlFor="patientAddress">
+                            Alamat Lengkap Domisili *
+                        </Label>
                         <Input
                             id="patientAddress"
                             name="patientAddress"
@@ -137,7 +143,9 @@ export function EditReportForm({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="patientAge">Usia Pasien (Tahun) *</Label>
+                        <Label htmlFor="patientAge">
+                            Usia Pasien (Tahun) *
+                        </Label>
                         <Input
                             id="patientAge"
                             name="patientAge"
@@ -161,16 +169,22 @@ export function EditReportForm({
                                 <option value="L">Laki-laki (L)</option>
                                 <option value="P">Perempuan (P)</option>
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="phoneNumber">Nomor Telepon / WhatsApp</Label>
+                        <Label htmlFor="phoneNumber">
+                            Nomor Telepon / WhatsApp
+                        </Label>
                         <Input
                             id="phoneNumber"
                             name="phoneNumber"
-                            defaultValue={report.patient.phone === '—' ? '' : report.patient.phone}
+                            defaultValue={
+                                report.patient.phone === '—'
+                                    ? ''
+                                    : report.patient.phone
+                            }
                             placeholder="Contoh: 08123456789"
                         />
                     </div>
@@ -187,7 +201,7 @@ export function EditReportForm({
                     </span>
                 }
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="kelurahan">Kelurahan *</Label>
                         <div className="relative">
@@ -195,8 +209,10 @@ export function EditReportForm({
                                 id="kelurahan"
                                 name="kelurahan"
                                 value={kelurahan}
-                                onChange={(e) => handleKelurahanChange(e.target.value)}
-                                className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs text-foreground outline-none focus-visible:border-[var(--accent)] font-medium"
+                                onChange={(e) =>
+                                    handleKelurahanChange(e.target.value)
+                                }
+                                className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-foreground outline-none focus-visible:border-[var(--accent)]"
                             >
                                 <option value="">Pilih Kelurahan...</option>
                                 {kelurahanOptions.map((k) => (
@@ -205,7 +221,7 @@ export function EditReportForm({
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
@@ -294,7 +310,7 @@ export function EditReportForm({
                     </span>
                 }
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="caseType">Diagnosis Kasus *</Label>
                         <div className="relative">
@@ -302,19 +318,29 @@ export function EditReportForm({
                                 id="caseType"
                                 name="caseType"
                                 defaultValue={report.caseType}
-                                className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs text-foreground outline-none focus-visible:border-[var(--accent)] font-medium"
+                                className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-foreground outline-none focus-visible:border-[var(--accent)]"
                             >
-                                <option value="DENGUE">Dengue Fever (DF / Demam Dengue)</option>
-                                <option value="DHF">DHF (Demam Berdarah Dengue / DBD)</option>
-                                <option value="DSS">DSS (Dengue Shock Syndrome)</option>
-                                <option value="SUSPECTED_DENGUE">Suspek Dengue</option>
+                                <option value="DENGUE">
+                                    Dengue Fever (DF / Demam Dengue)
+                                </option>
+                                <option value="DHF">
+                                    DHF (Demam Berdarah Dengue / DBD)
+                                </option>
+                                <option value="DSS">
+                                    DSS (Dengue Shock Syndrome)
+                                </option>
+                                <option value="SUSPECTED_DENGUE">
+                                    Suspek Dengue
+                                </option>
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="admissionDate">Tanggal Masuk Rawat *</Label>
+                        <Label htmlFor="admissionDate">
+                            Tanggal Masuk Rawat *
+                        </Label>
                         <Input
                             id="admissionDate"
                             name="admissionDate"
@@ -325,7 +351,9 @@ export function EditReportForm({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="symptomOnsetDate">Tanggal Onset Gejala</Label>
+                        <Label htmlFor="symptomOnsetDate">
+                            Tanggal Onset Gejala
+                        </Label>
                         <Input
                             id="symptomOnsetDate"
                             name="symptomOnsetDate"
@@ -345,7 +373,9 @@ export function EditReportForm({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="plateletCount">Trombosit Terakhir (sel/µL)</Label>
+                        <Label htmlFor="plateletCount">
+                            Trombosit Terakhir (sel/µL)
+                        </Label>
                         <Input
                             id="plateletCount"
                             name="plateletCount"
@@ -377,14 +407,18 @@ export function EditReportForm({
                             <select
                                 id="ns1Result"
                                 name="ns1Result"
-                                defaultValue={report.dengueBlot ?? 'TIDAK_DIPERIKSA'}
+                                defaultValue={
+                                    report.dengueBlot ?? 'TIDAK_DIPERIKSA'
+                                }
                                 className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs text-foreground outline-none focus-visible:border-[var(--accent)]"
                             >
-                                <option value="TIDAK_DIPERIKSA">Tidak Diperiksa</option>
+                                <option value="TIDAK_DIPERIKSA">
+                                    Tidak Diperiksa
+                                </option>
                                 <option value="POSITIF">Positif (+)</option>
                                 <option value="NEGATIF">Negatif (-)</option>
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
@@ -397,16 +431,20 @@ export function EditReportForm({
                                 defaultValue={report.igm ?? 'TIDAK_DIPERIKSA'}
                                 className="h-9 w-full appearance-none rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] px-3 text-xs text-foreground outline-none focus-visible:border-[var(--accent)]"
                             >
-                                <option value="TIDAK_DIPERIKSA">Tidak Diperiksa</option>
+                                <option value="TIDAK_DIPERIKSA">
+                                    Tidak Diperiksa
+                                </option>
                                 <option value="POSITIF">Positif (+)</option>
                                 <option value="NEGATIF">Negatif (-)</option>
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
-                        <Label htmlFor="diagnosis">Catatan Diagnosis / Komplikasi</Label>
+                        <Label htmlFor="diagnosis">
+                            Catatan Diagnosis / Komplikasi
+                        </Label>
                         <Textarea
                             id="diagnosis"
                             name="diagnosis"
@@ -433,7 +471,9 @@ export function EditReportForm({
             >
                 <div className="space-y-3">
                     <p className="text-xs text-muted-foreground">
-                        Pilih apakah laporan ini langsung diserahkan ke tim surveilans (Puskesmas / Dinkes) atau disimpan sementara sebagai Draf internal faskes Anda.
+                        Pilih apakah laporan ini langsung diserahkan ke tim
+                        surveilans (Puskesmas / Dinkes) atau disimpan sementara
+                        sebagai Draf internal faskes Anda.
                     </p>
 
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -450,8 +490,8 @@ export function EditReportForm({
                             className={cn(
                                 'flex cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border p-3.5 transition-colors',
                                 !isDraftState
-                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30'
-                                    : 'border-border bg-card/50 hover:bg-muted/50 text-foreground',
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 ring-1 ring-emerald-500/30 dark:text-emerald-100'
+                                    : 'border-border bg-card/50 text-foreground hover:bg-muted/50',
                             )}
                         >
                             <input
@@ -462,12 +502,16 @@ export function EditReportForm({
                                 className="mt-0.5 size-4 accent-emerald-600"
                             />
                             <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 font-semibold text-xs">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold">
                                     <Send className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                                     <span>Terkirim ke Surveilans (Aktif)</span>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    Laporan terkirim ke sistem surveilans terpadu. Puskesmas terkait dan Dinkes dapat segera memverifikasi dan menugaskan PE (Penyelidikan Epidemiologi).
+                                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                    Laporan terkirim ke sistem surveilans
+                                    terpadu. Setelah terkirim, notifikasi
+                                    WhatsApp otomatis dikirim sesuai wilayah
+                                    laporan ke Puskesmas terkait dan Dinkes
+                                    untuk verifikasi serta penugasan PE.
                                 </p>
                             </div>
                         </div>
@@ -485,8 +529,8 @@ export function EditReportForm({
                             className={cn(
                                 'flex cursor-pointer items-start gap-3 rounded-[var(--radius-control)] border p-3.5 transition-colors',
                                 isDraftState
-                                    ? 'border-amber-500 bg-amber-500/10 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/30'
-                                    : 'border-border bg-card/50 hover:bg-muted/50 text-foreground',
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-950 ring-1 ring-amber-500/30 dark:text-amber-100'
+                                    : 'border-border bg-card/50 text-foreground hover:bg-muted/50',
                             )}
                         >
                             <input
@@ -497,12 +541,14 @@ export function EditReportForm({
                                 className="mt-0.5 size-4 accent-amber-600"
                             />
                             <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 font-semibold text-xs">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold">
                                     <Save className="size-3.5 text-amber-600 dark:text-amber-400" />
                                     <span>Simpan sebagai Draf</span>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                    Hanya disimpan di faskes Anda. Belum diteruskan ke puskesmas wilayah atau dinas kesehatan hingga Anda mengirimkannya.
+                                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                    Hanya disimpan di faskes Anda. Belum
+                                    diteruskan ke puskesmas wilayah atau dinas
+                                    kesehatan hingga Anda mengirimkannya.
                                 </p>
                             </div>
                         </div>
@@ -523,7 +569,7 @@ export function EditReportForm({
                         className={cn(
                             'gap-1.5 text-xs font-semibold shadow-xs',
                             isDraftState
-                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                ? 'bg-amber-600 text-white hover:bg-amber-700'
                                 : 'bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90',
                         )}
                     >

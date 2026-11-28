@@ -18,6 +18,9 @@ import {
 } from '@/components/ui/dialog';
 import { decideVerificationAction } from '@/app/(dashboard)/actions';
 import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
+import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
+import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
+import type { Role } from '@/lib/roles';
 import { formatDate } from '@/lib/format';
 
 export type VerificationPeSummary = {
@@ -40,10 +43,22 @@ export type VerificationPeSummary = {
 export function VerifyControl({
     reportId,
     reportNumber,
+    kelurahan,
+    institutionId,
+    puskesmasId,
+    puskesmasName,
+    actorRole = 'DINKES',
+    actorInstitutionId = null,
     peSummary,
 }: {
     reportId: string;
     reportNumber: string;
+    kelurahan?: string | null;
+    institutionId?: string;
+    puskesmasId?: string | null;
+    puskesmasName?: string | null;
+    actorRole?: Role;
+    actorInstitutionId?: string | null;
     peSummary?: VerificationPeSummary;
 }) {
     const router = useRouter();
@@ -55,6 +70,16 @@ export function VerifyControl({
 
     const abjVal = peSummary?.abj ? Number(peSummary.abj) : null;
     const isAbjSafe = abjVal !== null && abjVal >= 95;
+    const notifyTargets = institutionId
+        ? buildManualNotifyTargets({
+              actorRole,
+              actorInstitutionId,
+              reportInstitutionId: institutionId,
+              reportInstitutionName: null,
+              puskesmasId: puskesmasId ?? null,
+              puskesmasName: puskesmasName ?? null,
+          })
+        : [];
 
     function submit() {
         if (!decision) return;
@@ -81,7 +106,16 @@ export function VerifyControl({
 
     return (
         <>
-            <div className="flex items-center justify-end gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <ManualNotifyButton
+                    reportId={reportId}
+                    reportNumber={reportNumber}
+                    kelurahan={kelurahan ?? null}
+                    context="PE"
+                    targets={notifyTargets}
+                    label="Notif PE"
+                    size="xs"
+                />
                 {peSummary?.peId ? (
                     <Button
                         size="xs"
@@ -178,7 +212,9 @@ export function VerifyControl({
                                                 : 'text-rose-600 dark:text-rose-400'
                                         }`}
                                     >
-                                        {peSummary.abj ? `${peSummary.abj}%` : '-'}
+                                        {peSummary.abj
+                                            ? `${peSummary.abj}%`
+                                            : '-'}
                                         {abjVal !== null && !isAbjSafe ? (
                                             <span className="ml-1 text-[10px] font-normal">
                                                 (&lt;95%)
@@ -193,7 +229,7 @@ export function VerifyControl({
                                     <p
                                         className={`font-medium ${
                                             peSummary.foggingRecommended
-                                                ? 'text-rose-600 font-semibold dark:text-rose-400'
+                                                ? 'font-semibold text-rose-600 dark:text-rose-400'
                                                 : 'text-foreground'
                                         }`}
                                     >
@@ -209,7 +245,7 @@ export function VerifyControl({
                                     <span className="text-[11px] text-muted-foreground">
                                         House Index (HI)
                                     </span>
-                                    <p className="font-medium tabular-nums text-foreground">
+                                    <p className="font-medium text-foreground tabular-nums">
                                         {peSummary.houseIndex
                                             ? `${peSummary.houseIndex}%`
                                             : '-'}
@@ -219,7 +255,7 @@ export function VerifyControl({
                                     <span className="text-[11px] text-muted-foreground">
                                         Container Index (CI)
                                     </span>
-                                    <p className="font-medium tabular-nums text-foreground">
+                                    <p className="font-medium text-foreground tabular-nums">
                                         {peSummary.containerIndex
                                             ? `${peSummary.containerIndex}%`
                                             : '-'}
@@ -254,7 +290,8 @@ export function VerifyControl({
                                 Dokumen PE & Foto Dokumentasi
                             </Label>
                             <p className="text-[11.5px] text-muted-foreground">
-                                Lampiran dokumen fisik bertandatangan atau foto kegiatan PE lapangan.
+                                Lampiran dokumen fisik bertandatangan atau foto
+                                kegiatan PE lapangan.
                             </p>
                             <AttachmentDropzone
                                 reportPEId={peSummary.peId}

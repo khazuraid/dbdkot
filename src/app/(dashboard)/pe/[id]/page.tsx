@@ -29,6 +29,10 @@ import { Button } from '@/components/ui/button';
 import { StatusText } from '@/components/shell/status-text';
 import { PeActionToolbar } from '@/app/(dashboard)/pe/pe-actions';
 import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
+import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
+import { findPuskesmasByKelurahan } from '@/lib/domain/assignment';
+import { institutionChoices } from '@/lib/domain/master';
+import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
 
 export const instant = false;
 
@@ -45,7 +49,9 @@ function Field({
 }) {
     return (
         <div className="space-y-1">
-            <dt className="text-[11.5px] font-medium text-muted-foreground">{label}</dt>
+            <dt className="text-[11.5px] font-medium text-muted-foreground">
+                {label}
+            </dt>
             <dd
                 className={`text-[13px] text-foreground ${mono ? 'font-mono' : ''} ${
                     highlight ? 'font-semibold text-[var(--accent)]' : ''
@@ -95,6 +101,24 @@ export default async function PeDetailPage({
         actor.role === 'DINKES' ||
         actor.institutionId === pe.institutionId;
 
+    const choices = await institutionChoices();
+    const instNameById = new Map(choices.map((c) => [c.id, c.name]));
+    const fallbackPuskesmas = detail.assignedPuskesmasId
+        ? null
+        : await findPuskesmasByKelurahan(detail.kelurahan);
+    const peNotifyTargets = buildManualNotifyTargets({
+        actorRole: actor.role,
+        actorInstitutionId: actor.institutionId,
+        reportInstitutionId: detail.institutionId,
+        reportInstitutionName: instNameById.get(detail.institutionId) ?? null,
+        puskesmasId:
+            detail.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null,
+        puskesmasName:
+            (detail.assignedPuskesmasId
+                ? instNameById.get(detail.assignedPuskesmasId)
+                : fallbackPuskesmas?.name) ?? null,
+    });
+
     const abjVal = Number(pe.abj ?? 0);
     const hiVal = Number(pe.houseIndex ?? 0);
     const ciVal = Number(pe.containerIndex ?? 0);
@@ -134,21 +158,48 @@ export default async function PeDetailPage({
                 }
                 aside={
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                        >
                             <Link href={`/laporan/${detail.reportRSId}`}>
                                 <ArrowLeft className="size-3.5" aria-hidden />
                                 Laporan Kasus
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                            <Link href={`/api/pdf/pe-lengkap/${pe.id}`} target="_blank">
-                                <FileText className="size-3.5 text-rose-600" aria-hidden />
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                        >
+                            <Link
+                                href={`/api/pdf/pe-lengkap/${pe.id}`}
+                                target="_blank"
+                            >
+                                <FileText
+                                    className="size-3.5 text-rose-600"
+                                    aria-hidden
+                                />
                                 Form PE Kemenkes (PDF)
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                            <Link href={`/api/export/pe/${pe.id}/excel`} target="_blank">
-                                <FileSpreadsheet className="size-3.5 text-emerald-600" aria-hidden />
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                        >
+                            <Link
+                                href={`/api/export/pe/${pe.id}/excel`}
+                                target="_blank"
+                            >
+                                <FileSpreadsheet
+                                    className="size-3.5 text-emerald-600"
+                                    aria-hidden
+                                />
                                 Unduh Excel
                             </Link>
                         </Button>
@@ -158,6 +209,14 @@ export default async function PeDetailPage({
                                 reportNumber={detail.reportNumber}
                             />
                         )}
+                        <ManualNotifyButton
+                            reportId={detail.reportRSId}
+                            reportNumber={detail.reportNumber}
+                            kelurahan={detail.kelurahan}
+                            context="PE"
+                            targets={peNotifyTargets}
+                            label="Kirim Notif PE"
+                        />
                     </div>
                 }
             />
@@ -171,10 +230,10 @@ export default async function PeDetailPage({
                             : 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/20'
                     }`}
                 >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                         <div className="flex items-start gap-3">
                             <div
-                                className={`mt-0.5 rounded-full p-1.5 shrink-0 ${
+                                className={`mt-0.5 shrink-0 rounded-full p-1.5 ${
                                     isFogging
                                         ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300'
                                         : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
@@ -201,7 +260,7 @@ export default async function PeDetailPage({
                                             : 'Negatif Penularan · PSN 3M Plus & Larvasidasi'}
                                     </span>
                                 </h3>
-                                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                                     {pe.conclusion ||
                                         (isFogging
                                             ? 'Ditemukan jentik positif atau penderita demam lain di radius 100m. Diperlukan fogging fokus 2 siklus (H0 & H+7) dan larvasidasi serentak.'
@@ -210,8 +269,8 @@ export default async function PeDetailPage({
                             </div>
                         </div>
                         {pe.recommendation && (
-                            <div className="sm:text-right shrink-0">
-                                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground block">
+                            <div className="shrink-0 sm:text-right">
+                                <span className="block text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
                                     Rekomendasi Petugas
                                 </span>
                                 <span className="text-xs font-semibold text-foreground">
@@ -224,8 +283,8 @@ export default async function PeDetailPage({
 
                 {/* Key Entomology Metrics KPI */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             ABJ (Bebas Jentik)
                         </span>
                         <div className="flex items-baseline gap-1">
@@ -239,11 +298,13 @@ export default async function PeDetailPage({
                                 {pe.abj ? `${abjVal.toFixed(1)}%` : '—'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Standar Kemenkes &ge; 95%</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Standar Kemenkes &ge; 95%
+                        </p>
                     </div>
 
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             House Index (HI)
                         </span>
                         <div className="flex items-baseline gap-1">
@@ -251,23 +312,29 @@ export default async function PeDetailPage({
                                 {pe.houseIndex ? `${hiVal.toFixed(1)}%` : '—'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Rumah positif jentik</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Rumah positif jentik
+                        </p>
                     </div>
 
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Container Index (CI)
                         </span>
                         <div className="flex items-baseline gap-1">
                             <span className="font-mono text-2xl font-bold text-foreground tabular-nums">
-                                {pe.containerIndex ? `${ciVal.toFixed(1)}%` : '—'}
+                                {pe.containerIndex
+                                    ? `${ciVal.toFixed(1)}%`
+                                    : '—'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Kontainer positif jentik</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Kontainer positif jentik
+                        </p>
                     </div>
 
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Breteau Index (BI)
                         </span>
                         <div className="flex items-baseline gap-1">
@@ -275,11 +342,13 @@ export default async function PeDetailPage({
                                 {pe.breteauIndex ? `${biVal.toFixed(1)}%` : '—'}
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Kontainer (+) per 100 rmh</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Kontainer (+) per 100 rmh
+                        </p>
                     </div>
 
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Rumah Diperiksa
                         </span>
                         <div className="flex items-baseline gap-1">
@@ -290,11 +359,13 @@ export default async function PeDetailPage({
                                 / {pe.housesPositive ?? 0} (+)
                             </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Radius 100m (min. 20)</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Radius 100m (min. 20)
+                        </p>
                     </div>
 
-                    <div className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-1">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="space-y-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Demam Lain (100m)
                         </span>
                         <div className="flex items-baseline gap-1">
@@ -307,9 +378,13 @@ export default async function PeDetailPage({
                             >
                                 {pe.otherFeverCasesCount ?? 0}
                             </span>
-                            <span className="text-xs text-muted-foreground">orang</span>
+                            <span className="text-xs text-muted-foreground">
+                                orang
+                            </span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">Penderita demam sekitar</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            Penderita demam sekitar
+                        </p>
                     </div>
                 </div>
 
@@ -319,20 +394,39 @@ export default async function PeDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <User className="size-4 text-[var(--accent)]" aria-hidden />
+                                <User
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Data Responden & Lingkungan Domisili
                             </span>
                         }
                     >
                         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                            <Field label="Nama Responden" value={pe.respondentName} />
-                            <Field label="Hubungan dengan Kasus" value={pe.respondentRelation} />
+                            <Field
+                                label="Nama Responden"
+                                value={pe.respondentName}
+                            />
+                            <Field
+                                label="Hubungan dengan Kasus"
+                                value={pe.respondentRelation}
+                            />
                             <Field
                                 label="Usia Responden"
-                                value={formData.respondentAge ? `${formData.respondentAge} Tahun` : undefined}
+                                value={
+                                    formData.respondentAge
+                                        ? `${formData.respondentAge} Tahun`
+                                        : undefined
+                                }
                             />
-                            <Field label="Pekerjaan Responden" value={formData.respondentJob} />
-                            <Field label="Alamat Responden" value={formData.respondentAddress} />
+                            <Field
+                                label="Pekerjaan Responden"
+                                value={formData.respondentJob}
+                            />
+                            <Field
+                                label="Alamat Responden"
+                                value={formData.respondentAddress}
+                            />
                             <Field
                                 label="Rukun Tetangga / RW"
                                 value={
@@ -347,7 +441,10 @@ export default async function PeDetailPage({
                             />
                             <Field
                                 label="Riwayat Perjalanan 14 Hari"
-                                value={pe.travelHistory14d || 'Tidak ada riwayat bepergian'}
+                                value={
+                                    pe.travelHistory14d ||
+                                    'Tidak ada riwayat bepergian'
+                                }
                             />
                         </dl>
                     </Panel>
@@ -356,18 +453,44 @@ export default async function PeDetailPage({
                         padded
                         title={
                             <span className="flex items-center gap-2">
-                                <Home className="size-4 text-[var(--accent)]" aria-hidden />
+                                <Home
+                                    className="size-4 text-[var(--accent)]"
+                                    aria-hidden
+                                />
                                 Informasi Petugas & Puskesmas
                             </span>
                         }
                     >
                         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                            <Field label="Nama Petugas PE" value={pe.officerName} />
-                            <Field label="NIP Petugas" value={pe.officerNip} mono />
-                            <Field label="Kepala Puskesmas" value={pe.headOfPuskesmasName} />
-                            <Field label="NIP Kepala Puskesmas" value={pe.headOfPuskesmasNip} mono />
-                            <Field label="Tanggal Penyelidikan" value={formatDate(pe.peDate)} />
-                            <Field label="Lokasi Penyelidikan" value={pe.sourceLocation || 'Rumah / Domisili Penderita'} />
+                            <Field
+                                label="Nama Petugas PE"
+                                value={pe.officerName}
+                            />
+                            <Field
+                                label="NIP Petugas"
+                                value={pe.officerNip}
+                                mono
+                            />
+                            <Field
+                                label="Kepala Puskesmas"
+                                value={pe.headOfPuskesmasName}
+                            />
+                            <Field
+                                label="NIP Kepala Puskesmas"
+                                value={pe.headOfPuskesmasNip}
+                                mono
+                            />
+                            <Field
+                                label="Tanggal Penyelidikan"
+                                value={formatDate(pe.peDate)}
+                            />
+                            <Field
+                                label="Lokasi Penyelidikan"
+                                value={
+                                    pe.sourceLocation ||
+                                    'Rumah / Domisili Penderita'
+                                }
+                            />
                             <Field
                                 label="Ada Penderita DBD Lain di Sekitar?"
                                 value={
@@ -389,8 +512,12 @@ export default async function PeDetailPage({
                     padded
                     title={
                         <span className="flex items-center gap-2">
-                            <Stethoscope className="size-4 text-[var(--accent)]" aria-hidden />
-                            Gejala Klinis & Pemeriksaan Laboratorium Tambahan Lapangan
+                            <Stethoscope
+                                className="size-4 text-[var(--accent)]"
+                                aria-hidden
+                            />
+                            Gejala Klinis & Pemeriksaan Laboratorium Tambahan
+                            Lapangan
                         </span>
                     }
                     subtitle="Parameter laboratorium dan gejala pasien yang diverifikasi petugas saat PE di lapangan."
@@ -399,31 +526,64 @@ export default async function PeDetailPage({
                         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
                             <Field
                                 label="Tanggal Mulai Sakit (Demam)"
-                                value={formData.symptomOnsetDate ? formatDate(new Date(formData.symptomOnsetDate)) : undefined}
+                                value={
+                                    formData.symptomOnsetDate
+                                        ? formatDate(
+                                              new Date(
+                                                  formData.symptomOnsetDate,
+                                              ),
+                                          )
+                                        : undefined
+                                }
                             />
-                            <Field label="Keluhan Utama" value={formData.mainComplaint} />
-                            <Field label="Tindakan Pertama Berobat" value={formData.firstActionTaken} />
-                            <Field label="Riwayat Infeksi DBD" value={formData.dengueAttackOrder ? `Infeksi ke-${formData.dengueAttackOrder}` : undefined} />
-                            <Field label="Penyakit Penyerta (Komorbid)" value={formData.comorbidity || 'Tidak ada'} />
-                            <Field label="Pengobatan / Tindakan" value={formData.treatmentGiven || 'Rawat Inap / Observasi'} />
+                            <Field
+                                label="Keluhan Utama"
+                                value={formData.mainComplaint}
+                            />
+                            <Field
+                                label="Tindakan Pertama Berobat"
+                                value={formData.firstActionTaken}
+                            />
+                            <Field
+                                label="Riwayat Infeksi DBD"
+                                value={
+                                    formData.dengueAttackOrder
+                                        ? `Infeksi ke-${formData.dengueAttackOrder}`
+                                        : undefined
+                                }
+                            />
+                            <Field
+                                label="Penyakit Penyerta (Komorbid)"
+                                value={formData.comorbidity || 'Tidak ada'}
+                            />
+                            <Field
+                                label="Pengobatan / Tindakan"
+                                value={
+                                    formData.treatmentGiven ||
+                                    'Rawat Inap / Observasi'
+                                }
+                            />
                         </dl>
 
                         {/* Gejala Klinis Badges */}
-                        <div className="border-t border-[var(--border)] pt-3.5 space-y-2">
-                            <span className="text-[11.5px] font-medium text-muted-foreground block">
+                        <div className="space-y-2 border-t border-[var(--border)] pt-3.5">
+                            <span className="block text-[11.5px] font-medium text-muted-foreground">
                                 Gejala Klinis Terkonfirmasi:
                             </span>
-                            {formData.clinicalSymptoms && formData.clinicalSymptoms.length > 0 ? (
+                            {formData.clinicalSymptoms &&
+                            formData.clinicalSymptoms.length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5">
-                                    {formData.clinicalSymptoms.map((symptom) => (
-                                        <span
-                                            key={symptom}
-                                            className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-foreground"
-                                        >
-                                            <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
-                                            {symptom}
-                                        </span>
-                                    ))}
+                                    {formData.clinicalSymptoms.map(
+                                        (symptom) => (
+                                            <span
+                                                key={symptom}
+                                                className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-foreground"
+                                            >
+                                                <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                                {symptom}
+                                            </span>
+                                        ),
+                                    )}
                                 </div>
                             ) : (
                                 <span className="text-xs text-muted-foreground italic">
@@ -434,26 +594,32 @@ export default async function PeDetailPage({
 
                         {/* Lab Results Grid */}
                         <div className="border-t border-[var(--border)] pt-3.5">
-                            <span className="text-[11.5px] font-medium text-muted-foreground block mb-2.5">
+                            <span className="mb-2.5 block text-[11.5px] font-medium text-muted-foreground">
                                 Hasil Pemeriksaan Laboratorium saat Investigasi:
                             </span>
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                                <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--surface)] text-center">
-                                    <span className="text-[11px] text-muted-foreground block">RDT NS1</span>
+                                <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-2.5 text-center">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        RDT NS1
+                                    </span>
                                     <span
                                         className={`text-xs font-bold ${
                                             formData.labRdtNs1 === 'POSITIF'
                                                 ? 'text-rose-600 dark:text-rose-400'
-                                                : formData.labRdtNs1 === 'NEGATIF'
+                                                : formData.labRdtNs1 ===
+                                                    'NEGATIF'
                                                   ? 'text-emerald-600 dark:text-emerald-400'
                                                   : 'text-muted-foreground'
                                         }`}
                                     >
-                                        {formData.labRdtNs1 ?? 'Belum Diperiksa'}
+                                        {formData.labRdtNs1 ??
+                                            'Belum Diperiksa'}
                                     </span>
                                 </div>
-                                <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--surface)] text-center">
-                                    <span className="text-[11px] text-muted-foreground block">Antibodi IgM</span>
+                                <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-2.5 text-center">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Antibodi IgM
+                                    </span>
                                     <span
                                         className={`text-xs font-bold ${
                                             formData.labIgm === 'POSITIF'
@@ -466,8 +632,10 @@ export default async function PeDetailPage({
                                         {formData.labIgm ?? 'Belum Diperiksa'}
                                     </span>
                                 </div>
-                                <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--surface)] text-center">
-                                    <span className="text-[11px] text-muted-foreground block">Antibodi IgG</span>
+                                <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-2.5 text-center">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Antibodi IgG
+                                    </span>
                                     <span
                                         className={`text-xs font-bold ${
                                             formData.labIgg === 'POSITIF'
@@ -480,16 +648,24 @@ export default async function PeDetailPage({
                                         {formData.labIgg ?? 'Belum Diperiksa'}
                                     </span>
                                 </div>
-                                <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--surface)] text-center">
-                                    <span className="text-[11px] text-muted-foreground block">Trombosit</span>
-                                    <span className="text-xs font-mono font-bold text-foreground">
-                                        {formData.labPlatelet ? `${formData.labPlatelet.toLocaleString('id-ID')} /µL` : '—'}
+                                <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-2.5 text-center">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Trombosit
+                                    </span>
+                                    <span className="font-mono text-xs font-bold text-foreground">
+                                        {formData.labPlatelet
+                                            ? `${formData.labPlatelet.toLocaleString('id-ID')} /µL`
+                                            : '—'}
                                     </span>
                                 </div>
-                                <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--surface)] text-center">
-                                    <span className="text-[11px] text-muted-foreground block">Hematokrit</span>
-                                    <span className="text-xs font-mono font-bold text-foreground">
-                                        {formData.labHematocrit ? `${formData.labHematocrit}%` : '—'}
+                                <div className="rounded border border-[var(--border)] bg-[var(--surface)] p-2.5 text-center">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Hematokrit
+                                    </span>
+                                    <span className="font-mono text-xs font-bold text-foreground">
+                                        {formData.labHematocrit
+                                            ? `${formData.labHematocrit}%`
+                                            : '—'}
                                     </span>
                                 </div>
                             </div>
@@ -519,33 +695,53 @@ export default async function PeDetailPage({
                 >
                     {detail.households.length === 0 ? (
                         <div className="p-8 text-center text-xs text-muted-foreground">
-                            Tidak ada data survei jentik individual tersimpan untuk PE ini.
+                            Tidak ada data survei jentik individual tersimpan
+                            untuk PE ini.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
-                                <thead className="border-b border-[var(--border)] bg-muted/30 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <thead className="border-b border-[var(--border)] bg-muted/30 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                     <tr>
                                         <th className="px-3.5 py-2.5">No</th>
-                                        <th className="px-3.5 py-2.5">Alamat / Kepala Keluarga</th>
-                                        <th className="px-3.5 py-2.5 text-right">Jiwa</th>
-                                        <th className="px-3.5 py-2.5 text-right">Jml Jentik</th>
-                                        <th className="px-3.5 py-2.5">Tipe Jentik</th>
-                                        <th className="px-3.5 py-2.5">Bubuk Abate</th>
-                                        <th className="px-3.5 py-2.5 text-center">Status</th>
-                                        <th className="px-3.5 py-2.5">Catatan</th>
+                                        <th className="px-3.5 py-2.5">
+                                            Alamat / Kepala Keluarga
+                                        </th>
+                                        <th className="px-3.5 py-2.5 text-right">
+                                            Jiwa
+                                        </th>
+                                        <th className="px-3.5 py-2.5 text-right">
+                                            Jml Jentik
+                                        </th>
+                                        <th className="px-3.5 py-2.5">
+                                            Tipe Jentik
+                                        </th>
+                                        <th className="px-3.5 py-2.5">
+                                            Bubuk Abate
+                                        </th>
+                                        <th className="px-3.5 py-2.5 text-center">
+                                            Status
+                                        </th>
+                                        <th className="px-3.5 py-2.5">
+                                            Catatan
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border)]">
                                     {detail.households.map((h, i) => {
-                                        const hasLarva = (h.larvaCount ?? 0) > 0;
+                                        const hasLarva =
+                                            (h.larvaCount ?? 0) > 0;
                                         return (
-                                            <tr key={h.id || i} className="hover:bg-muted/20">
+                                            <tr
+                                                key={h.id || i}
+                                                className="hover:bg-muted/20"
+                                            >
                                                 <td className="px-3.5 py-2.5 font-mono text-muted-foreground">
                                                     {i + 1}
                                                 </td>
                                                 <td className="px-3.5 py-2.5 font-medium text-foreground">
-                                                    {h.address || `Rumah #${i + 1}`}
+                                                    {h.address ||
+                                                        `Rumah #${i + 1}`}
                                                 </td>
                                                 <td className="px-3.5 py-2.5 text-right font-mono tabular-nums">
                                                     {h.population ?? '—'}
@@ -553,7 +749,8 @@ export default async function PeDetailPage({
                                                 <td className="px-3.5 py-2.5 text-right font-mono tabular-nums">
                                                     <span
                                                         className={
-                                                            (h.larvaCount ?? 0) > 0
+                                                            (h.larvaCount ??
+                                                                0) > 0
                                                                 ? 'font-bold text-rose-600 dark:text-rose-400'
                                                                 : 'text-muted-foreground'
                                                         }
@@ -574,7 +771,9 @@ export default async function PeDetailPage({
                                                                 : 'bg-muted text-muted-foreground'
                                                         }`}
                                                     >
-                                                        {h.abateUsed ? 'Diberikan' : 'Tidak'}
+                                                        {h.abateUsed
+                                                            ? 'Diberikan'
+                                                            : 'Tidak'}
                                                     </span>
                                                 </td>
                                                 <td className="px-3.5 py-2.5 text-center">
@@ -585,7 +784,9 @@ export default async function PeDetailPage({
                                                                 : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                                                         }`}
                                                     >
-                                                        {hasLarva ? 'Positif Jentik' : 'Bebas Jentik'}
+                                                        {hasLarva
+                                                            ? 'Positif Jentik'
+                                                            : 'Bebas Jentik'}
                                                     </span>
                                                 </td>
                                                 <td className="px-3.5 py-2.5 text-muted-foreground">

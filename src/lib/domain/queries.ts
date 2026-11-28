@@ -285,6 +285,9 @@ export async function listPendingVerifications(
                 caseType: reportsRS.caseType,
                 kelurahan: reportsRS.kelurahan,
                 sourceType: reportsRS.sourceType,
+                institutionId: reportsRS.institutionId,
+                puskesmasId: reportsRS.assignedPuskesmasId,
+                puskesmasName: institutions.name,
                 createdAt: reportsRS.createdAt,
                 peId: reportsPE.id,
                 peDate: reportsPE.peDate,
@@ -297,6 +300,10 @@ export async function listPendingVerifications(
                 conclusion: reportsPE.conclusion,
             })
             .from(reportsRS)
+            .leftJoin(
+                institutions,
+                eq(institutions.id, reportsRS.assignedPuskesmasId),
+            )
             .leftJoin(reportsPE, eq(reportsPE.reportRSId, reportsRS.id))
             .where(eq(reportsRS.status, 'PE_COMPLETED'))
             .orderBy(desc(reportsRS.createdAt))

@@ -4,14 +4,7 @@ import { institutions, kelurahan, reportsRS } from '@/db/schema';
 import { encryptPii, hashPii } from '@/lib/crypto';
 import { audit } from '@/lib/audit';
 import { scopeToInstitution, type Actor } from '@/lib/session';
-import {
-    enqueueAssign,
-    enqueueClusterDetector,
-    enqueueSla,
-    enqueueWhatsAppDispatch,
-} from '@/lib/queue';
-import { insertNotifications } from './notify';
-import { assignReportByKelurahan } from './assignment';
+import { notifySubmittedReport } from './notify';
 
 // Re-exported so server callers keep importing from the domain module while
 // client forms import the same schema without the DB client (form-contracts.ts).
@@ -234,98 +227,18 @@ export async function createReport(
     });
 
     if (!input.isDraft) {
-        if (isCrossBorder) {
-            await insertNotifications(
-                { kind: 'ROLE', role: 'DINKES' },
-                {
-                    title: 'Kasus luar wilayah terdeteksi',
-                    message: `Laporan ${reportNumber} berdomisili di ${input.kota} dan menunggu disposisi Dinkes.`,
-                    type: 'CROSS_BORDER',
-                    entityType: 'REPORT_RS',
-                    entityId: inserted.id,
-                },
-            );
-        } else if (!isPuskesmasPoli) {
-            // Intra-city hospital report: auto-assign inline and notify Puskesmas & Dinkes immediately
-            try {
-                const assignRes = await assignReportByKelurahan(inserted.id);
-                if (assignRes.assigned) {
-                    await insertNotifications(
-                        {
-                            kind: 'INSTITUTION',
-                            institutionId: assignRes.puskesmasId,
-                        },
-                        {
-                            title: 'Laporan kasus baru masuk',
-                            message: `Laporan ${reportNumber} (${input.caseType}) di Kel. ${input.kelurahan} menunggu verifikasi Puskesmas (SLA 24 jam).`,
-                            type: 'ASSIGNMENT',
-                            entityType: 'REPORT_RS',
-                            entityId: inserted.id,
-                        },
-                    );
-                }
-            } catch (err) {
-                console.error('[laporan] auto-assign inline error:', err);
-            }
-
-            // Notify Dinkes for city-wide surveillance monitoring
-            try {
-                await insertNotifications(
-                    { kind: 'ROLE', role: 'DINKES' },
-                    {
-                        title: 'Laporan kasus DBD baru',
-                        message: `Laporan ${reportNumber} (${input.caseType}) diterima dari faskes di Kel. ${input.kelurahan}, Kec. ${input.kecamatan}.`,
-                        type: 'NEW_REPORT',
-                        entityType: 'REPORT_RS',
-                        entityId: inserted.id,
-                    },
-                );
-            } catch (err) {
-                console.error('[laporan] dinkes notification error:', err);
-            }
-        } else {
-            // Puskesmas poli report: notify Dinkes
-            try {
-                await insertNotifications(
-                    { kind: 'ROLE', role: 'DINKES' },
-                    {
-                        title: 'Laporan kasus DBD dari Poli Puskesmas',
-                        message: `Laporan ${reportNumber} (${input.caseType}) dicatat oleh Puskesmas di Kel. ${input.kelurahan}.`,
-                        type: 'NEW_REPORT',
-                        entityType: 'REPORT_RS',
-                        entityId: inserted.id,
-                    },
-                );
-            } catch (err) {
-                console.error('[laporan] poli dinkes notification error:', err);
-            }
-        }
-
-        // Queued outside the request's critical path; a Redis outage must not lose
-        // the report that was already committed.
-        try {
-            if (!isCrossBorder && !isPuskesmasPoli) {
-                await enqueueAssign(inserted.id);
-                await enqueueSla(inserted.id);
-            }
-            if (input.latitude !== undefined && input.longitude !== undefined) {
-                await enqueueClusterDetector(inserted.id);
-            }
-            if (isCrossBorder) {
-                await enqueueWhatsAppDispatch({
-                    recipientPhone: process.env.DINKES_ALERT_PHONE ?? '',
-                    recipientRole: 'DINKES',
-                    reportRSId: inserted.id,
-                    eventKind: 'CROSS_BORDER',
-                    message: `[WALI-EPI] Kasus luar wilayah ${reportNumber} (${input.kelurahan}, ${input.kota}) menunggu disposisi Dinkes di /laporan/lintas-wilayah.`,
-                });
-            }
-        } catch (error) {
-            console.error('[laporan] gagal enqueue ke Redis', {
-                reportId: inserted.id,
-                error,
-            });
-        }
+        await notifySubmittedReport({
+            reportId: inserted.id,
+            reportNumber,
+            caseType: input.caseType,
+            kelurahan: input.kelurahan,
+            kecamatan: input.kecamatan,
+            kota: input.kota,
+            isCrossBorder,
+            isPuskesmasPoli,
+            hasCoordinates:
+                input.latitude !== undefined && input.longitude !== undefined,
+        });
     }
 
     return {

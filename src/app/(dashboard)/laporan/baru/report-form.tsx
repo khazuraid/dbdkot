@@ -92,7 +92,9 @@ export function ReportForm({
     const [geocodingBusy, setGeocodingBusy] = useState(false);
     const [geocodeNotice, setGeocodeNotice] = useState<string | null>(null);
     const [skipGeotag, setSkipGeotag] = useState(false);
-    const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+    const [stagedAttachments, setStagedAttachments] = useState<
+        StagedAttachment[]
+    >([]);
 
     const {
         register,
@@ -118,8 +120,12 @@ export function ReportForm({
 
     const watched = useWatch({ control });
     const nikDigits = (watched.patientNik ?? '').replace(/\D/g, '').length;
-    const parsedLat = watched.latitude ? parseFloat(String(watched.latitude)) : null;
-    const parsedLng = watched.longitude ? parseFloat(String(watched.longitude)) : null;
+    const parsedLat = watched.latitude
+        ? parseFloat(String(watched.latitude))
+        : null;
+    const parsedLng = watched.longitude
+        ? parseFloat(String(watched.longitude))
+        : null;
 
     const checklist = useMemo(() => {
         const items: ChecklistItem[] = [
@@ -155,7 +161,7 @@ export function ReportForm({
                 label: 'Kelurahan & kecamatan',
                 done: Boolean(
                     (watched.kelurahan ?? '').trim() &&
-                        (watched.kecamatan ?? '').trim(),
+                    (watched.kecamatan ?? '').trim(),
                 ),
                 sectionId: 'sec-domisili',
             },
@@ -247,7 +253,9 @@ export function ReportForm({
                     shouldValidate: true,
                 });
                 setGpsBusy(false);
-                setGeocodeNotice('Koordinat GPS perangkat berhasil disematkan.');
+                setGeocodeNotice(
+                    'Koordinat GPS perangkat berhasil disematkan.',
+                );
                 toast.success('Koordinat GPS berhasil diambil dari perangkat.');
             },
             (err) => {
@@ -285,13 +293,17 @@ export function ReportForm({
             if (res.ok && res.lat !== undefined && res.lng !== undefined) {
                 setSkipGeotag(false);
                 setValue('latitude', String(res.lat), { shouldValidate: true });
-                setValue('longitude', String(res.lng), { shouldValidate: true });
+                setValue('longitude', String(res.lng), {
+                    shouldValidate: true,
+                });
                 setGeocodeNotice(
                     res.isFallback
                         ? `Perkiraan kelurahan: ${res.displayName}`
                         : `Alamat terverifikasi: ${res.displayName}`,
                 );
-                toast.success('Koordinat geospasial berhasil ditemukan dari alamat.');
+                toast.success(
+                    'Koordinat geospasial berhasil ditemukan dari alamat.',
+                );
             } else {
                 toast.error(
                     res.error ??
@@ -330,7 +342,9 @@ export function ReportForm({
         isDraft = false,
     ) => {
         if (stagedAttachments.some((a) => a.status === 'compressing')) {
-            toast.info('Mohon tunggu hingga kompresi gambar selesai sebelum mengirim.');
+            toast.info(
+                'Mohon tunggu hingga kompresi gambar selesai sebelum mengirim.',
+            );
             return;
         }
 
@@ -395,7 +409,11 @@ export function ReportForm({
                             setStagedAttachments((prev) =>
                                 prev.map((x) =>
                                     x.id === item.id
-                                        ? { ...x, status: 'done', progress: 100 }
+                                        ? {
+                                              ...x,
+                                              status: 'done',
+                                              progress: 100,
+                                          }
                                         : x,
                                 ),
                             );
@@ -407,7 +425,9 @@ export function ReportForm({
                                         ? {
                                               ...x,
                                               status: 'error',
-                                              error: uploadRes.error ?? 'Gagal unggah',
+                                              error:
+                                                  uploadRes.error ??
+                                                  'Gagal unggah',
                                           }
                                         : x,
                                 ),
@@ -427,11 +447,14 @@ export function ReportForm({
                             'Laporan belum dikirim ke surveilans. Anda dapat melengkapinya kembali nanti.',
                     });
                 } else {
+                    const wilayahNote = result.crossBorder
+                        ? 'Notifikasi WhatsApp & in-app otomatis dikirim ke Dinkes (kasus luar wilayah).'
+                        : 'Notifikasi WhatsApp & in-app otomatis dikirim sesuai wilayah laporan (Puskesmas & Dinkes).';
                     toast.success('Laporan kasus berhasil dikirim', {
                         description:
                             pendingFiles.length > 0
-                                ? `${pendingFiles.length} lampiran terenkripsi ikut tersimpan.`
-                                : 'Puskesmas wilayah menerima penugasan Penyelidikan Epidemiologi.',
+                                ? `${pendingFiles.length} lampiran terenkripsi ikut tersimpan. ${wilayahNote}`
+                                : wilayahNote,
                     });
                 }
 
@@ -440,13 +463,17 @@ export function ReportForm({
             }
 
             if (result.fieldErrors) {
-                for (const [field, message] of Object.entries(result.fieldErrors)) {
+                for (const [field, message] of Object.entries(
+                    result.fieldErrors,
+                )) {
                     setError(field as keyof FormValues, {
                         type: 'server',
                         message,
                     });
                 }
-                toast.error('Mohon periksa kembali kolom isian yang ditandai merah.');
+                toast.error(
+                    'Mohon periksa kembali kolom isian yang ditandai merah.',
+                );
             }
             if (result.error) {
                 setFormError(result.error);
@@ -470,7 +497,9 @@ export function ReportForm({
             ? Number(watched.plateletCount)
             : null;
     const isLowPlatelet =
-        trombositNum !== null && !Number.isNaN(trombositNum) && trombositNum < 100_000;
+        trombositNum !== null &&
+        !Number.isNaN(trombositNum) &&
+        trombositNum < 100_000;
 
     return (
         <form
@@ -523,7 +552,9 @@ export function ReportForm({
                             <button
                                 type="button"
                                 onClick={() =>
-                                    setValue('sourceType', 'RS', { shouldValidate: true })
+                                    setValue('sourceType', 'RS', {
+                                        shouldValidate: true,
+                                    })
                                 }
                                 className={cn(
                                     'flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
@@ -545,7 +576,8 @@ export function ReportForm({
                                         )}
                                     </p>
                                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                                        Rujukan rawat inap / IGD RS; menugaskan Puskesmas wilayah pasien.
+                                        Rujukan rawat inap / IGD RS; menugaskan
+                                        Puskesmas wilayah pasien.
                                     </p>
                                 </div>
                             </button>
@@ -565,19 +597,24 @@ export function ReportForm({
                                 )}
                             >
                                 <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]">
-                                    <Stethoscope className="size-4" aria-hidden />
+                                    <Stethoscope
+                                        className="size-4"
+                                        aria-hidden
+                                    />
                                 </div>
                                 <div className="min-w-0">
                                     <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                                         Puskesmas (Poli / IGD)
-                                        {watched.sourceType === 'PUSKESMAS_POLI' && (
+                                        {watched.sourceType ===
+                                            'PUSKESMAS_POLI' && (
                                             <span className="rounded bg-[var(--accent)]/20 px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent)]">
                                                 Aktif
                                             </span>
                                         )}
                                     </p>
                                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                                        Temuan langsung Poli/IGD Puskesmas untuk alur PE terpadu.
+                                        Temuan langsung Poli/IGD Puskesmas untuk
+                                        alur PE terpadu.
                                     </p>
                                 </div>
                             </button>
@@ -608,7 +645,10 @@ export function ReportForm({
                                     <div className="flex items-center justify-between">
                                         <Label htmlFor="f-patientNik">
                                             NIK (Nomor Induk Kependudukan){' '}
-                                            <span className="text-[var(--negative)]" aria-hidden>
+                                            <span
+                                                className="text-[var(--negative)]"
+                                                aria-hidden
+                                            >
                                                 *
                                             </span>
                                         </Label>
@@ -627,7 +667,12 @@ export function ReportForm({
                                         name="patientNik"
                                         control={control}
                                         error={errors.patientNik?.message}
-                                        render={({ id, value, onChange, invalid }) => (
+                                        render={({
+                                            id,
+                                            value,
+                                            onChange,
+                                            invalid,
+                                        }) => (
                                             <PatternFormat
                                                 id={id}
                                                 value={
@@ -636,12 +681,14 @@ export function ReportForm({
                                                         ? value
                                                         : ''
                                                 }
-                                                onValueChange={(val) => onChange(val.value)}
+                                                onValueChange={(val) =>
+                                                    onChange(val.value)
+                                                }
                                                 format="#### #### #### ####"
                                                 mask="_"
                                                 placeholder="3274 0123 4567 8901"
                                                 className={cn(
-                                                    'mt-1.5 h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 font-mono text-[13.5px] text-foreground transition-colors placeholder:text-faint focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25 outline-none',
+                                                    'mt-1.5 h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 font-mono text-[13.5px] text-foreground transition-colors outline-none placeholder:text-faint focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
                                                     invalid &&
                                                         'border-[var(--negative)] ring-2 ring-[var(--negative)]/20',
                                                 )}
@@ -663,7 +710,10 @@ export function ReportForm({
                                 <div>
                                     <Label id="lbl-gender">
                                         Jenis Kelamin{' '}
-                                        <span className="text-[var(--negative)]" aria-hidden>
+                                        <span
+                                            className="text-[var(--negative)]"
+                                            aria-hidden
+                                        >
                                             *
                                         </span>
                                     </Label>
@@ -678,10 +728,17 @@ export function ReportForm({
                                                 className="mt-1.5 grid grid-cols-2 gap-2"
                                             >
                                                 {[
-                                                    { value: 'L', label: 'Laki-laki' },
-                                                    { value: 'P', label: 'Perempuan' },
+                                                    {
+                                                        value: 'L',
+                                                        label: 'Laki-laki',
+                                                    },
+                                                    {
+                                                        value: 'P',
+                                                        label: 'Perempuan',
+                                                    },
                                                 ].map((opt) => {
-                                                    const active = value === opt.value;
+                                                    const active =
+                                                        value === opt.value;
                                                     return (
                                                         <label
                                                             key={opt.value}
@@ -695,9 +752,15 @@ export function ReportForm({
                                                             <input
                                                                 type="radio"
                                                                 className="sr-only"
-                                                                value={opt.value}
+                                                                value={
+                                                                    opt.value
+                                                                }
                                                                 checked={active}
-                                                                onChange={() => onChange(opt.value)}
+                                                                onChange={() =>
+                                                                    onChange(
+                                                                        opt.value,
+                                                                    )
+                                                                }
                                                             />
                                                             {opt.label}
                                                         </label>
@@ -735,7 +798,9 @@ export function ReportForm({
                                         type="tel"
                                         inputMode="tel"
                                         placeholder="0812-3456-7890"
-                                        aria-invalid={Boolean(errors.phoneNumber)}
+                                        aria-invalid={Boolean(
+                                            errors.phoneNumber,
+                                        )}
                                         {...register('phoneNumber')}
                                         className={cn(
                                             'pl-9 font-mono text-[13px]',
@@ -750,7 +815,8 @@ export function ReportForm({
                                     </p>
                                 ) : (
                                     <p className="text-[11.5px] text-muted-foreground">
-                                        Digunakan tim Puskesmas untuk koordinasi PE lapangan.
+                                        Digunakan tim Puskesmas untuk koordinasi
+                                        PE lapangan.
                                     </p>
                                 )}
                             </div>
@@ -778,27 +844,41 @@ export function ReportForm({
                         <div className="space-y-5">
                             {kelurahanOptions.length > 0 && (
                                 <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--raised)]/45 p-3.5">
-                                    <Label htmlFor="kelurahan-preset" className="text-[12.5px] font-semibold">
-                                        Isi Cepat dari Daftar Kelurahan Terdaftar
+                                    <Label
+                                        htmlFor="kelurahan-preset"
+                                        className="text-[12.5px] font-semibold"
+                                    >
+                                        Isi Cepat dari Daftar Kelurahan
+                                        Terdaftar
                                     </Label>
                                     <div className="relative">
                                         <select
                                             id="kelurahan-preset"
                                             value={selectedPreset}
-                                            onChange={(e) => applyKelurahanPreset(e.target.value)}
-                                            className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-9 pl-3 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
+                                            onChange={(e) =>
+                                                applyKelurahanPreset(
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-9 pl-3 text-[13px] text-foreground transition-colors outline-none focus-visible:border-[var(--accent)]"
                                         >
                                             <option value="">
-                                                — Pilih kelurahan untuk melengkapi kecamatan/kota otomatis —
+                                                — Pilih kelurahan untuk
+                                                melengkapi kecamatan/kota
+                                                otomatis —
                                             </option>
-                                            {kelurahanOptions.map((opt, idx) => (
-                                                <option
-                                                    key={`${opt.name}-${opt.kecamatan}`}
-                                                    value={idx}
-                                                >
-                                                    {opt.name} · Kec. {opt.kecamatan} ({opt.kota})
-                                                </option>
-                                            ))}
+                                            {kelurahanOptions.map(
+                                                (opt, idx) => (
+                                                    <option
+                                                        key={`${opt.name}-${opt.kecamatan}`}
+                                                        value={idx}
+                                                    >
+                                                        {opt.name} · Kec.{' '}
+                                                        {opt.kecamatan} (
+                                                        {opt.kota})
+                                                    </option>
+                                                ),
+                                            )}
                                         </select>
                                         <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
                                     </div>
@@ -808,7 +888,10 @@ export function ReportForm({
                             <div>
                                 <Label htmlFor="f-address">
                                     Alamat Lengkap Domisili{' '}
-                                    <span className="text-[var(--negative)]" aria-hidden>
+                                    <span
+                                        className="text-[var(--negative)]"
+                                        aria-hidden
+                                    >
                                         *
                                     </span>
                                 </Label>
@@ -816,7 +899,9 @@ export function ReportForm({
                                     id="f-address"
                                     rows={2}
                                     placeholder="Nama jalan, nomor rumah, blok, atau patokan terdekat…"
-                                    aria-invalid={Boolean(errors.patientAddress)}
+                                    aria-invalid={Boolean(
+                                        errors.patientAddress,
+                                    )}
                                     {...register('patientAddress')}
                                     className="mt-1.5 resize-y text-[13.5px]"
                                 />
@@ -881,15 +966,18 @@ export function ReportForm({
                                             Koordinat Geospasial Domisili Pasien
                                         </p>
                                         <p className="text-[11.5px] text-muted-foreground">
-                                            Untuk pemetaan klaster 100 m & penentuan radius fokus PE.
+                                            Untuk pemetaan klaster 100 m &
+                                            penentuan radius fokus PE.
                                         </p>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                                         <Button
                                             type="button"
                                             size="sm"
                                             onClick={handleSearchAddressCoords}
-                                            disabled={geocodingBusy || skipGeotag}
+                                            disabled={
+                                                geocodingBusy || skipGeotag
+                                            }
                                             className="h-8 gap-1.5 text-[12px]"
                                         >
                                             {geocodingBusy ? (
@@ -897,7 +985,9 @@ export function ReportForm({
                                             ) : (
                                                 <Search className="size-3.5" />
                                             )}
-                                            {geocodingBusy ? 'Mencari…' : 'Cari dari Alamat'}
+                                            {geocodingBusy
+                                                ? 'Mencari…'
+                                                : 'Cari dari Alamat'}
                                         </Button>
                                         <Button
                                             type="button"
@@ -912,7 +1002,9 @@ export function ReportForm({
                                             ) : (
                                                 <Compass className="size-3.5 text-[var(--accent)]" />
                                             )}
-                                            {gpsBusy ? 'GPS Aktif…' : 'Gunakan GPS'}
+                                            {gpsBusy
+                                                ? 'GPS Aktif…'
+                                                : 'Gunakan GPS'}
                                         </Button>
                                     </div>
                                 </div>
@@ -927,12 +1019,15 @@ export function ReportForm({
                                             type="checkbox"
                                             checked={skipGeotag}
                                             onChange={(e) =>
-                                                handleToggleSkipGeotag(e.target.checked)
+                                                handleToggleSkipGeotag(
+                                                    e.target.checked,
+                                                )
                                             }
                                             className="size-4 rounded border-[var(--border)] accent-[var(--accent)]"
                                         />
                                         <span className="font-medium text-foreground">
-                                            Lewati geotag / Tanpa koordinat saat ini
+                                            Lewati geotag / Tanpa koordinat saat
+                                            ini
                                         </span>
                                     </label>
                                     <span className="hidden text-[11px] text-muted-foreground sm:inline">
@@ -942,14 +1037,21 @@ export function ReportForm({
 
                                 {skipGeotag ? (
                                     <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/60 px-3.5 py-2.5 text-[12px] text-muted-foreground">
-                                        Geotag dilewati. Petugas Puskesmas dapat melakukan geotagging rumah pasien saat kunjungan lapangan.
+                                        Geotag dilewati. Petugas Puskesmas dapat
+                                        melakukan geotagging rumah pasien saat
+                                        kunjungan lapangan, dan Anda tetap dapat
+                                        mengirim notifikasi manual ke WhatsApp
+                                        &amp; Dinkes dari halaman detail
+                                        laporan.
                                     </div>
                                 ) : (
                                     <>
                                         {geocodeNotice && (
                                             <div className="flex items-center gap-2 rounded-lg border border-[var(--pill-positive-border)] bg-[var(--pill-positive-bg)] px-3 py-2 text-[11.5px] text-[var(--pill-positive-ink)]">
                                                 <CheckCircle2 className="size-3.5 shrink-0" />
-                                                <span className="truncate">{geocodeNotice}</span>
+                                                <span className="truncate">
+                                                    {geocodeNotice}
+                                                </span>
                                             </div>
                                         )}
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -962,22 +1064,28 @@ export function ReportForm({
                                             <Field
                                                 label="Longitude"
                                                 placeholder="108.550000"
-                                                error={errors.longitude?.message}
+                                                error={
+                                                    errors.longitude?.message
+                                                }
                                                 reg={register('longitude')}
                                             />
                                         </div>
                                         <PatientLocationMap
                                             lat={
-                                                parsedLat !== null && !Number.isNaN(parsedLat)
+                                                parsedLat !== null &&
+                                                !Number.isNaN(parsedLat)
                                                     ? parsedLat
                                                     : null
                                             }
                                             lng={
-                                                parsedLng !== null && !Number.isNaN(parsedLng)
+                                                parsedLng !== null &&
+                                                !Number.isNaN(parsedLng)
                                                     ? parsedLng
                                                     : null
                                             }
-                                            onLocationSelect={handleMapLocationSelect}
+                                            onLocationSelect={
+                                                handleMapLocationSelect
+                                            }
                                             height="250px"
                                         />
                                     </>
@@ -993,7 +1101,10 @@ export function ReportForm({
                         title={
                             <span className="flex items-center gap-2.5">
                                 <span className="grid size-7 place-items-center rounded-lg bg-[var(--warning)]/15 text-[var(--warning)]">
-                                    <Stethoscope className="size-4" aria-hidden />
+                                    <Stethoscope
+                                        className="size-4"
+                                        aria-hidden
+                                    />
                                 </span>
                                 <span>Diagnosis Klinis & Hasil Lab</span>
                             </span>
@@ -1008,7 +1119,10 @@ export function ReportForm({
                             <div>
                                 <Label id="lbl-casetype">
                                     Klasifikasi Kasus Dengue{' '}
-                                    <span className="text-[var(--negative)]" aria-hidden>
+                                    <span
+                                        className="text-[var(--negative)]"
+                                        aria-hidden
+                                    >
                                         *
                                     </span>
                                 </Label>
@@ -1023,7 +1137,8 @@ export function ReportForm({
                                             className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2"
                                         >
                                             {CASE_TYPES.map((ct) => {
-                                                const active = value === ct.value;
+                                                const active =
+                                                    value === ct.value;
                                                 return (
                                                     <label
                                                         key={ct.value}
@@ -1038,7 +1153,11 @@ export function ReportForm({
                                                             type="radio"
                                                             className="sr-only"
                                                             checked={active}
-                                                            onChange={() => onChange(ct.value)}
+                                                            onChange={() =>
+                                                                onChange(
+                                                                    ct.value,
+                                                                )
+                                                            }
                                                         />
                                                         <div className="flex items-center justify-between gap-2">
                                                             <span className="text-[13px] font-semibold text-foreground">
@@ -1047,9 +1166,11 @@ export function ReportForm({
                                                             <span
                                                                 className={cn(
                                                                     'rounded px-1.5 py-0.5 text-[10.5px] font-semibold',
-                                                                    ct.tone === 'bad'
+                                                                    ct.tone ===
+                                                                        'bad'
                                                                         ? 'bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)]'
-                                                                        : ct.tone === 'warn'
+                                                                        : ct.tone ===
+                                                                            'warn'
                                                                           ? 'bg-[var(--pill-warning-bg)] text-[var(--pill-warning-ink)]'
                                                                           : 'bg-[var(--pill-info-bg)] text-[var(--pill-info-ink)]',
                                                                 )}
@@ -1075,13 +1196,20 @@ export function ReportForm({
                                     required
                                     control={control}
                                     error={errors.admissionDate?.message}
-                                    render={({ id, value, onChange, invalid }) => (
+                                    render={({
+                                        id,
+                                        value,
+                                        onChange,
+                                        invalid,
+                                    }) => (
                                         <DateField
                                             id={id}
                                             value={value as string | undefined}
                                             onChange={onChange}
                                             placeholder="Pilih tanggal"
-                                            aria-invalid={invalid ? true : undefined}
+                                            aria-invalid={
+                                                invalid ? true : undefined
+                                            }
                                         />
                                     )}
                                 />
@@ -1091,13 +1219,20 @@ export function ReportForm({
                                     label="Tanggal Mulai Demam"
                                     control={control}
                                     error={errors.symptomOnsetDate?.message}
-                                    render={({ id, value, onChange, invalid }) => (
+                                    render={({
+                                        id,
+                                        value,
+                                        onChange,
+                                        invalid,
+                                    }) => (
                                         <DateField
                                             id={id}
                                             value={value as string | undefined}
                                             onChange={onChange}
                                             placeholder="Pilih bila diketahui"
-                                            aria-invalid={invalid ? true : undefined}
+                                            aria-invalid={
+                                                invalid ? true : undefined
+                                            }
                                         />
                                     )}
                                 />
@@ -1107,13 +1242,20 @@ export function ReportForm({
                                     label="Tanggal Diagnosis"
                                     control={control}
                                     error={errors.diagnosisDate?.message}
-                                    render={({ id, value, onChange, invalid }) => (
+                                    render={({
+                                        id,
+                                        value,
+                                        onChange,
+                                        invalid,
+                                    }) => (
                                         <DateField
                                             id={id}
                                             value={value as string | undefined}
                                             onChange={onChange}
                                             placeholder="Pilih bila ditegakkan"
-                                            aria-invalid={invalid ? true : undefined}
+                                            aria-invalid={
+                                                invalid ? true : undefined
+                                            }
                                         />
                                     )}
                                 />
@@ -1136,13 +1278,20 @@ export function ReportForm({
                                         name="plateletCount"
                                         control={control}
                                         error={errors.plateletCount?.message}
-                                        render={({ id, value, onChange, invalid }) => (
+                                        render={({
+                                            id,
+                                            value,
+                                            onChange,
+                                            invalid,
+                                        }) => (
                                             <div className="relative mt-1.5">
                                                 <NumericFormat
                                                     id={id}
                                                     value={
-                                                        typeof value === 'number' ||
-                                                        typeof value === 'string'
+                                                        typeof value ===
+                                                            'number' ||
+                                                        typeof value ===
+                                                            'string'
                                                             ? value
                                                             : ''
                                                     }
@@ -1150,14 +1299,16 @@ export function ReportForm({
                                                         onChange(
                                                             val.value === ''
                                                                 ? undefined
-                                                                : Number(val.value),
+                                                                : Number(
+                                                                      val.value,
+                                                                  ),
                                                         )
                                                     }
                                                     thousandSeparator="."
                                                     decimalSeparator=","
                                                     placeholder="Contoh: 75.000"
                                                     className={cn(
-                                                        'h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 pr-16 font-mono text-[13.5px] tabular-nums text-foreground outline-none transition-colors focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
+                                                        'h-[var(--control-height)] w-full rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] px-3 pr-16 font-mono text-[13.5px] text-foreground tabular-nums transition-colors outline-none focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/25',
                                                         invalid &&
                                                             'border-[var(--negative)] ring-2 ring-[var(--negative)]/20',
                                                     )}
@@ -1183,7 +1334,8 @@ export function ReportForm({
                                         reg={register('hematocrit')}
                                     />
                                     <p className="mt-1 text-[11.5px] text-muted-foreground">
-                                        Kenaikan ≥ 20% mengindikasikan hemokonsentrasi.
+                                        Kenaikan ≥ 20% mengindikasikan
+                                        hemokonsentrasi.
                                     </p>
                                 </div>
                             </div>
@@ -1195,7 +1347,11 @@ export function ReportForm({
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     {(
                                         [
-                                            { id: 'f-ns1', name: 'ns1Result', label: 'NS1 Antigen' },
+                                            {
+                                                id: 'f-ns1',
+                                                name: 'ns1Result',
+                                                label: 'NS1 Antigen',
+                                            },
                                             {
                                                 id: 'f-igm',
                                                 name: 'igmResult',
@@ -1212,20 +1368,30 @@ export function ReportForm({
                                             key={ser.name}
                                             className="space-y-1.5 rounded-xl border border-[var(--border)] bg-[var(--raised)]/30 p-3"
                                         >
-                                            <Label htmlFor={ser.id} className="text-[12.5px] font-medium">
+                                            <Label
+                                                htmlFor={ser.id}
+                                                className="text-[12.5px] font-medium"
+                                            >
                                                 {ser.label}
                                             </Label>
                                             <div className="relative">
                                                 <select
                                                     id={ser.id}
                                                     {...register(ser.name)}
-                                                    className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:border-[var(--accent)]"
+                                                    className="h-[var(--control-height)] w-full appearance-none rounded-[var(--radius-control)] border border-[var(--control)] bg-[var(--surface)] pr-8 pl-2.5 text-[13px] text-foreground transition-colors outline-none focus-visible:border-[var(--accent)]"
                                                 >
-                                                    {LAB_RESULT_OPTIONS.map((opt) => (
-                                                        <option key={opt.value} value={opt.value}>
-                                                            {opt.label}
-                                                        </option>
-                                                    ))}
+                                                    {LAB_RESULT_OPTIONS.map(
+                                                        (opt) => (
+                                                            <option
+                                                                key={opt.value}
+                                                                value={
+                                                                    opt.value
+                                                                }
+                                                            >
+                                                                {opt.label}
+                                                            </option>
+                                                        ),
+                                                    )}
                                                 </select>
                                                 <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                                             </div>
@@ -1236,7 +1402,8 @@ export function ReportForm({
 
                             <div>
                                 <Label htmlFor="f-diagnosis">
-                                    Catatan Klinis / Komplikasi Tambahan (Opsional)
+                                    Catatan Klinis / Komplikasi Tambahan
+                                    (Opsional)
                                 </Label>
                                 <Textarea
                                     id="f-diagnosis"
@@ -1258,7 +1425,9 @@ export function ReportForm({
                                 <span className="grid size-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
                                     <Paperclip className="size-4" aria-hidden />
                                 </span>
-                                <span>Berkas Lampiran Hasil Lab & Dokumentasi</span>
+                                <span>
+                                    Berkas Lampiran Hasil Lab & Dokumentasi
+                                </span>
                             </span>
                         }
                         aside={
@@ -1299,8 +1468,12 @@ export function ReportForm({
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">
                                     {stagedAttachments.length > 0
-                                        ? `${stagedAttachments.length} berkas lampiran akan diunggah otomatis setelah laporan dibuat.`
-                                        : 'Target investigasi PE Puskesmas wilayah ≤ 24 jam sejak dikirim.'}
+                                        ? `${stagedAttachments.length} berkas lampiran akan diunggah otomatis setelah laporan dibuat. `
+                                        : 'Target investigasi PE Puskesmas wilayah ≤ 24 jam sejak dikirim. '}
+                                    Setelah laporan terkirim, notifikasi
+                                    WhatsApp otomatis dikirim sesuai wilayah
+                                    laporan (Puskesmas kelurahan terkait atau
+                                    Dinkes).
                                 </p>
                             </div>
                         </div>
@@ -1317,7 +1490,10 @@ export function ReportForm({
                                 type="button"
                                 variant="outline"
                                 onClick={() =>
-                                    handleSubmit((d) => executeSubmit(d, true), onInvalid)()
+                                    handleSubmit(
+                                        (d) => executeSubmit(d, true),
+                                        onInvalid,
+                                    )()
                                 }
                                 disabled={busy}
                                 className="h-10 gap-2 px-4 text-[13px] font-medium"

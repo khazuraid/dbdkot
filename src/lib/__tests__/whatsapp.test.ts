@@ -90,7 +90,10 @@ describe('whatsapp OpenWA adapter & anti-ban helpers', () => {
 
     it('computes deduplication cooldown windows per event kind', () => {
         expect(getCooldownMs('TEST')).toBe(0);
+        expect(getCooldownMs('MANUAL_ALERT')).toBe(0);
         expect(getCooldownMs('ASSIGNMENT')).toBe(10 * 60 * 1000);
+        expect(getCooldownMs('PE_COMPLETED')).toBe(10 * 60 * 1000);
+        expect(getCooldownMs('FOGGING_COMPLETED')).toBe(10 * 60 * 1000);
         expect(getCooldownMs('SLA_WARNING_6H')).toBe(6 * 60 * 60 * 1000);
         expect(getCooldownMs('SLA_ESCALATION_24H')).toBe(6 * 60 * 60 * 1000);
         expect(getCooldownMs('PE_SLA_WARNING')).toBe(6 * 60 * 60 * 1000);

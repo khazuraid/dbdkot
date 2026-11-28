@@ -13,7 +13,7 @@ import { enqueueFoggingReminders } from '@/lib/queue';
 import { isValidUuid } from '@/lib/security';
 import { scopeToInstitution, type Actor } from '@/lib/session';
 import type { FoggingCycleInput } from './form-contracts';
-import { insertNotifications } from './notify';
+import { enqueueWaSafe, insertNotifications } from './notify';
 
 export type FoggingQueueItem = {
     reportId: string;
@@ -21,6 +21,7 @@ export type FoggingQueueItem = {
     kelurahan: string | null;
     kecamatan: string | null;
     status: string;
+    institutionId: string;
     puskesmasId: string | null;
     puskesmasName: string | null;
     abj: string | null;
@@ -53,6 +54,7 @@ export async function listFoggingQueue(
             kelurahan: reportsRS.kelurahan,
             kecamatan: reportsRS.kecamatan,
             status: reportsRS.status,
+            institutionId: reportsRS.institutionId,
             puskesmasId: reportsRS.assignedPuskesmasId,
             puskesmasName: institutions.name,
             abj: reportsPE.abj,
@@ -305,10 +307,7 @@ export async function executeFoggingCycle(
                 .from(assets)
                 .where(eq(assets.institutionId, targetInstitutionId));
 
-            const deductAsset = async (
-                keyword: string,
-                usedAmount: number,
-            ) => {
+            const deductAsset = async (keyword: string, usedAmount: number) => {
                 if (usedAmount <= 0) return;
                 const match = instAssets.find(
                     (a) =>
@@ -347,33 +346,100 @@ export async function executeFoggingCycle(
         };
     }
 
+    const kelLabel = report.kelurahan ?? '-';
+    const cycle2DateLabel = cycle2ScheduledDate.toLocaleDateString('id-ID');
+
     if (input.cycleNumber === 1) {
         try {
-            await enqueueFoggingReminders(input.reportRSId, cycle2ScheduledDate);
+            await enqueueFoggingReminders(
+                input.reportRSId,
+                cycle2ScheduledDate,
+            );
         } catch (err) {
             console.error('[fogging] gagal enqueue pengingat Siklus 2', err);
         }
-        await insertNotifications(
-            { kind: 'INSTITUTION', institutionId: targetInstitutionId },
-            {
-                title: 'Fogging Siklus 2 dijadwalkan (H+7)',
-                message: `Kasus ${report.reportNumber} dijadwalkan untuk Fogging Siklus 2 pada ${cycle2ScheduledDate.toLocaleDateString('id-ID')}.`,
-                type: 'FOGGING_SCHEDULED',
-                entityType: 'REPORT_RS',
-                entityId: input.reportRSId,
-            },
-        );
+        await Promise.all([
+            insertNotifications(
+                { kind: 'INSTITUTION', institutionId: targetInstitutionId },
+                {
+                    title: 'Fogging Siklus 2 dijadwalkan (H+7)',
+                    message: `Kasus ${report.reportNumber} dijadwalkan untuk Fogging Siklus 2 pada ${cycle2DateLabel}.`,
+                    type: 'FOGGING_SCHEDULED',
+                    entityType: 'REPORT_RS',
+                    entityId: input.reportRSId,
+                },
+            ),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'PUSKESMAS',
+                institutionId: targetInstitutionId,
+                reportRSId: input.reportRSId,
+                eventKind: 'FOGGING_SCHEDULED',
+                message: `[WALI-EPI] Fogging Siklus 1 kasus ${report.reportNumber} (Kel. ${kelLabel}) selesai. Siklus 2 dijadwalkan pada ${cycle2DateLabel}.`,
+            }),
+            insertNotifications(
+                { kind: 'ROLE', role: 'DINKES' },
+                {
+                    title: 'Fogging Siklus 1 selesai · Siklus 2 terjadwal',
+                    message: `Fogging Siklus 1 kasus ${report.reportNumber} (Kel. ${kelLabel}) selesai. Siklus 2 dijadwalkan ${cycle2DateLabel}.`,
+                    type: 'FOGGING_SCHEDULED',
+                    entityType: 'REPORT_RS',
+                    entityId: input.reportRSId,
+                },
+            ),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'DINKES',
+                reportRSId: input.reportRSId,
+                eventKind: 'FOGGING_SCHEDULED',
+                message: `[WALI-EPI] Fogging Siklus 1 kasus ${report.reportNumber} (Kel. ${kelLabel}) selesai. Siklus 2 dijadwalkan ${cycle2DateLabel}.`,
+            }),
+        ]);
     } else {
-        await insertNotifications(
-            { kind: 'ROLE', role: 'DINKES' },
-            {
-                title: 'Penanggulangan fokus tuntas',
-                message: `Fogging Siklus 2 untuk ${report.reportNumber} selesai dan kasus ditutup.`,
-                type: 'FOGGING_COMPLETED',
-                entityType: 'REPORT_RS',
-                entityId: input.reportRSId,
-            },
-        );
+        await Promise.all([
+            insertNotifications(
+                { kind: 'ROLE', role: 'DINKES' },
+                {
+                    title: 'Penanggulangan fokus tuntas',
+                    message: `Fogging Siklus 2 untuk ${report.reportNumber} selesai dan kasus ditutup.`,
+                    type: 'FOGGING_COMPLETED',
+                    entityType: 'REPORT_RS',
+                    entityId: input.reportRSId,
+                },
+            ),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'DINKES',
+                reportRSId: input.reportRSId,
+                eventKind: 'FOGGING_COMPLETED',
+                message: `[WALI-EPI] Fogging Siklus 2 kasus ${report.reportNumber} (Kel. ${kelLabel}) selesai dan kasus ditutup.`,
+            }),
+            ...(actor.role !== 'PUSKESMAS'
+                ? [
+                      insertNotifications(
+                          {
+                              kind: 'INSTITUTION',
+                              institutionId: targetInstitutionId,
+                          },
+                          {
+                              title: 'Fogging Siklus 2 selesai & kasus ditutup',
+                              message: `Fogging Siklus 2 untuk ${report.reportNumber} (Kel. ${kelLabel}) telah dicatat selesai.`,
+                              type: 'FOGGING_COMPLETED',
+                              entityType: 'REPORT_RS',
+                              entityId: input.reportRSId,
+                          },
+                      ),
+                      enqueueWaSafe({
+                          recipientPhone: '',
+                          recipientRole: 'PUSKESMAS',
+                          institutionId: targetInstitutionId,
+                          reportRSId: input.reportRSId,
+                          eventKind: 'FOGGING_COMPLETED',
+                          message: `[WALI-EPI] Fogging Siklus 2 kasus ${report.reportNumber} (Kel. ${kelLabel}) telah dicatat selesai dan kasus ditutup.`,
+                      }),
+                  ]
+                : []),
+        ]);
     }
 
     await audit({

@@ -13,7 +13,7 @@ import {
 import type { Actor } from '@/lib/session';
 import { audit } from '@/lib/audit';
 import { assignReportByKelurahan } from './assignment';
-import { insertNotifications } from './notify';
+import { enqueueWaSafe, insertNotifications } from './notify';
 import { transitionReport } from './report-detail';
 
 /**
@@ -275,6 +275,14 @@ export async function reassignReport(
                         entityId: reportId,
                     },
                 ),
+                enqueueWaSafe({
+                    recipientPhone: '',
+                    recipientRole: 'PUSKESMAS',
+                    institutionId: puskesmasId,
+                    reportRSId: reportId,
+                    eventKind: 'ASSIGNMENT',
+                    message: `[WALI-EPI] Disposisi ulang dari Dinkes: laporan ${state.reportNumber} ditugaskan ke Puskesmas Anda untuk Penyelidikan Epidemiologi.`,
+                }),
             ]);
 
             return { ok: true, puskesmasId };
@@ -284,6 +292,33 @@ export async function reassignReport(
     const result = await assignReportByKelurahan(reportId);
 
     if (result.assigned) {
+        const [assignedReport] = await db
+            .select({ reportNumber: reportsRS.reportNumber })
+            .from(reportsRS)
+            .where(eq(reportsRS.id, reportId))
+            .limit(1);
+        const reportLabel = assignedReport?.reportNumber ?? reportId;
+
+        await Promise.all([
+            insertNotifications(
+                { kind: 'INSTITUTION', institutionId: result.puskesmasId },
+                {
+                    title: 'Laporan kasus baru masuk',
+                    message: `Laporan ${reportLabel} ditugaskan ke Puskesmas Anda untuk verifikasi dan PE.`,
+                    type: 'ASSIGNMENT',
+                    entityType: 'REPORT_RS',
+                    entityId: reportId,
+                },
+            ),
+            enqueueWaSafe({
+                recipientPhone: '',
+                recipientRole: 'PUSKESMAS',
+                institutionId: result.puskesmasId,
+                reportRSId: reportId,
+                eventKind: 'ASSIGNMENT',
+                message: `[WALI-EPI] Laporan ${reportLabel} ditugaskan ke Puskesmas Anda untuk verifikasi dan Penyelidikan Epidemiologi.`,
+            }),
+        ]);
         return { ok: true, puskesmasId: result.puskesmasId };
     }
 

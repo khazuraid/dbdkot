@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { isValidUsername, loginSchema, registerSchema } from '../auth-schemas';
-import { validateTransitionNote } from '../domain/report-labels';
+import {
+    buildDefaultManualNotifyMessage,
+    buildManualNotifyTargets,
+    validateTransitionNote,
+} from '../domain/report-labels';
 
 describe('username & identifier auth validation', () => {
     it('validates allowed username format', () => {
@@ -100,5 +104,88 @@ describe('rejection note enforcement', () => {
             ok: true,
             note: null,
         });
+    });
+});
+
+describe('manual notification targets & default messages', () => {
+    it('builds role-appropriate targets for RS, Puskesmas, and Dinkes', () => {
+        const rsTargets = buildManualNotifyTargets({
+            actorRole: 'RUMAH_SAKIT',
+            actorInstitutionId: 'rs-1',
+            reportInstitutionId: 'rs-1',
+            reportInstitutionName: 'RSUD Gunung Jati',
+            puskesmasId: 'pkm-1',
+            puskesmasName: 'PKM Kejaksan',
+        });
+        expect(rsTargets.map((t) => t.value)).toEqual([
+            'DINKES',
+            'PUSKESMAS',
+            'PUSKESMAS_AND_DINKES',
+        ]);
+
+        const rsUnassigned = buildManualNotifyTargets({
+            actorRole: 'RUMAH_SAKIT',
+            actorInstitutionId: 'rs-1',
+            reportInstitutionId: 'rs-1',
+            reportInstitutionName: 'RSUD Gunung Jati',
+            puskesmasId: null,
+            puskesmasName: null,
+        });
+        expect(rsUnassigned.map((t) => t.value)).toEqual(['DINKES']);
+
+        const pkmTargets = buildManualNotifyTargets({
+            actorRole: 'PUSKESMAS',
+            actorInstitutionId: 'pkm-1',
+            reportInstitutionId: 'rs-1',
+            reportInstitutionName: 'RSUD Gunung Jati',
+            puskesmasId: 'pkm-1',
+            puskesmasName: 'PKM Kejaksan',
+        });
+        expect(pkmTargets.map((t) => t.value)).toEqual(['DINKES', 'FASKES']);
+
+        const dinkesTargets = buildManualNotifyTargets({
+            actorRole: 'DINKES',
+            actorInstitutionId: 'dinkes-1',
+            reportInstitutionId: 'rs-1',
+            reportInstitutionName: 'RSUD Gunung Jati',
+            puskesmasId: 'pkm-1',
+            puskesmasName: 'PKM Kejaksan',
+        });
+        expect(dinkesTargets.map((t) => t.value)).toEqual([
+            'PUSKESMAS',
+            'FASKES',
+            'DINKES',
+            'PUSKESMAS_AND_DINKES',
+        ]);
+    });
+
+    it('builds context-specific default messages for REPORT, unconfirmed location, PE, and FOGGING', () => {
+        expect(
+            buildDefaultManualNotifyMessage({
+                context: 'REPORT',
+                reportId: 'rep-1',
+                reportNumber: 'DBD-2026-001',
+                kelurahan: 'Kejaksan',
+                locationUnconfirmed: true,
+            }),
+        ).toContain('konfirmasi lokasi/koordinat');
+
+        expect(
+            buildDefaultManualNotifyMessage({
+                context: 'PE',
+                reportId: 'rep-1',
+                reportNumber: 'DBD-2026-001',
+                kelurahan: 'Kejaksan',
+            }),
+        ).toContain('Penyelidikan Epidemiologi (PE)');
+
+        expect(
+            buildDefaultManualNotifyMessage({
+                context: 'FOGGING',
+                reportId: 'rep-1',
+                reportNumber: 'DBD-2026-001',
+                kelurahan: 'Kejaksan',
+            }),
+        ).toContain('Fogging Fokus');
     });
 });

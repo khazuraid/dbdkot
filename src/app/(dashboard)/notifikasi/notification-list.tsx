@@ -22,10 +22,27 @@ export type NotificationRow = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
+    NEW_REPORT: 'Laporan Baru',
+    CROSS_BORDER: 'Luar Wilayah',
     ASSIGNMENT: 'Penugasan',
     VERIFICATION: 'Verifikasi',
     REJECTION: 'Penolakan',
+    REJECTED: 'Ditolak',
+    PE_COMPLETED: 'PE Selesai',
+    PE_VERIFIED: 'PE Terverifikasi',
+    PE_REJECTED: 'PE Ditolak',
+    PE_MANUAL: 'Pengingat PE',
+    PE_SLA_BREACH: 'SLA PE',
+    FOGGING_REQUIRED: 'Wajib Fogging',
+    FOGGING_SCHEDULED: 'Jadwal Fogging',
+    FOGGING_COMPLETED: 'Fogging Selesai',
+    FOGGING_REMINDER: 'Pengingat Fogging',
+    FOGGING_MANUAL: 'Pengingat Fogging',
     SLA: 'SLA',
+    SLA_WARNING: 'Peringatan SLA',
+    SLA_BREACH: 'Pelanggaran SLA',
+    CLUSTER_ALERT: 'Klaster Kasus',
+    MANUAL_ALERT: 'Notifikasi Manual',
     SYSTEM: 'Sistem',
 };
 

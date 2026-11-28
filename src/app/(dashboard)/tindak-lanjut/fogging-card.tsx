@@ -11,6 +11,9 @@ import { StatusText } from '@/components/shell/status-text';
 import { formatDate } from '@/lib/format';
 import type { FoggingQueueItem } from '@/lib/domain/fogging';
 import { foggingCycleSchema } from '@/lib/domain/form-contracts';
+import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
+import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
+import type { Role } from '@/lib/roles';
 import { executeFoggingAction } from './actions';
 
 const formatIdr = (n: number) =>
@@ -23,13 +26,25 @@ const formatIdr = (n: number) =>
 export function FoggingCard({
     item,
     canExecute,
+    actorRole = 'DINKES',
+    actorInstitutionId = null,
 }: {
     item: FoggingQueueItem;
     canExecute: boolean;
+    actorRole?: Role;
+    actorInstitutionId?: string | null;
 }) {
     const pendingCycle =
         item.cycles.find((c) => c.status !== 'DONE')?.cycleNumber ?? 1;
     const cycleNumber: 1 | 2 = pendingCycle === 2 ? 2 : 1;
+    const notifyTargets = buildManualNotifyTargets({
+        actorRole,
+        actorInstitutionId,
+        reportInstitutionId: item.institutionId,
+        reportInstitutionName: null,
+        puskesmasId: item.puskesmasId,
+        puskesmasName: item.puskesmasName,
+    });
 
     const [abateUsedKg, setAbateUsedKg] = useState(1.5);
     const [insecticideUsedLiter, setInsecticideUsedLiter] = useState(2);
@@ -47,7 +62,8 @@ export function FoggingCard({
     };
 
     const isDoneAll =
-        item.cycles.length >= 2 && item.cycles.every((c) => c.status === 'DONE');
+        item.cycles.length >= 2 &&
+        item.cycles.every((c) => c.status === 'DONE');
 
     function handleExecute(e: React.FormEvent) {
         e.preventDefault();
@@ -65,7 +81,9 @@ export function FoggingCard({
         });
 
         if (!parsed.success) {
-            toast.error(parsed.error.issues[0]?.message ?? 'Data fogging tidak valid.');
+            toast.error(
+                parsed.error.issues[0]?.message ?? 'Data fogging tidak valid.',
+            );
             return;
         }
 
@@ -106,16 +124,27 @@ export function FoggingCard({
                     </p>
                 </div>
 
-                <div className="rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--raised)]/60 px-3 py-1.5 text-right">
-                    <p className="text-[10.5px] text-muted-foreground">
-                        Proyeksi Budget 2 Siklus
-                    </p>
-                    <p
-                        data-numeric
-                        className="font-mono text-[13.5px] font-semibold"
-                    >
-                        {budget.formattedTwoCycles}
-                    </p>
+                <div className="flex flex-wrap items-center gap-2">
+                    <ManualNotifyButton
+                        reportId={item.reportId}
+                        reportNumber={item.reportNumber}
+                        kelurahan={item.kelurahan}
+                        context="FOGGING"
+                        targets={notifyTargets}
+                        label="Kirim Notif Fogging"
+                        size="xs"
+                    />
+                    <div className="rounded-[var(--radius-control)] border border-[var(--rule)] bg-[var(--raised)]/60 px-3 py-1.5 text-right">
+                        <p className="text-[10.5px] text-muted-foreground">
+                            Proyeksi Budget 2 Siklus
+                        </p>
+                        <p
+                            data-numeric
+                            className="font-mono text-[13.5px] font-semibold"
+                        >
+                            {budget.formattedTwoCycles}
+                        </p>
+                    </div>
                 </div>
             </div>
 
