@@ -32,7 +32,10 @@ function inCidr4(ipInt: number, base: string, prefix: number): boolean {
 
 /** Returns true if an IPv4 or IPv6 address is loopback, private, link-local, metadata, or reserved. */
 export function isPrivateIp(address: string): boolean {
-    const clean = address.trim().toLowerCase().replace(/^\[|\]$/g, '');
+    const clean = address
+        .trim()
+        .toLowerCase()
+        .replace(/^\[|\]$/g, '');
     const version = isIP(clean);
     if (version === 4) {
         const n = ipv4ToInt(clean);
@@ -59,7 +62,9 @@ export function isPrivateIp(address: string): boolean {
         // IPv4-mapped IPv6 (`::ffff:127.0.0.1` or `::ffff:7f00:1`)
         const mapped = clean.match(/^::ffff:([0-9.]+)$/);
         if (mapped) return isPrivateIp(mapped[1]);
-        const mappedHex = clean.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+        const mappedHex = clean.match(
+            /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/,
+        );
         if (mappedHex) {
             const hi = parseInt(mappedHex[1], 16);
             const lo = parseInt(mappedHex[2], 16);
@@ -85,7 +90,50 @@ export function isPrivateIp(address: string): boolean {
 export type ExternalUrlOptions = {
     allowHttp?: boolean;
     skipDnsLookup?: boolean;
+    /** Exact origins (scheme + host + port) explicitly trusted for internal sidecars like OpenWA. */
+    allowedInternalOrigins?: ReadonlySet<string>;
 };
+
+/**
+ * Parses `WHATSAPP_ALLOWED_INTERNAL_ORIGINS` (comma-separated) plus the origin of
+ * `WHATSAPP_API_URL` when configured via server env, returning normalized origins.
+ */
+export function getTrustedWhatsAppOrigins(): ReadonlySet<string> {
+    const origins = new Set<string>();
+    const rawList = process.env.WHATSAPP_ALLOWED_INTERNAL_ORIGINS ?? '';
+    for (const entry of rawList.split(',')) {
+        const trimmed = entry.trim();
+        if (!trimmed) continue;
+        try {
+            const u = new URL(trimmed);
+            if (
+                (u.protocol === 'http:' || u.protocol === 'https:') &&
+                !u.username &&
+                !u.password
+            ) {
+                origins.add(u.origin);
+            }
+        } catch {
+            // Ignore malformed entries
+        }
+    }
+    const envUrl = process.env.WHATSAPP_API_URL?.trim();
+    if (envUrl) {
+        try {
+            const u = new URL(envUrl);
+            if (
+                (u.protocol === 'http:' || u.protocol === 'https:') &&
+                !u.username &&
+                !u.password
+            ) {
+                origins.add(u.origin);
+            }
+        } catch {
+            // Ignore malformed env URL
+        }
+    }
+    return origins;
+}
 
 /**
  * Validates that an outbound URL targets a public HTTPS host and does not
@@ -102,13 +150,17 @@ export async function assertSafeExternalUrl(
         throw new Error('URL tidak valid.');
     }
 
+    if (parsed.username || parsed.password) {
+        throw new Error('URL tidak boleh mengandung kredensial.');
+    }
+
+    if (opts.allowedInternalOrigins?.has(parsed.origin)) {
+        return parsed;
+    }
+
     const allowedProtocols = opts.allowHttp ? ['https:', 'http:'] : ['https:'];
     if (!allowedProtocols.includes(parsed.protocol)) {
         throw new Error('URL eksternal wajib menggunakan protokol HTTPS.');
-    }
-
-    if (parsed.username || parsed.password) {
-        throw new Error('URL tidak boleh mengandung kredensial.');
     }
 
     const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
@@ -154,7 +206,9 @@ export async function assertSafeExternalUrl(
 /** Outbound fetch with SSRF validation and redirects disabled (`redirect: 'error'`). */
 export async function safeFetch(
     rawUrl: string,
-    init?: RequestInit & { next?: { revalidate?: number | false; tags?: string[] } },
+    init?: RequestInit & {
+        next?: { revalidate?: number | false; tags?: string[] };
+    },
     opts?: ExternalUrlOptions,
 ): Promise<Response> {
     const safeUrl = await assertSafeExternalUrl(rawUrl, opts);

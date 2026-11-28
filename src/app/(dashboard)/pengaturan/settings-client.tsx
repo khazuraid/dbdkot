@@ -23,6 +23,7 @@ import {
     User,
     Globe2,
     Mail,
+    MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -44,6 +45,8 @@ import {
 import { RegionalApiSettings } from './regional-api-settings';
 import { BrandingSettings } from './branding-settings';
 import { SmtpSettings } from './smtp-settings';
+import { WhatsAppSettings } from './whatsapp-settings';
+import type { WhatsAppGatewaySummary } from '@/lib/whatsapp';
 
 type UserProfileData = {
     id: string;
@@ -102,6 +105,7 @@ export function SettingsClient({
     categories = [],
     canManageSystem = false,
     isAdmin = false,
+    whatsappGateway,
 }: {
     user: UserProfileData;
     systemSettings?: SettingRow[];
@@ -109,6 +113,7 @@ export function SettingsClient({
     categories?: string[];
     canManageSystem?: boolean;
     isAdmin?: boolean;
+    whatsappGateway?: WhatsAppGatewaySummary;
 }) {
     const { theme, setTheme } = useTheme();
 
@@ -273,6 +278,13 @@ export function SettingsClient({
                                 >
                                     <Mail className="size-4" />
                                     Email & SMTP (Sumopod)
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="whatsapp"
+                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                >
+                                    <MessageSquare className="size-4" />
+                                    WhatsApp (OpenWA)
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="sistem"
@@ -906,6 +918,16 @@ export function SettingsClient({
                     <TabsContent value="smtp" className="space-y-6 pt-4">
                         <SmtpSettings
                             settings={systemSettings}
+                            canManage={canManageSystem}
+                        />
+                    </TabsContent>
+                )}
+
+                {/* 6b. Gateway WhatsApp (OpenWA / Webhook) */}
+                {canManageSystem && (
+                    <TabsContent value="whatsapp" className="space-y-6 pt-4">
+                        <WhatsAppSettings
+                            initial={whatsappGateway}
                             canManage={canManageSystem}
                         />
                     </TabsContent>

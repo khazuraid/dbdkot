@@ -34,8 +34,11 @@ COPY . .
 # compiled — no page is rendered at build time, so no database is contacted.
 # A placeholder is enough to satisfy a module that reads DATABASE_URL at
 # import; the real value arrives at run time.
+ARG NEXT_PUBLIC_APP_NAME=WALI-EPI
+ARG NEXT_PUBLIC_APP_URL=
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
-ENV NEXT_PUBLIC_APP_URL=http://localhost:3000
+ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 ENV BETTER_AUTH_URL=http://localhost:3000
 
 RUN npm run build

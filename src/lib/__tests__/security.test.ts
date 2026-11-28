@@ -14,6 +14,7 @@ import {
     assertSafeExternalUrl,
     decryptSettingValue,
     encryptSettingValue,
+    getTrustedWhatsAppOrigins,
     isPrivateIp,
 } from '../security-server';
 import { assertInsideUploadRoot } from '../attachments';
@@ -34,11 +35,15 @@ describe('security client-safe helpers', () => {
     it('validates strict UUID format', () => {
         expect(isValidUuid('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
         expect(isValidUuid('not-a-uuid')).toBe(false);
-        expect(isValidUuid('550e8400-e29b-41d4-a716-446655440000;DROP')).toBe(false);
+        expect(isValidUuid('550e8400-e29b-41d4-a716-446655440000;DROP')).toBe(
+            false,
+        );
     });
 
     it('neutralizes Excel formula injection (CWE-1236) while keeping safe text', () => {
-        expect(sanitizeExcelCell('=CMD|\' /C calc\'!A0')).toBe("'=CMD|' /C calc'!A0");
+        expect(sanitizeExcelCell("=CMD|' /C calc'!A0")).toBe(
+            "'=CMD|' /C calc'!A0",
+        );
         expect(sanitizeExcelCell('+1+1')).toBe("'+1+1");
         expect(sanitizeExcelCell('-2+3')).toBe("'-2+3");
         expect(sanitizeExcelCell('@SUM(A1:A2)')).toBe("'@SUM(A1:A2)");
@@ -55,7 +60,17 @@ describe('security client-safe helpers', () => {
             { value: 'Normal' as unknown },
         ];
         const fakeWb = {
-            eachSheet(cb: (ws: { eachRow: (r: (row: { eachCell: (c: (cell: { value: unknown }) => void) => void }) => void) => void }) => void) {
+            eachSheet(
+                cb: (ws: {
+                    eachRow: (
+                        r: (row: {
+                            eachCell: (
+                                c: (cell: { value: unknown }) => void,
+                            ) => void;
+                        }) => void,
+                    ) => void;
+                }) => void,
+            ) {
                 cb({
                     eachRow(rcb) {
                         rcb({
@@ -77,9 +92,13 @@ describe('security client-safe helpers', () => {
     it('validates branding URLs and wilayah codes', () => {
         expect(isSafeBrandingUrl('')).toBe(true);
         expect(isSafeBrandingUrl('/logo.png')).toBe(true);
-        expect(isSafeBrandingUrl('https://cdn.example.org/logo.png')).toBe(true);
+        expect(isSafeBrandingUrl('https://cdn.example.org/logo.png')).toBe(
+            true,
+        );
         expect(isSafeBrandingUrl('javascript:alert(1)')).toBe(false);
-        expect(isSafeBrandingUrl('http://insecure.example.org/a.png')).toBe(false);
+        expect(isSafeBrandingUrl('http://insecure.example.org/a.png')).toBe(
+            false,
+        );
         expect(isSafeBrandingUrl('//evil.example/x.png')).toBe(false);
 
         expect(isValidWilayahCode('32')).toBe(true);
@@ -138,22 +157,78 @@ describe('security server-only helpers', () => {
     });
 
     it('rejects SSRF URLs (http, localhost, metadata IP, embedded creds)', async () => {
-        await expect(assertSafeExternalUrl('http://example.com')).rejects.toThrow();
-        await expect(assertSafeExternalUrl('https://localhost/api')).rejects.toThrow();
-        await expect(assertSafeExternalUrl('https://169.254.169.254/latest')).rejects.toThrow();
-        await expect(assertSafeExternalUrl('https://user:pass@example.com')).rejects.toThrow();
+        await expect(
+            assertSafeExternalUrl('http://example.com'),
+        ).rejects.toThrow();
+        await expect(
+            assertSafeExternalUrl('https://localhost/api'),
+        ).rejects.toThrow();
+        await expect(
+            assertSafeExternalUrl('https://169.254.169.254/latest'),
+        ).rejects.toThrow();
+        await expect(
+            assertSafeExternalUrl('https://user:pass@example.com'),
+        ).rejects.toThrow();
+    });
+
+    it('allows only exact trusted internal origins for WhatsApp sidecar', async () => {
+        const origAllowed = process.env.WHATSAPP_ALLOWED_INTERNAL_ORIGINS;
+        const origApiUrl = process.env.WHATSAPP_API_URL;
+        try {
+            process.env.WHATSAPP_ALLOWED_INTERNAL_ORIGINS =
+                'http://openwa:2785';
+            delete process.env.WHATSAPP_API_URL;
+            const allowed = getTrustedWhatsAppOrigins();
+
+            const ok = await assertSafeExternalUrl(
+                'http://openwa:2785/api/sessions/wali-epi/messages/send-text',
+                { allowedInternalOrigins: allowed },
+            );
+            expect(ok.origin).toBe('http://openwa:2785');
+
+            await expect(
+                assertSafeExternalUrl('http://openwa:5432/secret', {
+                    allowedInternalOrigins: allowed,
+                }),
+            ).rejects.toThrow();
+            await expect(
+                assertSafeExternalUrl('http://postgres:5432', {
+                    allowedInternalOrigins: allowed,
+                }),
+            ).rejects.toThrow();
+            await expect(
+                assertSafeExternalUrl('http://user:pass@openwa:2785/api', {
+                    allowedInternalOrigins: allowed,
+                }),
+            ).rejects.toThrow();
+        } finally {
+            if (origAllowed === undefined) {
+                delete process.env.WHATSAPP_ALLOWED_INTERNAL_ORIGINS;
+            } else {
+                process.env.WHATSAPP_ALLOWED_INTERNAL_ORIGINS = origAllowed;
+            }
+            if (origApiUrl === undefined) {
+                delete process.env.WHATSAPP_API_URL;
+            } else {
+                process.env.WHATSAPP_API_URL = origApiUrl;
+            }
+        }
     });
 
     it('encrypts and decrypts secret settings with plaintext fallback', () => {
         const cipher = encryptSettingValue('super-secret-token');
         expect(cipher.startsWith('v1.')).toBe(true);
         expect(decryptSettingValue(cipher)).toBe('super-secret-token');
-        expect(decryptSettingValue('legacy-plaintext')).toBe('legacy-plaintext');
+        expect(decryptSettingValue('legacy-plaintext')).toBe(
+            'legacy-plaintext',
+        );
     });
 
     it('refuses to hash OTP when BETTER_AUTH_SECRET is missing', () => {
         delete process.env.BETTER_AUTH_SECRET;
-        expect(() => hashOtp('reset-otp:a@b.com', '123456')).toThrow(/BETTER_AUTH_SECRET/);
+        expect(() => hashOtp('reset-otp:a@b.com', '123456')).toThrow(
+            /BETTER_AUTH_SECRET/,
+        );
 
         process.env.BETTER_AUTH_SECRET = 'test-secret-key-at-least-32-chars';
         const d1 = hashOtp('reset-otp:a@b.com', '123456');

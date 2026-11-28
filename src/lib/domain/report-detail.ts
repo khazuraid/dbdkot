@@ -535,6 +535,7 @@ export async function transitionReport(
             await enqueueWhatsAppDispatch({
                 recipientPhone: '',
                 recipientRole: 'PUSKESMAS',
+                institutionId: current.assignedPuskesmasId,
                 reportRSId: id,
                 eventKind: 'FOGGING_REQUIRED',
                 message: `[WALI-EPI] PE ${current.reportNumber} (${current.kelurahan ?? '-'}) terverifikasi POSITIF PENULARAN. Segera laksanakan Fogging Fokus Siklus 1.`,

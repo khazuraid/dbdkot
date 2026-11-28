@@ -1,7 +1,13 @@
-import { eq } from 'drizzle-orm';
-import { getDb } from '@/db';
-import { systemSettings, waDispatches } from '@/db/schema';
-import { decryptSettingValue, safeFetch } from './security-server';
+import { and, eq, gte, isNull } from 'drizzle-orm';
+import { getDb } from '../db';
+import { systemSettings, waDispatches } from '../db/schema';
+import {
+    decryptSettingValue,
+    getTrustedWhatsAppOrigins,
+    safeFetch,
+} from './security-server';
+
+export type WaProvider = 'openwa' | 'generic';
 
 export type WaEventKind =
     | 'ASSIGNMENT'
@@ -30,11 +36,26 @@ export type DispatchWhatsAppResult = {
     detail?: string;
 };
 
-type GatewayConfig = {
+export type GatewayConfig = {
+    provider: WaProvider;
     url: string;
+    sessionId?: string;
     token?: string;
     enabled: boolean;
+    envManaged?: boolean;
 };
+
+export type WhatsAppGatewaySummary = {
+    provider: WaProvider;
+    baseUrl: string;
+    sessionId: string;
+    enabled: boolean;
+    hasToken: boolean;
+    envManaged: boolean;
+};
+
+const SESSION_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+const DISPATCH_TIMEOUT_MS = 15_000;
 
 export function normalizeIndonesianPhone(raw: string): string {
     const digits = raw.replace(/\D/g, '');
@@ -44,11 +65,119 @@ export function normalizeIndonesianPhone(raw: string): string {
     return digits;
 }
 
-async function resolveGatewayConfig(): Promise<GatewayConfig> {
+export function getCooldownMs(eventKind: WaEventKind): number {
+    if (eventKind === 'TEST') return 0;
+    if (
+        eventKind === 'SLA_WARNING_6H' ||
+        eventKind === 'SLA_ESCALATION_24H' ||
+        eventKind === 'PE_SLA_WARNING'
+    ) {
+        return 6 * 60 * 60 * 1000;
+    }
+    return 10 * 60 * 1000;
+}
+
+export function parseRateLimitMeta(
+    status: number,
+    bodyText: string,
+    retryAfterHeader?: string | null,
+): { rateLimited: boolean; code?: string; retryAfterSeconds?: number } {
+    if (status !== 429) return { rateLimited: false };
+    let code: string | undefined;
+    let retryAfterSeconds: number | undefined;
+    try {
+        const parsed = JSON.parse(bodyText) as {
+            code?: unknown;
+            retryAfterSeconds?: unknown;
+        };
+        if (typeof parsed.code === 'string') code = parsed.code;
+        if (
+            typeof parsed.retryAfterSeconds === 'number' &&
+            Number.isFinite(parsed.retryAfterSeconds)
+        ) {
+            retryAfterSeconds = parsed.retryAfterSeconds;
+        }
+    } catch {
+        // Non-JSON 429 body
+    }
+    if (retryAfterSeconds === undefined && retryAfterHeader) {
+        const n = Number(retryAfterHeader);
+        if (Number.isFinite(n) && n >= 0) retryAfterSeconds = n;
+    }
+    return { rateLimited: true, code, retryAfterSeconds };
+}
+
+export function buildWhatsAppRequest(
+    gateway: Pick<GatewayConfig, 'provider' | 'url' | 'sessionId' | 'token'>,
+    phone: string,
+    input: Pick<DispatchWhatsAppInput, 'message' | 'eventKind' | 'reportRSId'>,
+): { url: string; headers: Record<string, string>; body: string } {
+    if (gateway.provider === 'openwa') {
+        const sessionId = gateway.sessionId?.trim() ?? '';
+        if (!SESSION_ID_RE.test(sessionId)) {
+            throw new Error('Session ID OpenWA tidak valid atau belum diisi.');
+        }
+        const base = gateway.url.trim().replace(/\/+$/, '');
+        return {
+            url: `${base}/api/sessions/${encodeURIComponent(sessionId)}/messages/send-text`,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(gateway.token ? { 'X-API-Key': gateway.token } : {}),
+            },
+            body: JSON.stringify({
+                chatId: `${phone}@c.us`,
+                text: input.message,
+            }),
+        };
+    }
+
+    return {
+        url: gateway.url.trim(),
+        headers: {
+            'Content-Type': 'application/json',
+            ...(gateway.token
+                ? { Authorization: `Bearer ${gateway.token}` }
+                : {}),
+        },
+        body: JSON.stringify({
+            target: phone,
+            phone,
+            message: input.message,
+            eventKind: input.eventKind,
+            reportRSId: input.reportRSId ?? null,
+        }),
+    };
+}
+
+type StoredGatewayJson = {
+    provider?: string;
+    baseUrl?: string;
+    webhookUrl?: string;
+    sessionId?: string;
+    token?: string;
+    enabled?: boolean;
+};
+
+async function readStoredGatewayConfig(): Promise<GatewayConfig> {
     const envUrl = process.env.WHATSAPP_API_URL?.trim();
     const envToken = process.env.WHATSAPP_API_TOKEN?.trim();
+    const envSession = process.env.WHATSAPP_SESSION_ID?.trim();
+    const envProviderRaw = process.env.WHATSAPP_PROVIDER?.trim().toLowerCase();
     if (envUrl) {
-        return { url: envUrl, token: envToken, enabled: true };
+        const provider: WaProvider =
+            envProviderRaw === 'openwa' || envProviderRaw === 'generic'
+                ? envProviderRaw
+                : envSession
+                  ? 'openwa'
+                  : 'generic';
+        return {
+            provider,
+            url: envUrl,
+            sessionId: envSession || undefined,
+            token: envToken || undefined,
+            enabled: true,
+            envManaged: true,
+        };
     }
 
     try {
@@ -58,38 +187,60 @@ async function resolveGatewayConfig(): Promise<GatewayConfig> {
             .where(eq(systemSettings.key, 'whatsapp_gateway'))
             .limit(1);
         const rawStored = decryptSettingValue(setting?.value);
-        let val:
-            | { webhookUrl?: string; token?: string; enabled?: boolean }
-            | undefined;
+        let val: StoredGatewayJson | undefined;
         if (rawStored) {
             try {
-                val = JSON.parse(rawStored) as {
-                    webhookUrl?: string;
-                    token?: string;
-                    enabled?: boolean;
-                };
+                val = JSON.parse(rawStored) as StoredGatewayJson;
             } catch {
                 val = undefined;
             }
         }
-        if (val?.enabled && val.webhookUrl?.trim()) {
-            return {
-                url: val.webhookUrl.trim(),
-                token: val.token?.trim(),
-                enabled: true,
-            };
-        }
+        const url = (val?.baseUrl ?? val?.webhookUrl ?? '').trim();
+        const sessionId = val?.sessionId?.trim() || undefined;
+        const provider: WaProvider =
+            val?.provider === 'openwa' || val?.provider === 'generic'
+                ? val.provider
+                : sessionId
+                  ? 'openwa'
+                  : 'generic';
+        return {
+            provider,
+            url,
+            sessionId,
+            token: val?.token?.trim() || undefined,
+            enabled: Boolean(val?.enabled && url),
+            envManaged: false,
+        };
     } catch {
         // DB config optional; fallback logging remains available.
     }
 
-    return { url: '', enabled: false };
+    return { provider: 'openwa', url: '', enabled: false, envManaged: false };
+}
+
+async function resolveGatewayConfig(): Promise<GatewayConfig> {
+    const cfg = await readStoredGatewayConfig();
+    if (!cfg.enabled || !cfg.url) {
+        return { ...cfg, url: '', enabled: false };
+    }
+    return cfg;
+}
+
+export async function getWhatsAppGatewaySummary(): Promise<WhatsAppGatewaySummary> {
+    const cfg = await readStoredGatewayConfig();
+    return {
+        provider: cfg.provider,
+        baseUrl: cfg.url,
+        sessionId: cfg.sessionId ?? '',
+        enabled: cfg.enabled,
+        hasToken: Boolean(cfg.token),
+        envManaged: Boolean(cfg.envManaged),
+    };
 }
 
 /**
- * Sends a WhatsApp dispatch through a configured HTTP webhook adapter
- * (Fonnte / Wablas / Meta Cloud / custom gateway) or falls back cleanly to a
- * durable local audit row in `wa_dispatches` when no gateway URL is configured.
+ * Sends a WhatsApp dispatch through OpenWA or a generic HTTP webhook adapter,
+ * or falls back cleanly to a durable local audit row in `wa_dispatches`.
  */
 export async function dispatchWhatsApp(
     input: DispatchWhatsAppInput,
@@ -146,30 +297,77 @@ export async function dispatchWhatsApp(
         };
     }
 
+    const cooldownMs = getCooldownMs(input.eventKind);
+    if (cooldownMs > 0) {
+        const since = new Date(Date.now() - cooldownMs);
+        const [recent] = await db
+            .select({ id: waDispatches.id })
+            .from(waDispatches)
+            .where(
+                and(
+                    eq(waDispatches.recipientPhone, phone),
+                    eq(waDispatches.eventKind, input.eventKind),
+                    eq(waDispatches.deliveryStatus, 'SENT'),
+                    gte(waDispatches.createdAt, since),
+                    input.reportRSId
+                        ? eq(waDispatches.reportRSId, input.reportRSId)
+                        : isNull(waDispatches.reportRSId),
+                ),
+            )
+            .limit(1);
+
+        if (recent) {
+            const [row] = await db
+                .insert(waDispatches)
+                .values({
+                    recipientPhone: phone,
+                    recipientRole: input.recipientRole ?? null,
+                    institutionId: input.institutionId ?? null,
+                    reportRSId: input.reportRSId ?? null,
+                    eventKind: input.eventKind,
+                    message: input.message,
+                    providerMode: 'LOCAL_FALLBACK',
+                    deliveryStatus: 'FALLBACK_LOGGED',
+                    responseMeta: {
+                        skipped: 'duplicate_cooldown',
+                        cooldownMs,
+                        previousDispatchId: recent.id,
+                    },
+                })
+                .returning({ id: waDispatches.id });
+
+            return {
+                id: row.id,
+                providerMode: 'LOCAL_FALLBACK',
+                deliveryStatus: 'FALLBACK_LOGGED',
+                detail: 'Dilewati (cooldown duplikat)',
+            };
+        }
+    }
+
     try {
+        const req = buildWhatsAppRequest(gateway, phone, input);
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8_000);
-        const res = await safeFetch(gateway.url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(gateway.token
-                    ? { Authorization: `Bearer ${gateway.token}` }
-                    : {}),
+        const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
+        const res = await safeFetch(
+            req.url,
+            {
+                method: 'POST',
+                headers: req.headers,
+                body: req.body,
+                signal: controller.signal,
             },
-            body: JSON.stringify({
-                target: phone,
-                phone,
-                message: input.message,
-                eventKind: input.eventKind,
-                reportRSId: input.reportRSId ?? null,
-            }),
-            signal: controller.signal,
-        });
+            { allowedInternalOrigins: getTrustedWhatsAppOrigins() },
+        );
         clearTimeout(timer);
 
         const bodyText = await res.text().catch(() => '');
         const status = res.ok ? 'SENT' : 'FAILED';
+        const rateLimit = parseRateLimitMeta(
+            res.status,
+            bodyText,
+            res.headers.get('retry-after'),
+        );
 
         const [row] = await db
             .insert(waDispatches)
@@ -183,7 +381,9 @@ export async function dispatchWhatsApp(
                 providerMode: 'WEBHOOK',
                 deliveryStatus: status,
                 responseMeta: {
+                    provider: gateway.provider,
                     httpStatus: res.status,
+                    ...(rateLimit.rateLimited ? rateLimit : {}),
                     body: bodyText.slice(0, 500),
                 },
             })
@@ -193,7 +393,11 @@ export async function dispatchWhatsApp(
             id: row.id,
             providerMode: 'WEBHOOK',
             deliveryStatus: status,
-            detail: res.ok ? undefined : `HTTP ${res.status}`,
+            detail: res.ok
+                ? undefined
+                : rateLimit.rateLimited
+                  ? `Rate limited (${rateLimit.code ?? 'HTTP 429'})`
+                  : `HTTP ${res.status}`,
         };
     } catch (err) {
         const reason = err instanceof Error ? err.message : 'Network error';
@@ -208,7 +412,7 @@ export async function dispatchWhatsApp(
                 message: input.message,
                 providerMode: 'WEBHOOK',
                 deliveryStatus: 'FAILED',
-                responseMeta: { error: reason },
+                responseMeta: { provider: gateway.provider, error: reason },
             })
             .returning({ id: waDispatches.id });
 

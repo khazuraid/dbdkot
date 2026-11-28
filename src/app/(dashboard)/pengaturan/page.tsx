@@ -3,6 +3,7 @@ import { getDb } from '@/db';
 import { institutions, users } from '@/db/schema';
 import { requireActor } from '@/lib/session';
 import { listSettings } from '@/lib/domain/admin';
+import { getWhatsAppGatewaySummary } from '@/lib/whatsapp';
 import { PageBody, PageContent, PageHeader } from '@/components/shell/page';
 import { SettingsClient } from './settings-client';
 import type { SettingRow } from './settings-editor';
@@ -17,7 +18,7 @@ export default async function PengaturanPage() {
 
     const db = getDb();
 
-    const [userRows, settingsData] = await Promise.all([
+    const [userRows, settingsData, whatsappGateway] = await Promise.all([
         db
             .select({
                 id: users.id,
@@ -36,6 +37,9 @@ export default async function PengaturanPage() {
         canManageSystem
             ? listSettings(!isAdmin)
             : Promise.resolve({ rows: [] as SettingRow[], total: 0 }),
+        canManageSystem
+            ? getWhatsAppGatewaySummary()
+            : Promise.resolve(undefined),
     ]);
 
     const me = userRows[0];
@@ -51,7 +55,11 @@ export default async function PengaturanPage() {
     }
 
     const { rows: rawSystemSettings, total: totalSettings } = settingsData;
-    const SECRET_KEYS = new Set(['SMTP_PASS', 'REGIONAL_API_KEY']);
+    const SECRET_KEYS = new Set([
+        'SMTP_PASS',
+        'REGIONAL_API_KEY',
+        'whatsapp_gateway',
+    ]);
     const systemSettings = rawSystemSettings.map((row) =>
         SECRET_KEYS.has(row.key) && row.value
             ? { ...row, value: '••••••••' }
@@ -88,6 +96,7 @@ export default async function PengaturanPage() {
                     categories={categories}
                     canManageSystem={canManageSystem}
                     isAdmin={isAdmin}
+                    whatsappGateway={whatsappGateway}
                 />
             </PageContent>
         </PageBody>

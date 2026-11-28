@@ -89,6 +89,15 @@ drizzle/               # SQL migrasi hasil generate
 `ADMIN`, `DINKES`, `PUSKESMAS`, `RUMAH_SAKIT`. Role **server-owned** — registrasi tidak boleh
 menentukan role sendiri (celah C1 pada prototipe lama).
 
+## Deploy 1 Paket di Coolify
+
+Gunakan `compose.coolify.yaml` (berisi `postgres`, `redis`, `migrate`, `app`, `worker`, dan sidecar `openwa`):
+
+1. Di Coolify pilih **Build Pack: Docker Compose** dan isi **Docker Compose Location** = `/compose.coolify.yaml`.
+2. Isi `ADMIN_EMAIL` dan `ADMIN_PASSWORD` (minimal 10 karakter) di **Environment Variables** sebelum deploy pertama agar `migrate` otomatis membuat akun `ADMIN`. Secret (`SERVICE_PASSWORD_64_POSTGRES`, `SERVICE_HEX_64_AUTH`, `SERVICE_REALBASE64_32_PIIENC`, `SERVICE_HEX_64_PIIHASH`, `SERVICE_HEX_64_OPENWA`) dan domain (`SERVICE_URL_APP_3000`, `SERVICE_URL_OPENWA_2785`) dibuat otomatis oleh Coolify.
+3. Setelah deploy, buka domain `openwa` (login memakai nilai `SERVICE_HEX_64_OPENWA`), buat session (mis. `wali-epi`), scan QR WhatsApp, lalu buat API Key.
+4. Login ke WALI-EPI → `/pengaturan` → tab **WhatsApp** → isi URL internal `http://openwa:2785`, Session ID, dan API Key → aktifkan & kirim pesan tes. (Opsional: hapus domain publik `openwa` di Coolify setelah QR terhubung agar dashboard OpenWA hanya internal.)
+
 ## Aturan kerja
 
 - Perubahan schema lewat `npm run db:generate`; migrasi di-commit, `db:push` hanya untuk dev lokal.

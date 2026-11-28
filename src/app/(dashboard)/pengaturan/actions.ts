@@ -16,23 +16,23 @@ import {
 } from '@/lib/security';
 import {
     assertSafeExternalUrl,
+    decryptSettingValue,
     encryptSettingValue,
+    getTrustedWhatsAppOrigins,
     safeFetch,
 } from '@/lib/security-server';
+import { dispatchWhatsApp, normalizeIndonesianPhone } from '@/lib/whatsapp';
 
 const profileUpdateSchema = z.object({
     name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(100),
     whatsappPhone: z
         .string()
         .trim()
-        .refine(
-            (val) => {
-                if (!val) return true;
-                const cleaned = val.replace(/[\s-]/g, '');
-                return /^(\+?62|0|8)[0-9]{7,14}$/.test(cleaned);
-            },
-            'Nomor HP/WhatsApp tidak valid (contoh: 081234567890 atau 6281234567890)',
-        )
+        .refine((val) => {
+            if (!val) return true;
+            const cleaned = val.replace(/[\s-]/g, '');
+            return /^(\+?62|0|8)[0-9]{7,14}$/.test(cleaned);
+        }, 'Nomor HP/WhatsApp tidak valid (contoh: 081234567890 atau 6281234567890)')
         .optional(),
     whatsappOptIn: z.boolean(),
 });
@@ -46,7 +46,8 @@ export async function updateUserProfileAction(input: {
     if (!parsed.success) {
         return {
             ok: false as const,
-            error: parsed.error.issues[0]?.message ?? 'Data profil tidak valid.',
+            error:
+                parsed.error.issues[0]?.message ?? 'Data profil tidak valid.',
         };
     }
 
@@ -163,7 +164,9 @@ export async function changeUserPasswordAction(input: {
         return { ok: true as const };
     } catch (err: unknown) {
         const message =
-            err instanceof Error ? err.message : 'Gagal memperbarui kata sandi.';
+            err instanceof Error
+                ? err.message
+                : 'Gagal memperbarui kata sandi.';
         return {
             ok: false as const,
             error:
@@ -205,7 +208,9 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
     if (!parsed.success) {
         return {
             ok: false as const,
-            error: parsed.error.issues[0]?.message ?? 'Data konfigurasi wilayah tidak valid.',
+            error:
+                parsed.error.issues[0]?.message ??
+                'Data konfigurasi wilayah tidak valid.',
         };
     }
 
@@ -328,7 +333,10 @@ export async function saveRegionalApiSettingsAction(input: RegionalApiConfig) {
         changes: {
             regionalApiSettings: {
                 from: null,
-                to: { provider: parsed.data.provider, baseUrl: parsed.data.baseUrl },
+                to: {
+                    provider: parsed.data.provider,
+                    baseUrl: parsed.data.baseUrl,
+                },
             },
         },
     });
@@ -364,7 +372,12 @@ export async function testRegionalApiConnectionAction(url: string) {
 
         const latency = Date.now() - start;
 
-        if (res.ok || res.status === 404 || res.status === 401 || res.status === 403) {
+        if (
+            res.ok ||
+            res.status === 404 ||
+            res.status === 401 ||
+            res.status === 403
+        ) {
             return {
                 ok: true as const,
                 latency,
@@ -400,9 +413,17 @@ export type BrandingConfig = {
 };
 
 const brandingSchema = z.object({
-    appTitle: z.string().trim().min(2, 'Judul aplikasi minimal 2 karakter').max(100),
+    appTitle: z
+        .string()
+        .trim()
+        .min(2, 'Judul aplikasi minimal 2 karakter')
+        .max(100),
     appTagline: z.string().trim().min(3, 'Tagline minimal 3 karakter').max(200),
-    institutionName: z.string().trim().min(3, 'Nama instansi minimal 3 karakter').max(150),
+    institutionName: z
+        .string()
+        .trim()
+        .min(3, 'Nama instansi minimal 3 karakter')
+        .max(150),
     logoUrl: z
         .string()
         .trim()
@@ -419,8 +440,16 @@ const brandingSchema = z.object({
             'URL favicon hanya boleh path lokal (/...) atau HTTPS yang valid.',
         )
         .optional(),
-    footerText: z.string().trim().min(3, 'Teks footer minimal 3 karakter').max(200),
-    emergencyHotline: z.string().trim().min(3, 'Nomor darurat wajib diisi').max(50),
+    footerText: z
+        .string()
+        .trim()
+        .min(3, 'Teks footer minimal 3 karakter')
+        .max(200),
+    emergencyHotline: z
+        .string()
+        .trim()
+        .min(3, 'Nomor darurat wajib diisi')
+        .max(50),
     supportEmail: z.string().trim().email('Email dukungan tidak valid'),
 });
 
@@ -431,7 +460,8 @@ export async function saveBrandingSettingsAction(input: BrandingConfig) {
     if (!parsed.success) {
         return {
             ok: false as const,
-            error: parsed.error.issues[0]?.message ?? 'Data branding tidak valid.',
+            error:
+                parsed.error.issues[0]?.message ?? 'Data branding tidak valid.',
         };
     }
 
@@ -535,7 +565,9 @@ export async function saveSmtpSettingsAction(formData: FormData) {
     const parsed = smtpSettingsSchema.safeParse({
         host: formData.get('host'),
         port: formData.get('port'),
-        secure: formData.get('secure') === 'true' || formData.get('secure') === 'on',
+        secure:
+            formData.get('secure') === 'true' ||
+            formData.get('secure') === 'on',
         user: formData.get('user'),
         pass: formData.get('pass') ?? '',
         fromEmail: formData.get('fromEmail'),
@@ -545,14 +577,17 @@ export async function saveSmtpSettingsAction(formData: FormData) {
     if (!parsed.success) {
         return {
             ok: false as const,
-            error: parsed.error.issues[0]?.message || 'Input pengaturan SMTP tidak valid',
+            error:
+                parsed.error.issues[0]?.message ||
+                'Input pengaturan SMTP tidak valid',
         };
     }
 
     const db = getDb();
     const now = new Date();
     const submittedPass = parsed.data.pass ?? '';
-    const isMaskedOrBlank = submittedPass === '' || submittedPass === '••••••••';
+    const isMaskedOrBlank =
+        submittedPass === '' || submittedPass === '••••••••';
 
     let finalPass = submittedPass;
     if (isMaskedOrBlank) {
@@ -571,10 +606,26 @@ export async function saveSmtpSettingsAction(formData: FormData) {
     }
 
     const items = [
-        { key: 'SMTP_HOST', value: parsed.data.host, description: 'Host server SMTP (contoh: smtp.sumopod.com)' },
-        { key: 'SMTP_PORT', value: String(parsed.data.port), description: 'Port server SMTP (465 SSL / 587 TLS)' },
-        { key: 'SMTP_SECURE', value: String(parsed.data.secure), description: 'Apakah menggunakan SSL langsung' },
-        { key: 'SMTP_USER', value: parsed.data.user, description: 'Username autentikasi SMTP' },
+        {
+            key: 'SMTP_HOST',
+            value: parsed.data.host,
+            description: 'Host server SMTP (contoh: smtp.sumopod.com)',
+        },
+        {
+            key: 'SMTP_PORT',
+            value: String(parsed.data.port),
+            description: 'Port server SMTP (465 SSL / 587 TLS)',
+        },
+        {
+            key: 'SMTP_SECURE',
+            value: String(parsed.data.secure),
+            description: 'Apakah menggunakan SSL langsung',
+        },
+        {
+            key: 'SMTP_USER',
+            value: parsed.data.user,
+            description: 'Username autentikasi SMTP',
+        },
         ...(isMaskedOrBlank
             ? []
             : [
@@ -584,8 +635,16 @@ export async function saveSmtpSettingsAction(formData: FormData) {
                       description: 'Password autentikasi SMTP',
                   },
               ]),
-        { key: 'SMTP_FROM_EMAIL', value: parsed.data.fromEmail, description: 'Alamat email pengirim default' },
-        { key: 'SMTP_FROM_NAME', value: parsed.data.fromName, description: 'Nama tampilan pengirim email' },
+        {
+            key: 'SMTP_FROM_EMAIL',
+            value: parsed.data.fromEmail,
+            description: 'Alamat email pengirim default',
+        },
+        {
+            key: 'SMTP_FROM_NAME',
+            value: parsed.data.fromName,
+            description: 'Nama tampilan pengirim email',
+        },
     ];
 
     for (const item of items) {
@@ -653,7 +712,8 @@ export async function testSmtpConnectionAction(targetEmail?: string) {
         if (to && to.includes('@')) {
             await sendEmail({
                 to,
-                subject: '[WALI-EPI] Uji Coba Pengiriman Email SMTP Sumopod Berhasil',
+                subject:
+                    '[WALI-EPI] Uji Coba Pengiriman Email SMTP Sumopod Berhasil',
                 text: 'Koneksi ke server SMTP Sumopod berhasil! Layanan pengiriman email siap digunakan untuk verifikasi OTP pendaftaran dan reset kata sandi.',
                 html: `
                     <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -668,8 +728,172 @@ export async function testSmtpConnectionAction(targetEmail?: string) {
 
         return { ok: true as const, recipient: to };
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Gagal menghubungkan ke server SMTP';
+        const message =
+            err instanceof Error
+                ? err.message
+                : 'Gagal menghubungkan ke server SMTP';
         return { ok: false as const, error: message };
     }
 }
 
+const whatsappGatewaySchema = z.object({
+    provider: z.enum(['openwa', 'generic']),
+    baseUrl: z.string().trim().max(500),
+    sessionId: z.string().trim().max(64).optional().default(''),
+    token: z.string().trim().max(500).optional().default(''),
+    enabled: z.boolean(),
+});
+
+export async function saveWhatsAppGatewayAction(input: {
+    provider: 'openwa' | 'generic';
+    baseUrl: string;
+    sessionId?: string;
+    token?: string;
+    enabled: boolean;
+}) {
+    const actor = await requireRole('ADMIN');
+
+    const parsed = whatsappGatewaySchema.safeParse(input);
+    if (!parsed.success) {
+        return {
+            ok: false as const,
+            error:
+                parsed.error.issues[0]?.message ??
+                'Konfigurasi WhatsApp Gateway tidak valid.',
+        };
+    }
+
+    const { provider, baseUrl, sessionId, token, enabled } = parsed.data;
+
+    if (enabled && !baseUrl) {
+        return {
+            ok: false as const,
+            error: 'URL gateway WhatsApp wajib diisi saat diaktifkan.',
+        };
+    }
+
+    if (baseUrl) {
+        try {
+            await assertSafeExternalUrl(baseUrl, {
+                allowedInternalOrigins: getTrustedWhatsAppOrigins(),
+            });
+        } catch (err: unknown) {
+            return {
+                ok: false as const,
+                error:
+                    err instanceof Error
+                        ? err.message
+                        : 'URL gateway WhatsApp tidak valid.',
+            };
+        }
+    }
+
+    if (
+        (enabled &&
+            provider === 'openwa' &&
+            !/^[a-zA-Z0-9_-]{1,64}$/.test(sessionId)) ||
+        (sessionId && !/^[a-zA-Z0-9_-]{1,64}$/.test(sessionId))
+    ) {
+        return {
+            ok: false as const,
+            error: 'Session ID OpenWA wajib berupa huruf, angka, tanda hubung (-), atau garis bawah (_).',
+        };
+    }
+
+    const db = getDb();
+    let finalToken: string | undefined;
+    if (token === MASKED_SECRET) {
+        const [existing] = await db
+            .select({ value: systemSettings.value })
+            .from(systemSettings)
+            .where(eq(systemSettings.key, 'whatsapp_gateway'))
+            .limit(1);
+        const rawStored = decryptSettingValue(existing?.value);
+        if (rawStored) {
+            try {
+                const prev = JSON.parse(rawStored) as { token?: string };
+                finalToken = prev.token?.trim() || undefined;
+            } catch {
+                finalToken = undefined;
+            }
+        }
+    } else {
+        finalToken = token || undefined;
+    }
+
+    const encrypted = encryptSettingValue(
+        JSON.stringify({
+            provider,
+            baseUrl,
+            sessionId: sessionId || undefined,
+            token: finalToken,
+            enabled,
+        }),
+    );
+
+    const now = new Date();
+    await db
+        .insert(systemSettings)
+        .values({
+            key: 'whatsapp_gateway',
+            value: encrypted,
+            type: 'json',
+            category: 'WHATSAPP',
+            description: 'Konfigurasi gateway WhatsApp (OpenWA / Webhook)',
+            isPublic: false,
+            createdAt: now,
+            updatedAt: now,
+        })
+        .onConflictDoUpdate({
+            target: systemSettings.key,
+            set: {
+                value: encrypted,
+                type: 'json',
+                category: 'WHATSAPP',
+                isPublic: false,
+                updatedAt: now,
+            },
+        });
+
+    await audit({
+        actor,
+        action: 'UPDATE',
+        entityType: 'USER',
+        entityId: actor.userId,
+        changes: {
+            whatsappGateway: {
+                from: null,
+                to: { provider, enabled, hasBaseUrl: Boolean(baseUrl) },
+            },
+        },
+    });
+
+    revalidatePath('/pengaturan');
+    return { ok: true as const };
+}
+
+export async function testWhatsAppGatewayAction(targetPhone: string) {
+    const actor = await requireRole('ADMIN');
+    const phone = normalizeIndonesianPhone(targetPhone);
+    if (!phone || phone.length < 8 || phone.length > 16) {
+        return {
+            ok: false as const,
+            error: 'Nomor WhatsApp tujuan tidak valid (contoh: 081234567890).',
+        };
+    }
+
+    const res = await dispatchWhatsApp({
+        recipientPhone: phone,
+        recipientRole: actor.role,
+        eventKind: 'TEST',
+        message:
+            '[WALI-EPI] Tes koneksi WhatsApp Gateway berhasil. Notifikasi surveilans siap dikirim.',
+    });
+
+    return {
+        ok: res.deliveryStatus === 'SENT',
+        deliveryStatus: res.deliveryStatus,
+        providerMode: res.providerMode,
+        detail: res.detail,
+    };
+}

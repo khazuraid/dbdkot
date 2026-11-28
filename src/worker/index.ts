@@ -24,7 +24,7 @@ import {
 import { insertNotifications } from '@/lib/domain/notify';
 import { buildReportExport, type ExportRow } from '@/lib/domain/export';
 import { findSpatialClusterMatches } from '@/lib/spatial-cluster';
-import { dispatchWhatsApp } from '@/lib/whatsapp';
+import { dispatchWhatsApp, normalizeIndonesianPhone } from '@/lib/whatsapp';
 import { enqueueWhatsAppDispatch } from '@/lib/queue';
 
 /**
@@ -69,6 +69,7 @@ async function handleAssign(job: Job<AssignJob>) {
                 await enqueueWhatsAppDispatch({
                     recipientPhone: officer.phone,
                     recipientRole: 'PUSKESMAS',
+                    institutionId: result.puskesmasId,
                     reportRSId: job.data.reportId,
                     eventKind: 'ASSIGNMENT',
                     message: `[WALI-EPI] Kasus DBD baru ditugaskan ke Puskesmas Anda (ID: ${job.data.reportId}). Mohon verifikasi sebelum batas SLA 24 jam.`,
@@ -113,6 +114,18 @@ async function handleSla(job: Job<SlaJob>) {
                     entityId: job.data.reportId,
                 },
             );
+            try {
+                await enqueueWhatsAppDispatch({
+                    recipientPhone: '',
+                    recipientRole: 'PUSKESMAS',
+                    institutionId: row.assignedPuskesmasId,
+                    reportRSId: job.data.reportId,
+                    eventKind: 'PE_SLA_WARNING',
+                    message: `[WALI-EPI] Investigasi PE untuk ${row.reportNumber} melewati batas SLA 72 jam. Mohon segera lengkapi laporan PE.`,
+                });
+            } catch {
+                // Non-blocking WA dispatch
+            }
         }
         await insertNotifications(
             { kind: 'ROLE', role: 'DINKES' },
@@ -124,6 +137,17 @@ async function handleSla(job: Job<SlaJob>) {
                 entityId: job.data.reportId,
             },
         );
+        try {
+            await enqueueWhatsAppDispatch({
+                recipientPhone: '',
+                recipientRole: 'DINKES',
+                reportRSId: job.data.reportId,
+                eventKind: 'PE_SLA_WARNING',
+                message: `[WALI-EPI] Eskalasi PE SLA 72 jam: kasus ${row.reportNumber} belum disubmit Puskesmas.`,
+            });
+        } catch {
+            // Non-blocking WA dispatch
+        }
         return { checked: 1, reminded: 1 };
     }
 
@@ -163,6 +187,18 @@ async function handleSla(job: Job<SlaJob>) {
                         entityId: reportId,
                     },
                 );
+                try {
+                    await enqueueWhatsAppDispatch({
+                        recipientPhone: '',
+                        recipientRole: 'PUSKESMAS',
+                        institutionId: row.assignedPuskesmasId,
+                        reportRSId: reportId,
+                        eventKind: 'SLA_WARNING_6H',
+                        message: `[WALI-EPI] Peringatan SLA: laporan ${row.reportNumber} tersisa 6 jam sebelum batas verifikasi 24 jam.`,
+                    });
+                } catch {
+                    // Non-blocking WA dispatch
+                }
             }
             reminded++;
             continue;
@@ -179,6 +215,18 @@ async function handleSla(job: Job<SlaJob>) {
                     entityId: reportId,
                 },
             );
+            try {
+                await enqueueWhatsAppDispatch({
+                    recipientPhone: '',
+                    recipientRole: 'PUSKESMAS',
+                    institutionId: row.assignedPuskesmasId,
+                    reportRSId: reportId,
+                    eventKind: 'SLA_ESCALATION_24H',
+                    message: `[WALI-EPI] Laporan ${row.reportNumber} melewati batas SLA 24 jam dan dieskalasikan ke Dinkes.`,
+                });
+            } catch {
+                // Non-blocking WA dispatch
+            }
         }
 
         await insertNotifications(
@@ -191,6 +239,17 @@ async function handleSla(job: Job<SlaJob>) {
                 entityId: reportId,
             },
         );
+        try {
+            await enqueueWhatsAppDispatch({
+                recipientPhone: '',
+                recipientRole: 'DINKES',
+                reportRSId: reportId,
+                eventKind: 'SLA_ESCALATION_24H',
+                message: `[WALI-EPI] Eskalasi SLA 24 jam: laporan ${row.reportNumber} belum diterima Puskesmas.`,
+            });
+        } catch {
+            // Non-blocking WA dispatch
+        }
 
         reminded++;
     }
@@ -231,8 +290,14 @@ async function handleNotify(job: Job<NotifyJob>) {
 }
 
 async function handleWhatsAppDispatch(job: Job<WhatsAppDispatchJob>) {
-    const { recipientPhone, recipientRole, reportRSId, eventKind, message } =
-        job.data;
+    const {
+        recipientPhone,
+        recipientRole,
+        institutionId,
+        reportRSId,
+        eventKind,
+        message,
+    } = job.data;
 
     let phones: string[] = recipientPhone ? [recipientPhone] : [];
     if (phones.length === 0 && recipientRole) {
@@ -244,11 +309,11 @@ async function handleWhatsAppDispatch(job: Job<WhatsAppDispatchJob>) {
                     eq(
                         users.role,
                         recipientRole as
-                            | 'ADMIN'
-                            | 'DINKES'
-                            | 'PUSKESMAS'
-                            | 'RUMAH_SAKIT',
+                            'ADMIN' | 'DINKES' | 'PUSKESMAS' | 'RUMAH_SAKIT',
                     ),
+                    ...(institutionId
+                        ? [eq(users.institutionId, institutionId)]
+                        : []),
                     eq(users.whatsappOptIn, true),
                     eq(users.isActive, true),
                     isNotNull(users.whatsappPhone),
@@ -260,11 +325,21 @@ async function handleWhatsAppDispatch(job: Job<WhatsAppDispatchJob>) {
             .filter((p): p is string => Boolean(p));
     }
 
-    if (phones.length === 0) {
+    if (phones.length === 0 && recipientRole === 'DINKES') {
+        const fallbackDinkes = process.env.DINKES_ALERT_PHONE?.trim();
+        if (fallbackDinkes) phones = [fallbackDinkes];
+    }
+
+    const uniquePhones = Array.from(
+        new Set(phones.map((p) => normalizeIndonesianPhone(p)).filter(Boolean)),
+    );
+
+    if (uniquePhones.length === 0) {
         // Still record a SKIPPED audit row so admin/detail page sees the dispatch intent.
         return dispatchWhatsApp({
             recipientPhone: 'UNCONFIGURED',
             recipientRole,
+            institutionId: institutionId ?? null,
             reportRSId,
             eventKind,
             message,
@@ -272,11 +347,16 @@ async function handleWhatsAppDispatch(job: Job<WhatsAppDispatchJob>) {
     }
 
     const results = [];
-    for (const phone of phones) {
+    for (let i = 0; i < uniquePhones.length; i++) {
+        if (i > 0 && results[i - 1]?.providerMode === 'WEBHOOK') {
+            const jitterMs = 2_000 + Math.floor(Math.random() * 2_500);
+            await new Promise((resolve) => setTimeout(resolve, jitterMs));
+        }
         results.push(
             await dispatchWhatsApp({
-                recipientPhone: phone,
+                recipientPhone: uniquePhones[i],
                 recipientRole,
+                institutionId: institutionId ?? null,
                 reportRSId,
                 eventKind,
                 message,
@@ -303,17 +383,11 @@ async function handleClusterDetector(job: Job<ClusterDetectorJob>) {
         .where(eq(reportsRS.id, job.data.reportId))
         .limit(1);
 
-    if (
-        !target ||
-        target.latitude === null ||
-        target.longitude === null
-    ) {
+    if (!target || target.latitude === null || target.longitude === null) {
         return { matched: 0 };
     }
 
-    const cutoff = new Date(
-        target.createdAt.getTime() - 14 * 24 * 3600 * 1000,
-    );
+    const cutoff = new Date(target.createdAt.getTime() - 14 * 24 * 3600 * 1000);
     const candidates = await db
         .select({
             id: reportsRS.id,
@@ -431,15 +505,16 @@ async function handleFoggingScheduler(job: Job<FoggingSchedulerJob>) {
                 entityId: report.id,
             },
         );
-    }
 
-    await enqueueWhatsAppDispatch({
-        recipientPhone: '',
-        recipientRole: 'PUSKESMAS',
-        reportRSId: report.id,
-        eventKind: isReminder ? 'FOGGING_H_MINUS_1' : 'FOGGING_DAY_0',
-        message: `[WALI-EPI] ${title}: ${message}`,
-    });
+        await enqueueWhatsAppDispatch({
+            recipientPhone: '',
+            recipientRole: 'PUSKESMAS',
+            institutionId: report.assignedPuskesmasId,
+            reportRSId: report.id,
+            eventKind: isReminder ? 'FOGGING_H_MINUS_1' : 'FOGGING_DAY_0',
+            message: `[WALI-EPI] ${title}: ${message}`,
+        });
+    }
 
     return { reminded: true };
 }
@@ -509,11 +584,20 @@ async function writeWorkbook(
     return `exports/${name}`;
 }
 
-function startWorker(name: string, handler: (job: Job) => Promise<unknown>) {
+function startWorker(
+    name: string,
+    handler: (job: Job) => Promise<unknown>,
+    opts?: {
+        concurrency?: number;
+        limiter?: { max: number; duration: number };
+    },
+) {
     const worker = new Worker(name, handler, {
         connection: redisConnection(),
-        concurrency: Number(process.env.WORKER_CONCURRENCY ?? 5),
+        concurrency:
+            opts?.concurrency ?? Number(process.env.WORKER_CONCURRENCY ?? 5),
         lockDuration: 60_000,
+        ...(opts?.limiter ? { limiter: opts.limiter } : {}),
     });
 
     worker.on('stalled', (jobId) => {
@@ -603,7 +687,10 @@ async function main() {
         startWorker(QUEUE_NAMES.sla, handleSla),
         startWorker(QUEUE_NAMES.notify, handleNotify),
         startWorker(QUEUE_NAMES.export, handleExport),
-        startWorker(QUEUE_NAMES.whatsappDispatch, handleWhatsAppDispatch),
+        startWorker(QUEUE_NAMES.whatsappDispatch, handleWhatsAppDispatch, {
+            concurrency: 1,
+            limiter: { max: 1, duration: 5_000 },
+        }),
         startWorker(QUEUE_NAMES.clusterDetector, handleClusterDetector),
         startWorker(QUEUE_NAMES.foggingScheduler, handleFoggingScheduler),
     ];
