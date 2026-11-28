@@ -1044,7 +1044,11 @@ export default async function LaporanDetailPage({
                                     </span>
                                     <StatusText
                                         tone={
-                                            w.status === 'SENT' ? 'good' : 'bad'
+                                            w.status === 'SENT'
+                                                ? 'good'
+                                                : w.status === 'FALLBACK_LOGGED'
+                                                  ? 'warn'
+                                                  : 'bad'
                                         }
                                     >
                                         {w.status}

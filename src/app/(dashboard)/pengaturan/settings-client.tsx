@@ -547,7 +547,7 @@ export function SettingsClient({
                         <Panel
                             padded
                             title="Ganti Kata Sandi"
-                            subtitle="Pastikan kata sandi baru Anda minimal 10 karakter dan sulit ditebak"
+                            subtitle="Pastikan kata sandi baru Anda minimal 8 karakter dan sulit ditebak"
                             className="lg:col-span-2"
                         >
                             <form
@@ -632,7 +632,7 @@ export function SettingsClient({
                                                         }),
                                                     );
                                             }}
-                                            placeholder="Minimal 10 karakter"
+                                            placeholder="Minimal 8 karakter"
                                             aria-invalid={Boolean(
                                                 passwordErrors.newPassword,
                                             )}
@@ -692,7 +692,7 @@ export function SettingsClient({
                                     </p>
                                     <ul className="list-inside list-disc space-y-0.5">
                                         <li>
-                                            Minimal 10 karakter sesuai standar
+                                            Minimal 8 karakter sesuai standar
                                             sistem Better-Auth
                                         </li>
                                         <li>

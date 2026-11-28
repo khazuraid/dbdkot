@@ -15,6 +15,7 @@ describe('whatsapp OpenWA adapter & anti-ban helpers', () => {
             '6281234567890',
         );
         expect(normalizeIndonesianPhone('6281234567890')).toBe('6281234567890');
+        expect(normalizeIndonesianPhone('81234567890')).toBe('6281234567890');
         expect(normalizeIndonesianPhone('UNCONFIGURED')).toBe('');
     });
 

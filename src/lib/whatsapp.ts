@@ -62,6 +62,7 @@ export function normalizeIndonesianPhone(raw: string): string {
     if (!digits) return '';
     if (digits.startsWith('0')) return `62${digits.slice(1)}`;
     if (digits.startsWith('62')) return digits;
+    if (digits.startsWith('8')) return `62${digits}`;
     return digits;
 }
 
@@ -349,17 +350,21 @@ export async function dispatchWhatsApp(
         const req = buildWhatsAppRequest(gateway, phone, input);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
-        const res = await safeFetch(
-            req.url,
-            {
-                method: 'POST',
-                headers: req.headers,
-                body: req.body,
-                signal: controller.signal,
-            },
-            { allowedInternalOrigins: getTrustedWhatsAppOrigins() },
-        );
-        clearTimeout(timer);
+        let res: Response;
+        try {
+            res = await safeFetch(
+                req.url,
+                {
+                    method: 'POST',
+                    headers: req.headers,
+                    body: req.body,
+                    signal: controller.signal,
+                },
+                { allowedInternalOrigins: getTrustedWhatsAppOrigins() },
+            );
+        } finally {
+            clearTimeout(timer);
+        }
 
         const bodyText = await res.text().catch(() => '');
         const status = res.ok ? 'SENT' : 'FAILED';

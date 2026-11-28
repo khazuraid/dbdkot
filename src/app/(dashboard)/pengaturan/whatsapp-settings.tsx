@@ -66,9 +66,15 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
                 enabled,
             });
             if (res.ok) {
-                toast.success(
-                    'Konfigurasi WhatsApp Gateway berhasil disimpan.',
-                );
+                if (enabled) {
+                    toast.success(
+                        'Konfigurasi WhatsApp Gateway berhasil disimpan.',
+                    );
+                } else {
+                    toast.warning(
+                        'Konfigurasi disimpan, tetapi pengiriman WhatsApp masih nonaktif. Aktifkan toggle di atas lalu simpan ulang.',
+                    );
+                }
             } else {
                 toast.error(
                     res.error || 'Gagal menyimpan konfigurasi WhatsApp.',
@@ -152,12 +158,23 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
                                 .
                             </p>
                         </div>
-                        <Switch
-                            id="wa-enabled"
-                            checked={enabled}
-                            onCheckedChange={setEnabled}
-                            disabled={!canManage || envManaged}
-                        />
+                        <div className="flex items-center gap-2.5">
+                            <span
+                                className={
+                                    enabled
+                                        ? 'text-[12px] font-medium text-[var(--positive)]'
+                                        : 'text-[12px] font-medium text-muted-foreground'
+                                }
+                            >
+                                {enabled ? 'Aktif' : 'Nonaktif'}
+                            </span>
+                            <Switch
+                                id="wa-enabled"
+                                checked={enabled}
+                                onCheckedChange={setEnabled}
+                                disabled={!canManage || envManaged}
+                            />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -68,11 +69,9 @@
 
     /* Restrained architectural elevation tinted toward Zinc-950 */
     --elev-soft:
-        0 1px 2px rgb(9 9 11 / 0.04),
-        0 6px 20px -12px rgb(9 9 11 / 0.08);
+        0 1px 2px rgb(9 9 11 / 0.04), 0 6px 20px -12px rgb(9 9 11 / 0.08);
     --elev-pop:
-        0 2px 6px rgb(9 9 11 / 0.06),
-        0 20px 44px -16px rgb(9 9 11 / 0.16);
+        0 2px 6px rgb(9 9 11 / 0.06), 0 20px 44px -16px rgb(9 9 11 / 0.16);
 
     /* Consistent shape & spatial scale (4px grid) */
     --radius-card: 12px;
@@ -153,11 +152,8 @@
     --pill-neutral-border: #27272a;
 
     --elev-soft:
-        0 1px 2px rgb(0 0 0 / 0.42),
-        0 8px 24px -12px rgb(0 0 0 / 0.58);
-    --elev-pop:
-        0 2px 6px rgb(0 0 0 / 0.5),
-        0 24px 48px -16px rgb(0 0 0 / 0.72);
+        0 1px 2px rgb(0 0 0 / 0.42), 0 8px 24px -12px rgb(0 0 0 / 0.58);
+    --elev-pop: 0 2px 6px rgb(0 0 0 / 0.5), 0 24px 48px -16px rgb(0 0 0 / 0.72);
 
     --color-scheme: dark;
     color-scheme: dark;
