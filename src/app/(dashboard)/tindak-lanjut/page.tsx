@@ -1,5 +1,6 @@
 import { requireRole } from '@/lib/session';
 import { listFoggingQueue } from '@/lib/domain/fogging';
+import { listPuskesmasWaOfficers } from '@/lib/domain/notify';
 import {
     Empty,
     PageBody,
@@ -16,6 +17,11 @@ export const instant = false;
 export default async function TindakLanjutPage() {
     const actor = await requireRole('ADMIN', 'DINKES', 'PUSKESMAS');
     const items = await listFoggingQueue(actor);
+    const officersByPkm = await listPuskesmasWaOfficers(
+        items
+            .map((i) => i.puskesmasId)
+            .filter((id): id is string => Boolean(id)),
+    );
 
     const canExecute = actor.role === 'DINKES' || actor.role === 'PUSKESMAS';
 
@@ -104,6 +110,12 @@ export default async function TindakLanjutPage() {
                                 canExecute={canExecute}
                                 actorRole={actor.role}
                                 actorInstitutionId={actor.institutionId}
+                                puskesmasOfficers={
+                                    item.puskesmasId
+                                        ? (officersByPkm[item.puskesmasId] ??
+                                          [])
+                                        : []
+                                }
                             />
                         ))}
                     </div>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/session';
 import { listPendingVerifications } from '@/lib/domain/queries';
+import { listPuskesmasWaOfficers } from '@/lib/domain/notify';
 import { CASE_TYPE_LABEL } from '@/lib/domain/report-labels';
 import { formatDate } from '@/lib/format';
 import {
@@ -34,6 +35,11 @@ export default async function VerifikasiPePage({
     const actor = await requireRole('DINKES', 'ADMIN');
     const page = readPage(sp.page);
     const { rows, perPage, total } = await listPendingVerifications(page, 25);
+    const officersByPkm = await listPuskesmasWaOfficers(
+        rows
+            .map((r) => r.puskesmasId)
+            .filter((id): id is string => Boolean(id)),
+    );
 
     return (
         <PageBody>
@@ -189,6 +195,13 @@ export default async function VerifikasiPePage({
                                         institutionId={r.institutionId}
                                         puskesmasId={r.puskesmasId}
                                         puskesmasName={r.puskesmasName}
+                                        puskesmasOfficers={
+                                            r.puskesmasId
+                                                ? (officersByPkm[
+                                                      r.puskesmasId
+                                                  ] ?? [])
+                                                : []
+                                        }
                                         actorRole={actor.role}
                                         actorInstitutionId={actor.institutionId}
                                         peSummary={{

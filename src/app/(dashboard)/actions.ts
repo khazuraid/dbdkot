@@ -265,6 +265,7 @@ export async function sendManualNotificationAction(input: {
     reportId: string;
     context: ManualNotifyContext;
     target: ManualNotifyTarget;
+    puskesmasOfficerId?: string;
     message?: string;
     sendInApp?: boolean;
     sendWhatsApp?: boolean;

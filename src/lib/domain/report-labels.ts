@@ -152,6 +152,12 @@ export type ManualNotifyTargetOption = {
     label: string;
 };
 
+export type PuskesmasOfficerOption = {
+    id: string;
+    name: string;
+    phone: string;
+};
+
 export function buildManualNotifyTargets(params: {
     actorRole: Role;
     actorInstitutionId: string | null;
@@ -182,9 +188,18 @@ export function buildManualNotifyTargets(params: {
     }
 
     if (params.actorRole === 'PUSKESMAS') {
+        if (params.puskesmasId) {
+            options.push({ value: 'PUSKESMAS', label: pkmLabel });
+        }
         options.push({ value: 'DINKES', label: 'Dinas Kesehatan' });
         if (params.reportInstitutionId !== params.actorInstitutionId) {
             options.push({ value: 'FASKES', label: faskesLabel });
+        }
+        if (params.puskesmasId) {
+            options.push({
+                value: 'PUSKESMAS_AND_DINKES',
+                label: 'Puskesmas Wilayah & Dinkes',
+            });
         }
         return options;
     }

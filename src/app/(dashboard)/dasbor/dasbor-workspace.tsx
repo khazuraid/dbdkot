@@ -345,7 +345,7 @@ export function DasborWorkspace({
 
             <div
                 className={cn(
-                    'min-h-0 flex-1 divide-y divide-[var(--rule)] overflow-y-auto overscroll-contain transition-[opacity,filter] duration-150 ease-out',
+                    'min-h-0 flex-1 divide-y divide-[var(--rule)] overflow-y-auto transition-[opacity,filter] duration-150 ease-out lg:overscroll-contain',
                     isPending ? 'opacity-70 blur-[1px]' : 'blur-0 opacity-100',
                 )}
             >
@@ -718,7 +718,7 @@ export function DasborWorkspace({
                                             <X className="size-3.5" />
                                         </Button>
                                     </div>
-                                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3.5">
+                                    <div className="min-h-0 flex-1 overflow-y-auto p-3.5 lg:overscroll-contain">
                                         <ReportDossierContent
                                             detail={selectedDetail}
                                             role={role}

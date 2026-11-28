@@ -28,6 +28,7 @@ import {
     type ManualNotifyContext,
     type ManualNotifyTarget,
     type ManualNotifyTargetOption,
+    type PuskesmasOfficerOption,
 } from '@/lib/domain/report-labels';
 
 const CONTEXT_TITLE: Record<ManualNotifyContext, string> = {
@@ -42,6 +43,8 @@ export function ManualNotifyButton({
     kelurahan,
     context,
     targets,
+    puskesmasName,
+    puskesmasOfficers = [],
     locationUnconfirmed = false,
     label = 'Kirim WA & Notif',
     size = 'sm',
@@ -53,6 +56,8 @@ export function ManualNotifyButton({
     kelurahan: string | null;
     context: ManualNotifyContext;
     targets: ManualNotifyTargetOption[];
+    puskesmasName?: string | null;
+    puskesmasOfficers?: PuskesmasOfficerOption[];
     locationUnconfirmed?: boolean;
     label?: string;
     size?: 'xs' | 'sm' | 'default';
@@ -64,6 +69,7 @@ export function ManualNotifyButton({
     const [target, setTarget] = useState<ManualNotifyTarget>(
         targets[0]?.value ?? 'DINKES',
     );
+    const [officerId, setOfficerId] = useState<string>('ALL');
     const [message, setMessage] = useState(() =>
         buildDefaultManualNotifyMessage({
             context,
@@ -79,9 +85,13 @@ export function ManualNotifyButton({
 
     if (targets.length === 0) return null;
 
+    const targetsPuskesmas =
+        target === 'PUSKESMAS' || target === 'PUSKESMAS_AND_DINKES';
+
     function handleOpenChange(next: boolean) {
         if (next) {
             setTarget(targets[0]?.value ?? 'DINKES');
+            setOfficerId('ALL');
             setMessage(
                 buildDefaultManualNotifyMessage({
                     context,
@@ -109,6 +119,10 @@ export function ManualNotifyButton({
                 reportId,
                 context,
                 target,
+                puskesmasOfficerId:
+                    targetsPuskesmas && officerId !== 'ALL'
+                        ? officerId
+                        : undefined,
                 message: message.trim() || undefined,
                 sendInApp,
                 sendWhatsApp,
@@ -186,9 +200,16 @@ export function ManualNotifyButton({
                             </Label>
                             <Select
                                 value={target}
-                                onValueChange={(v) =>
-                                    setTarget(v as ManualNotifyTarget)
-                                }
+                                onValueChange={(v) => {
+                                    const next = v as ManualNotifyTarget;
+                                    setTarget(next);
+                                    if (
+                                        next !== 'PUSKESMAS' &&
+                                        next !== 'PUSKESMAS_AND_DINKES'
+                                    ) {
+                                        setOfficerId('ALL');
+                                    }
+                                }}
                             >
                                 <SelectTrigger
                                     id={`notify-target-${reportId}-${context}`}
@@ -208,6 +229,59 @@ export function ManualNotifyButton({
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {targetsPuskesmas && (
+                            <div className="space-y-1.5">
+                                <Label
+                                    htmlFor={`notify-officer-${reportId}-${context}`}
+                                >
+                                    Nomor Petugas Puskesmas Wilayah
+                                </Label>
+                                {puskesmasOfficers.length > 0 ? (
+                                    <>
+                                        <Select
+                                            value={officerId}
+                                            onValueChange={setOfficerId}
+                                        >
+                                            <SelectTrigger
+                                                id={`notify-officer-${reportId}-${context}`}
+                                                className="w-full"
+                                            >
+                                                <SelectValue placeholder="Pilih petugas Puskesmas" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">
+                                                    Semua petugas opt-in (
+                                                    {puskesmasOfficers.length}{' '}
+                                                    nomor)
+                                                </SelectItem>
+                                                {puskesmasOfficers.map((o) => (
+                                                    <SelectItem
+                                                        key={o.id}
+                                                        value={o.id}
+                                                    >
+                                                        {o.name} · {o.phone}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-[11.5px] text-muted-foreground">
+                                            Wilayah:{' '}
+                                            {puskesmasName ??
+                                                'Puskesmas terkait'}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--raised)]/60 px-3 py-2 text-[12px] text-muted-foreground">
+                                        Belum ada petugas{' '}
+                                        {puskesmasName ?? 'Puskesmas wilayah'}{' '}
+                                        dengan nomor WhatsApp opt-in aktif.
+                                        Notifikasi tetap dikirim ke in-app
+                                        Puskesmas.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label>Kanal Pengiriman</Label>

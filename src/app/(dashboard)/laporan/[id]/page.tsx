@@ -34,6 +34,7 @@ import {
     STATUS_TONE,
 } from '@/lib/domain/report-labels';
 import { findPuskesmasByKelurahan } from '@/lib/domain/assignment';
+import { listPuskesmasWaOfficers } from '@/lib/domain/notify';
 import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
 import { formatDate, formatNumber } from '@/lib/format';
 import { ReportAction } from './report-action';
@@ -107,6 +108,16 @@ export default async function LaporanDetailPage({
     const fallbackPuskesmas = report.assignedPuskesmasId
         ? null
         : await findPuskesmasByKelurahan(report.kelurahan);
+    const resolvedPuskesmasId =
+        report.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null;
+    const resolvedPuskesmasName =
+        report.assignedPuskesmasName ?? fallbackPuskesmas?.name ?? null;
+    const officersByPkm = resolvedPuskesmasId
+        ? await listPuskesmasWaOfficers([resolvedPuskesmasId])
+        : {};
+    const puskesmasOfficers = resolvedPuskesmasId
+        ? (officersByPkm[resolvedPuskesmasId] ?? [])
+        : [];
     const locationUnconfirmed =
         report.latitude === null || report.longitude === null;
     const manualNotifyTargets = buildManualNotifyTargets({
@@ -114,10 +125,8 @@ export default async function LaporanDetailPage({
         actorInstitutionId: actor.institutionId,
         reportInstitutionId: report.institutionId,
         reportInstitutionName: report.institutionName,
-        puskesmasId:
-            report.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null,
-        puskesmasName:
-            report.assignedPuskesmasName ?? fallbackPuskesmas?.name ?? null,
+        puskesmasId: resolvedPuskesmasId,
+        puskesmasName: resolvedPuskesmasName,
     });
 
     return (
@@ -170,6 +179,8 @@ export default async function LaporanDetailPage({
                             kelurahan={report.kelurahan}
                             context="REPORT"
                             targets={manualNotifyTargets}
+                            puskesmasName={resolvedPuskesmasName}
+                            puskesmasOfficers={puskesmasOfficers}
                             locationUnconfirmed={locationUnconfirmed}
                         />
                         {canManageReport && (
@@ -697,6 +708,8 @@ export default async function LaporanDetailPage({
                                     kelurahan={report.kelurahan}
                                     context="REPORT"
                                     targets={manualNotifyTargets}
+                                    puskesmasName={resolvedPuskesmasName}
+                                    puskesmasOfficers={puskesmasOfficers}
                                     locationUnconfirmed={true}
                                     label="Kirim WA & Notif"
                                     size="xs"
@@ -866,6 +879,8 @@ export default async function LaporanDetailPage({
                                     kelurahan={report.kelurahan}
                                     context="PE"
                                     targets={manualNotifyTargets}
+                                    puskesmasName={resolvedPuskesmasName}
+                                    puskesmasOfficers={puskesmasOfficers}
                                     label="Kirim Notif PE"
                                     size="xs"
                                 />
@@ -1032,6 +1047,8 @@ export default async function LaporanDetailPage({
                                     kelurahan={report.kelurahan}
                                     context="FOGGING"
                                     targets={manualNotifyTargets}
+                                    puskesmasName={resolvedPuskesmasName}
+                                    puskesmasOfficers={puskesmasOfficers}
                                     label="Kirim Notif Fogging"
                                     size="xs"
                                 />
@@ -1101,6 +1118,8 @@ export default async function LaporanDetailPage({
                                 kelurahan={report.kelurahan}
                                 context="REPORT"
                                 targets={manualNotifyTargets}
+                                puskesmasName={resolvedPuskesmasName}
+                                puskesmasOfficers={puskesmasOfficers}
                                 locationUnconfirmed={locationUnconfirmed}
                                 size="xs"
                             />

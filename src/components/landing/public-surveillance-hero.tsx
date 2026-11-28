@@ -499,9 +499,9 @@ export function PublicSurveillanceHero({
         : { duration: reduce ? 0.12 : 0.16, ease: EASE_OUT };
 
     return (
-        <div className="flex h-dvh flex-col overflow-hidden">
+        <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
             {/* Static Command Header (never moves during view transitions) */}
-            <header className="z-30 shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm">
+            <header className="sticky top-0 z-30 shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur-sm lg:static">
                 <nav
                     aria-label="Navigasi command center publik"
                     className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-4 px-4 md:px-6"
@@ -648,14 +648,14 @@ export function PublicSurveillanceHero({
                 </nav>
             </header>
 
-            {/* Single 100dvh Stage: Base Layer stays mounted; Interactive Panel overlays with zero layout shift */}
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* Single 100dvh Stage on lg+; natural document scroll on mobile/tablet */}
+            <main className="relative flex min-h-0 flex-1 flex-col lg:overflow-hidden">
                 {/* Base Layer: Peta + Statistik (permanently mounted — Leaflet never reloads) */}
                 <div
                     aria-hidden={activePanel !== null}
                     inert={activePanel !== null ? true : undefined}
                     className={cn(
-                        'mx-auto flex h-full w-full max-w-[1440px] flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-4 md:px-6 lg:min-h-0 lg:overflow-hidden lg:py-5',
+                        'mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:px-6 md:pb-4 lg:h-full lg:min-h-0 lg:overflow-hidden lg:py-5',
                         viewState.instant
                             ? 'transition-none'
                             : 'transition-[transform,opacity] duration-200 ease-[var(--ease-out)]',
@@ -947,7 +947,7 @@ export function PublicSurveillanceHero({
                         {/* Right Command Column: Full-height Live Leaflet Spatial Map */}
                         <section
                             aria-label="Peta sebaran kasus DBD"
-                            className="flex min-h-[380px] flex-col lg:col-span-7 lg:min-h-0"
+                            className="flex h-[420px] flex-col lg:col-span-7 lg:h-auto lg:min-h-0"
                         >
                             <PublicCaseMap
                                 cases={cases}
@@ -1686,11 +1686,11 @@ export function PublicSurveillanceHero({
                 </SpringSheet>
             </main>
 
-            {/* Mobile Bottom Thumb Dock (<768px): pinned inside 100dvh with safe-area-inset-bottom */}
+            {/* Mobile Bottom Thumb Dock (<768px): fixed to viewport bottom while page scrolls */}
             <nav
                 aria-label="Navigasi bawah mobile"
                 role="tablist"
-                className="z-30 grid shrink-0 grid-cols-4 border-t border-[var(--border)] bg-[var(--surface)]/95 px-1.5 pt-1 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] backdrop-blur-sm md:hidden"
+                className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--surface)]/95 px-1.5 pt-1 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] backdrop-blur-sm md:hidden"
             >
                 {VIEWS.map((item) => {
                     const Icon = item.icon;

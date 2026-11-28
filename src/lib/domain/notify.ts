@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { institutions, notifications, reportsRS, users } from '@/db/schema';
 import { audit } from '@/lib/audit';
@@ -21,12 +21,14 @@ import {
     type ManualNotifyContext,
     type ManualNotifyTarget,
     type ManualNotifyTargetOption,
+    type PuskesmasOfficerOption,
 } from './report-labels';
 
 export type {
     ManualNotifyContext,
     ManualNotifyTarget,
     ManualNotifyTargetOption,
+    PuskesmasOfficerOption,
 };
 export { buildDefaultManualNotifyMessage, buildManualNotifyTargets };
 
@@ -286,12 +288,53 @@ function roleForInstitutionType(
     return 'RUMAH_SAKIT';
 }
 
+export async function listPuskesmasWaOfficers(
+    puskesmasIds: string[],
+): Promise<Record<string, PuskesmasOfficerOption[]>> {
+    const uniqueIds = Array.from(new Set(puskesmasIds.filter(isValidUuid)));
+    if (uniqueIds.length === 0) return {};
+
+    const rows = await getDb()
+        .select({
+            id: users.id,
+            name: users.name,
+            institutionId: users.institutionId,
+            phone: users.whatsappPhone,
+        })
+        .from(users)
+        .where(
+            and(
+                eq(users.role, 'PUSKESMAS'),
+                inArray(users.institutionId, uniqueIds),
+                eq(users.isActive, true),
+                eq(users.status, 'APPROVED'),
+                eq(users.whatsappOptIn, true),
+                isNotNull(users.whatsappPhone),
+            ),
+        )
+        .orderBy(asc(users.name));
+
+    const grouped: Record<string, PuskesmasOfficerOption[]> = {};
+    for (const r of rows) {
+        if (!r.institutionId || !r.phone) continue;
+        const phone = normalizeIndonesianPhone(r.phone);
+        if (!phone) continue;
+        (grouped[r.institutionId] ??= []).push({
+            id: r.id,
+            name: r.name,
+            phone,
+        });
+    }
+    return grouped;
+}
+
 export async function sendManualNotification(
     actor: Actor,
     input: {
         reportId: string;
         context: ManualNotifyContext;
         target: ManualNotifyTarget;
+        puskesmasOfficerId?: string;
         message?: string;
         sendInApp?: boolean;
         sendWhatsApp?: boolean;
@@ -402,7 +445,11 @@ export async function sendManualNotification(
         notifyTarget: NotifyTarget;
         waRole: 'DINKES' | 'PUSKESMAS' | 'RUMAH_SAKIT';
         waInstitutionId: string | null;
+        waPhoneOverride?: string;
     }> = [];
+
+    let selectedOfficer: { id: string; name: string; phone: string } | null =
+        null;
 
     if (
         input.target === 'PUSKESMAS' ||
@@ -414,10 +461,61 @@ export async function sendManualNotification(
                 error: 'Puskesmas wilayah belum terpetakan untuk kelurahan laporan ini.',
             };
         }
+
+        if (input.puskesmasOfficerId) {
+            if (!isValidUuid(input.puskesmasOfficerId)) {
+                return { ok: false, error: 'Petugas Puskesmas tidak valid.' };
+            }
+            const [officer] = await db
+                .select({
+                    id: users.id,
+                    name: users.name,
+                    phone: users.whatsappPhone,
+                    optIn: users.whatsappOptIn,
+                })
+                .from(users)
+                .where(
+                    and(
+                        eq(users.id, input.puskesmasOfficerId),
+                        eq(users.role, 'PUSKESMAS'),
+                        eq(users.institutionId, puskesmas.id),
+                        eq(users.isActive, true),
+                        eq(users.status, 'APPROVED'),
+                    ),
+                )
+                .limit(1);
+
+            if (!officer) {
+                return {
+                    ok: false,
+                    error: 'Petugas Puskesmas tidak ditemukan pada wilayah laporan ini.',
+                };
+            }
+
+            const officerPhone =
+                officer.optIn && officer.phone
+                    ? normalizeIndonesianPhone(officer.phone)
+                    : '';
+            if (sendWhatsApp && !officerPhone) {
+                return {
+                    ok: false,
+                    error: 'Petugas terpilih belum mengaktifkan nomor WhatsApp opt-in.',
+                };
+            }
+            selectedOfficer = {
+                id: officer.id,
+                name: officer.name,
+                phone: officerPhone,
+            };
+        }
+
         targets.push({
-            notifyTarget: { kind: 'INSTITUTION', institutionId: puskesmas.id },
+            notifyTarget: selectedOfficer
+                ? { kind: 'USER', userId: selectedOfficer.id }
+                : { kind: 'INSTITUTION', institutionId: puskesmas.id },
             waRole: 'PUSKESMAS',
             waInstitutionId: puskesmas.id,
+            waPhoneOverride: selectedOfficer?.phone || undefined,
         });
     }
     if (input.target === 'DINKES' || input.target === 'PUSKESMAS_AND_DINKES') {
@@ -455,6 +553,32 @@ export async function sendManualNotification(
         }
 
         if (sendWhatsApp) {
+            if (t.waPhoneOverride) {
+                waOptInCount += 1;
+                const queued = await enqueueWaSafe({
+                    recipientPhone: t.waPhoneOverride,
+                    recipientRole: t.waRole,
+                    institutionId: t.waInstitutionId,
+                    reportRSId: row.id,
+                    eventKind: 'MANUAL_ALERT',
+                    message: finalMessage,
+                });
+                if (queued) {
+                    waQueuedCount += 1;
+                } else {
+                    await dispatchWhatsApp({
+                        recipientPhone: t.waPhoneOverride,
+                        recipientRole: t.waRole,
+                        institutionId: t.waInstitutionId,
+                        reportRSId: row.id,
+                        eventKind: 'MANUAL_ALERT',
+                        message: finalMessage,
+                    });
+                    waDirectCount += 1;
+                }
+                continue;
+            }
+
             const phoneRows = await db
                 .select({ phone: users.whatsappPhone })
                 .from(users)
@@ -466,6 +590,7 @@ export async function sendManualNotification(
                             : []),
                         eq(users.whatsappOptIn, true),
                         eq(users.isActive, true),
+                        eq(users.status, 'APPROVED'),
                         isNotNull(users.whatsappPhone),
                     ),
                 )
@@ -527,6 +652,7 @@ export async function sendManualNotification(
                 to: {
                     context: input.context,
                     target: input.target,
+                    puskesmasOfficerId: selectedOfficer?.id ?? null,
                     inAppCount,
                     waOptInCount,
                     waQueuedCount,
@@ -542,6 +668,8 @@ export async function sendManualNotification(
         waOptInCount,
         waQueuedCount,
         waDirectCount,
-        targetLabel: selectedOption.label,
+        targetLabel: selectedOfficer
+            ? `${selectedOption.label} · ${selectedOfficer.name}`
+            : selectedOption.label,
     };
 }

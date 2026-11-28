@@ -141,7 +141,22 @@ describe('manual notification targets & default messages', () => {
             puskesmasId: 'pkm-1',
             puskesmasName: 'PKM Kejaksan',
         });
-        expect(pkmTargets.map((t) => t.value)).toEqual(['DINKES', 'FASKES']);
+        expect(pkmTargets.map((t) => t.value)).toEqual([
+            'PUSKESMAS',
+            'DINKES',
+            'FASKES',
+            'PUSKESMAS_AND_DINKES',
+        ]);
+
+        const pkmUnassigned = buildManualNotifyTargets({
+            actorRole: 'PUSKESMAS',
+            actorInstitutionId: 'pkm-1',
+            reportInstitutionId: 'rs-1',
+            reportInstitutionName: 'RSUD Gunung Jati',
+            puskesmasId: null,
+            puskesmasName: null,
+        });
+        expect(pkmUnassigned.map((t) => t.value)).toEqual(['DINKES', 'FASKES']);
 
         const dinkesTargets = buildManualNotifyTargets({
             actorRole: 'DINKES',

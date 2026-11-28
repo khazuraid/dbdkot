@@ -31,6 +31,7 @@ import { PeActionToolbar } from '@/app/(dashboard)/pe/pe-actions';
 import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
 import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
 import { findPuskesmasByKelurahan } from '@/lib/domain/assignment';
+import { listPuskesmasWaOfficers } from '@/lib/domain/notify';
 import { institutionChoices } from '@/lib/domain/master';
 import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
 
@@ -106,17 +107,25 @@ export default async function PeDetailPage({
     const fallbackPuskesmas = detail.assignedPuskesmasId
         ? null
         : await findPuskesmasByKelurahan(detail.kelurahan);
+    const resolvedPuskesmasId =
+        detail.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null;
+    const resolvedPuskesmasName =
+        (detail.assignedPuskesmasId
+            ? instNameById.get(detail.assignedPuskesmasId)
+            : fallbackPuskesmas?.name) ?? null;
+    const officersByPkm = resolvedPuskesmasId
+        ? await listPuskesmasWaOfficers([resolvedPuskesmasId])
+        : {};
+    const puskesmasOfficers = resolvedPuskesmasId
+        ? (officersByPkm[resolvedPuskesmasId] ?? [])
+        : [];
     const peNotifyTargets = buildManualNotifyTargets({
         actorRole: actor.role,
         actorInstitutionId: actor.institutionId,
         reportInstitutionId: detail.institutionId,
         reportInstitutionName: instNameById.get(detail.institutionId) ?? null,
-        puskesmasId:
-            detail.assignedPuskesmasId ?? fallbackPuskesmas?.id ?? null,
-        puskesmasName:
-            (detail.assignedPuskesmasId
-                ? instNameById.get(detail.assignedPuskesmasId)
-                : fallbackPuskesmas?.name) ?? null,
+        puskesmasId: resolvedPuskesmasId,
+        puskesmasName: resolvedPuskesmasName,
     });
 
     const abjVal = Number(pe.abj ?? 0);
@@ -215,6 +224,8 @@ export default async function PeDetailPage({
                             kelurahan={detail.kelurahan}
                             context="PE"
                             targets={peNotifyTargets}
+                            puskesmasName={resolvedPuskesmasName}
+                            puskesmasOfficers={puskesmasOfficers}
                             label="Kirim Notif PE"
                         />
                     </div>

@@ -44,7 +44,7 @@ export default async function LandingPage({
               };
 
     return (
-        <div className="h-dvh overflow-hidden bg-[var(--ground)] text-foreground">
+        <div className="min-h-dvh bg-[var(--ground)] text-foreground lg:h-dvh lg:overflow-hidden">
             <PublicSurveillanceHero
                 cases={resolved.cases}
                 summary={resolved.summary}

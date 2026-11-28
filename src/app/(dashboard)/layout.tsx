@@ -102,7 +102,7 @@ export default async function DashboardLayout({
                 <main
                     id="main-content"
                     tabIndex={-1}
-                    className="flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] outline-none md:pb-0"
+                    className="flex min-w-0 flex-1 flex-col overflow-x-clip pb-[calc(5rem+env(safe-area-inset-bottom,0px))] outline-none md:overflow-x-hidden md:overflow-y-auto md:overscroll-contain md:pb-0"
                 >
                     {children}
                 </main>

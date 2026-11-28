@@ -11,7 +11,10 @@ import { StatusText } from '@/components/shell/status-text';
 import { formatDate } from '@/lib/format';
 import type { FoggingQueueItem } from '@/lib/domain/fogging';
 import { foggingCycleSchema } from '@/lib/domain/form-contracts';
-import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
+import {
+    buildManualNotifyTargets,
+    type PuskesmasOfficerOption,
+} from '@/lib/domain/report-labels';
 import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
 import type { Role } from '@/lib/roles';
 import { executeFoggingAction } from './actions';
@@ -28,11 +31,13 @@ export function FoggingCard({
     canExecute,
     actorRole = 'DINKES',
     actorInstitutionId = null,
+    puskesmasOfficers = [],
 }: {
     item: FoggingQueueItem;
     canExecute: boolean;
     actorRole?: Role;
     actorInstitutionId?: string | null;
+    puskesmasOfficers?: PuskesmasOfficerOption[];
 }) {
     const pendingCycle =
         item.cycles.find((c) => c.status !== 'DONE')?.cycleNumber ?? 1;
@@ -131,6 +136,8 @@ export function FoggingCard({
                         kelurahan={item.kelurahan}
                         context="FOGGING"
                         targets={notifyTargets}
+                        puskesmasName={item.puskesmasName}
+                        puskesmasOfficers={puskesmasOfficers}
                         label="Kirim Notif Fogging"
                         size="xs"
                     />

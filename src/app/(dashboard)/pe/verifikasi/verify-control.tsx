@@ -19,7 +19,10 @@ import {
 import { decideVerificationAction } from '@/app/(dashboard)/actions';
 import { AttachmentDropzone } from '@/components/reports/attachment-dropzone';
 import { ManualNotifyButton } from '@/components/reports/manual-notify-button';
-import { buildManualNotifyTargets } from '@/lib/domain/report-labels';
+import {
+    buildManualNotifyTargets,
+    type PuskesmasOfficerOption,
+} from '@/lib/domain/report-labels';
 import type { Role } from '@/lib/roles';
 import { formatDate } from '@/lib/format';
 
@@ -47,6 +50,7 @@ export function VerifyControl({
     institutionId,
     puskesmasId,
     puskesmasName,
+    puskesmasOfficers = [],
     actorRole = 'DINKES',
     actorInstitutionId = null,
     peSummary,
@@ -57,6 +61,7 @@ export function VerifyControl({
     institutionId?: string;
     puskesmasId?: string | null;
     puskesmasName?: string | null;
+    puskesmasOfficers?: PuskesmasOfficerOption[];
     actorRole?: Role;
     actorInstitutionId?: string | null;
     peSummary?: VerificationPeSummary;
@@ -113,6 +118,8 @@ export function VerifyControl({
                     kelurahan={kelurahan ?? null}
                     context="PE"
                     targets={notifyTargets}
+                    puskesmasName={puskesmasName}
+                    puskesmasOfficers={puskesmasOfficers}
                     label="Notif PE"
                     size="xs"
                 />
