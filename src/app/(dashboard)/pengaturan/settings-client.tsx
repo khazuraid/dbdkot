@@ -226,6 +226,9 @@ export function SettingsClient({
         .join('')
         .toUpperCase();
 
+    const tabTriggerClass =
+        'flex h-9 flex-none items-center gap-2 px-3 py-2 text-[13px] font-medium group-data-horizontal/tabs:after:bottom-0';
+
     return (
         <div className="space-y-6">
             <Tabs
@@ -234,24 +237,24 @@ export function SettingsClient({
             >
                 {/* Horizontal Tab Navigation */}
                 <div className="border-b border-[var(--border)]">
-                    <TabsList variant="line" className="-mb-px h-11 gap-4">
-                        <TabsTrigger
-                            value="profil"
-                            className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
-                        >
+                    <TabsList
+                        variant="line"
+                        className="h-auto w-full flex-wrap justify-start gap-x-1.5 gap-y-1 p-0 group-data-horizontal/tabs:h-auto"
+                    >
+                        <TabsTrigger value="profil" className={tabTriggerClass}>
                             <User className="size-4" />
                             Profil & Akun
                         </TabsTrigger>
                         <TabsTrigger
                             value="keamanan"
-                            className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                            className={tabTriggerClass}
                         >
                             <Shield className="size-4" />
-                            Keamanan & Kata Sandi
+                            Keamanan
                         </TabsTrigger>
                         <TabsTrigger
                             value="preferensi"
-                            className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                            className={tabTriggerClass}
                         >
                             <Smartphone className="size-4" />
                             Notifikasi & Tampilan
@@ -260,35 +263,35 @@ export function SettingsClient({
                             <>
                                 <TabsTrigger
                                     value="branding"
-                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                    className={tabTriggerClass}
                                 >
                                     <Sparkles className="size-4" />
                                     Identitas & Logo
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="wilayah"
-                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                    className={tabTriggerClass}
                                 >
                                     <Globe2 className="size-4" />
-                                    API Wilayah (Sumopod)
+                                    API Wilayah
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="smtp"
-                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                    className={tabTriggerClass}
                                 >
                                     <Mail className="size-4" />
-                                    Email & SMTP (Sumopod)
+                                    Email & SMTP
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="whatsapp"
-                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                    className={tabTriggerClass}
                                 >
                                     <MessageSquare className="size-4" />
-                                    WhatsApp (OpenWA)
+                                    WhatsApp
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="sistem"
-                                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] font-medium"
+                                    className={tabTriggerClass}
                                 >
                                     <Settings className="size-4" />
                                     Parameter SLA & DB
