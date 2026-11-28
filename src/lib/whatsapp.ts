@@ -1,6 +1,7 @@
 import { and, eq, gte, isNull } from 'drizzle-orm';
 import { getDb } from '../db';
 import { systemSettings, waDispatches } from '../db/schema';
+import { isValidUuid } from './security';
 import {
     decryptSettingValue,
     getTrustedWhatsAppOrigins,
@@ -106,6 +107,91 @@ export function parseRateLimitMeta(
         if (Number.isFinite(n) && n >= 0) retryAfterSeconds = n;
     }
     return { rateLimited: true, code, retryAfterSeconds };
+}
+
+export function extractGatewayErrorDetail(
+    status: number,
+    bodyText: string,
+): string {
+    let msg = '';
+    const trimmed = bodyText.trim();
+    if (trimmed) {
+        try {
+            const parsed = JSON.parse(trimmed) as {
+                message?: unknown;
+                error?: unknown;
+            };
+            if (Array.isArray(parsed.message)) {
+                msg = parsed.message
+                    .filter((m): m is string => typeof m === 'string')
+                    .join('; ')
+                    .trim();
+            } else if (typeof parsed.message === 'string') {
+                msg = parsed.message.trim();
+            } else if (typeof parsed.error === 'string') {
+                msg = parsed.error.trim();
+            }
+        } catch {
+            if (!/^\s*</.test(trimmed)) {
+                msg = trimmed;
+            }
+        }
+    }
+    if (!msg) return `HTTP ${status}`;
+    const clipped = msg.length > 200 ? `${msg.slice(0, 197)}...` : msg;
+    return `HTTP ${status}: ${clipped}`;
+}
+
+export function matchOpenWaSessionId(
+    sessions: unknown,
+    rawSessionId: string,
+): string | undefined {
+    const raw = rawSessionId.trim();
+    if (!raw || !Array.isArray(sessions)) return undefined;
+    const rows = sessions.filter(
+        (s): s is { id: string; name?: unknown } =>
+            Boolean(s) &&
+            typeof s === 'object' &&
+            typeof (s as { id?: unknown }).id === 'string' &&
+            (s as { id: string }).id.length > 0,
+    );
+    const byId = rows.find((s) => s.id === raw);
+    if (byId) return byId.id;
+    const byName = rows.find((s) => s.name === raw);
+    if (byName) return byName.id;
+    const byPrefix = rows.filter((s) => s.id.startsWith(raw));
+    return byPrefix.length === 1 ? byPrefix[0].id : undefined;
+}
+
+async function resolveOpenWaSessionId(
+    gateway: GatewayConfig,
+): Promise<GatewayConfig> {
+    const raw = gateway.sessionId?.trim() ?? '';
+    if (gateway.provider !== 'openwa' || !raw || isValidUuid(raw)) {
+        return gateway;
+    }
+    const base = gateway.url.trim().replace(/\/+$/, '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    try {
+        const res = await safeFetch(
+            `${base}/api/sessions`,
+            {
+                method: 'GET',
+                headers: gateway.token ? { 'X-API-Key': gateway.token } : {},
+                signal: controller.signal,
+            },
+            { allowedInternalOrigins: getTrustedWhatsAppOrigins() },
+        );
+        if (!res.ok) return gateway;
+        const data: unknown = await res.json().catch(() => null);
+        const resolved = matchOpenWaSessionId(data, raw);
+        return resolved ? { ...gateway, sessionId: resolved } : gateway;
+    } catch {
+        return gateway;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 export function buildWhatsAppRequest(
@@ -347,7 +433,8 @@ export async function dispatchWhatsApp(
     }
 
     try {
-        const req = buildWhatsAppRequest(gateway, phone, input);
+        const resolvedGateway = await resolveOpenWaSessionId(gateway);
+        const req = buildWhatsAppRequest(resolvedGateway, phone, input);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
         let res: Response;
@@ -402,7 +489,7 @@ export async function dispatchWhatsApp(
                 ? undefined
                 : rateLimit.rateLimited
                   ? `Rate limited (${rateLimit.code ?? 'HTTP 429'})`
-                  : `HTTP ${res.status}`,
+                  : extractGatewayErrorDetail(res.status, bodyText),
         };
     } catch (err) {
         const reason = err instanceof Error ? err.message : 'Network error';

@@ -47,8 +47,9 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
     const [baseUrl, setBaseUrl] = useState(
         initial?.baseUrl || 'http://openwa:2785',
     );
-    const [sessionId, setSessionId] = useState(
-        initial?.sessionId || 'wali-epi',
+    const [sessionId, setSessionId] = useState(initial?.sessionId || '');
+    const [hasStoredToken, setHasStoredToken] = useState(
+        Boolean(initial?.hasToken),
     );
     const [token, setToken] = useState(initial?.hasToken ? MASKED_SECRET : '');
     const [testPhone, setTestPhone] = useState('');
@@ -66,6 +67,9 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
                 enabled,
             });
             if (res.ok) {
+                if (token && token !== MASKED_SECRET) {
+                    setHasStoredToken(true);
+                }
                 if (enabled) {
                     toast.success(
                         'Konfigurasi WhatsApp Gateway berhasil disimpan.',
@@ -234,10 +238,15 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
                                     onChange={(e) =>
                                         setSessionId(e.target.value)
                                     }
-                                    placeholder="wali-epi"
+                                    placeholder="UUID penuh (36 karakter) atau nama session"
                                     className="font-mono text-[13px]"
                                     disabled={!canManage || envManaged}
                                 />
+                                <p className="text-[11.5px] text-muted-foreground">
+                                    Salin UUID penuh dari detail session di
+                                    dashboard OpenWA (bukan potongan 12 karakter
+                                    di kartu).
+                                </p>
                             </div>
                         )}
 
@@ -250,30 +259,57 @@ export function WhatsAppSettings({ initial, canManage }: Props) {
                             <div className="relative">
                                 <Input
                                     id="wa-token"
-                                    type={showToken ? 'text' : 'password'}
+                                    type={
+                                        showToken && token !== MASKED_SECRET
+                                            ? 'text'
+                                            : 'password'
+                                    }
                                     value={token}
+                                    onFocus={() => {
+                                        if (token === MASKED_SECRET) {
+                                            setToken('');
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        if (!token && hasStoredToken) {
+                                            setToken(MASKED_SECRET);
+                                        }
+                                    }}
                                     onChange={(e) => setToken(e.target.value)}
-                                    placeholder="Tempel API Key dari dashboard OpenWA"
+                                    placeholder={
+                                        hasStoredToken
+                                            ? 'Tersimpan (biarkan kosong untuk tidak mengubah)'
+                                            : 'Tempel API Key dari dashboard OpenWA'
+                                    }
                                     className="pr-10 font-mono text-[13px]"
                                     disabled={!canManage || envManaged}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowToken((v) => !v)}
-                                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                                    disabled={token === MASKED_SECRET}
+                                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground disabled:opacity-40"
                                     aria-label={
                                         showToken
                                             ? 'Sembunyikan token'
                                             : 'Tampilkan token'
                                     }
                                 >
-                                    {showToken ? (
+                                    {showToken && token !== MASKED_SECRET ? (
                                         <EyeOff className="size-4" />
                                     ) : (
                                         <Eye className="size-4" />
                                     )}
                                 </button>
                             </div>
+                            {hasStoredToken && (
+                                <p className="text-[11.5px] text-muted-foreground">
+                                    API Key tersimpan terenkripsi di server.
+                                    Biarkan kosong atau{' '}
+                                    <code className="font-mono">••••••••</code>{' '}
+                                    jika tidak ingin mengubah.
+                                </p>
+                            )}
                         </div>
                     </div>
 

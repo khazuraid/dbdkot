@@ -802,7 +802,7 @@ export async function saveWhatsAppGatewayAction(input: {
 
     const db = getDb();
     let finalToken: string | undefined;
-    if (token === MASKED_SECRET) {
+    if (token === MASKED_SECRET || token === '') {
         const [existing] = await db
             .select({ value: systemSettings.value })
             .from(systemSettings)

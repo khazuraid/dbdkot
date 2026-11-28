@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
     buildWhatsAppRequest,
+    extractGatewayErrorDetail,
     getCooldownMs,
+    matchOpenWaSessionId,
     normalizeIndonesianPhone,
     parseRateLimitMeta,
 } from '../whatsapp';
@@ -114,5 +116,50 @@ describe('whatsapp OpenWA adapter & anti-ban helpers', () => {
             code: undefined,
             retryAfterSeconds: 15,
         });
+    });
+
+    it('extracts OpenWA JSON error messages and ignores HTML error pages', () => {
+        expect(
+            extractGatewayErrorDetail(
+                400,
+                JSON.stringify({
+                    statusCode: 400,
+                    message:
+                        "Session 'wali-epi' is not active. Start the session first.",
+                    error: 'Bad Request',
+                }),
+            ),
+        ).toBe(
+            "HTTP 400: Session 'wali-epi' is not active. Start the session first.",
+        );
+        expect(
+            extractGatewayErrorDetail(
+                400,
+                JSON.stringify({ message: ['chatId invalid', 'text empty'] }),
+            ),
+        ).toBe('HTTP 400: chatId invalid; text empty');
+        expect(
+            extractGatewayErrorDetail(400, '<html><body>Bad</body></html>'),
+        ).toBe('HTTP 400');
+    });
+
+    it('resolves OpenWA session UUID from exact id, name, or unique 12-char prefix', () => {
+        const sessions = [
+            { id: '8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a', name: 'wali-epi' },
+            { id: '8f3c2b1a-0000-4c7a-8b2f-1e6d5a4c3b2b', name: 'cadangan' },
+        ];
+        expect(
+            matchOpenWaSessionId(
+                sessions,
+                '8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a',
+            ),
+        ).toBe('8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a');
+        expect(matchOpenWaSessionId(sessions, 'wali-epi')).toBe(
+            '8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a',
+        );
+        expect(matchOpenWaSessionId(sessions, '8f3c2b1a-9d4')).toBe(
+            '8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a',
+        );
+        expect(matchOpenWaSessionId(sessions, '8f3c2b1a')).toBeUndefined();
     });
 });
